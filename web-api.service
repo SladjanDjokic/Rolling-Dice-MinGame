@@ -1,0 +1,14 @@
+[Unit]
+Description=AmeraIOT IM Secure Demo Service
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=amera
+WorkingDirectory=/opt/amera/web-api
+ExecStart=/usr/local/bin/pipenv run server
+
+[Install]
+WantedBy=multi-user.target

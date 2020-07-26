@@ -1,0 +1,38 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+coverage = "==5.0.3"
+autopep8 = "*"
+flake8 = "*"
+pylint = "*"
+
+[packages]
+falcon = "==2.0.0"
+limits = "==1.5"
+python-mimeparse = "==1.6.0"
+vyper-config = "==0.6.1"
+webargs = "==5.5.3"
+Beaker = "==1.11.0"
+uWSGI = "==2.0.18"
+gunicorn = "==20.0.4"
+python-dateutil = "==2.8.1"
+meinheld = "==1.0.1"
+falcon-multipart = "==0.2.0"
+falcon-auth = {git = "https://github.com/loanzen/falcon-auth",ref = "v2.0.1"}
+pillow = "*"
+cryptography = "*"
+psycopg2 = "*"
+jinja2 = "*"
+boto3 = "*"
+pytz = "*"
+
+[requires]
+python_version = "3.6"
+
+[scripts]
+"dev" = "python run.py --env-name=LOCAL"
+"docker" = "env GUNICORN_CMD_ARGS=\"--reload\" python run.py --env-name=LOCAL"
+"server" = "python run.py --env-name=PROD"

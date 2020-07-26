@@ -1,0 +1,47 @@
+bind = "0.0.0.0:5000"
+env_name = "PROD"
+app_name = "amera-api"
+gunicorn_preload = true
+log_level = "DEBUG"
+
+[web]
+session_expiration = 14400
+cookie_secure = false
+cookie_domain = "ameraiot.com"
+cookie_path = "/"
+cookie_name = "member_session"
+domain = "ameraiot.com"
+domains = [
+    "ameraiot.com",
+    "amerashare.com",
+    "localhost"
+]
+access_control_allow_origin = "auto"
+member_invite_register_url = "/member/invite/register/{}"
+
+[database]
+port = 5432
+user = "amera"
+password = "${AMERA_DB_PASSWORD}"
+database = "ameraiot"
+log_level = "DEBUG"
+
+[smtp]
+email_from = "support@ameraiot.com"
+server = "secure.emailsrvr.com"
+port = 465
+tls = true
+user = "support@ameraiot.com"
+password = "${SMTP_PASSWORD}"
+
+[services]
+[services.aws]
+access_key_id = "${AWS_ACCESS_KEY_ID}"
+secret_access_key = "${AWS_SECRET_ACCESS_KEY}"
+
+[storage]
+[storage.s3]
+bucket = "file-testing"
+arn = "arn:aws:s3:::file-testing"
+user = "file-upload-test"
+file_location_host = "https://file-testing.s3.us-east-2.amazonaws.com"

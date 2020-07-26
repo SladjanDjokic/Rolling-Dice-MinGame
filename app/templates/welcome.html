@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Welcome to {{product_name}}, {{first_name}}!{% endblock %}
+{% block content %}
+<h2>Welcome to {{product_name}}</h2>
+
+<p>Hello {{first_name}}, </p>
+
+<p>You have been invited to become a member of {{product_name}}, please click <a href="{{register_url}}">here</a> in order to
+    create your password to login</p>
+
+<p>If you are unable to click on the link, please copy paste the following URL into your browser:</p>
+
+<p>{{register_url}}</p>
+
+<p>Thank you!</p>
+{% endblock %}

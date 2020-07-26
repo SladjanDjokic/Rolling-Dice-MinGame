@@ -1,0 +1,3 @@
+[submodule "imsecure"]
+	path = imsecure
+	url = https://github.com/maxtweed/imsecure

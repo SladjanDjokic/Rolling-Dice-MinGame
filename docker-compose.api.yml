@@ -1,0 +1,41 @@
+version: '3.8'
+services:
+  amera-web-api:
+    container_name: amera-web-api
+    image: amera-web-api:latest
+    restart: always
+    build:
+      context: ../web-api
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - amera-web-db
+    networks:
+      - amera-net
+    expose:
+      - 5000
+    volumes:
+      - ../web-api:/app
+      - web-api-python-packages:/root/.local/share
+    command: ['pipenv', 'run', 'docker']
+    # env_file: 
+    #   - ".env.development"
+  amera-web-db:
+    container_name: amera-web-db
+    image: postgres:latest
+    restart: always
+    volumes:
+      - ../web-api/datasource/postgresql/members.sql:/docker-entrypoint-initdb.d/1-members.sql
+      - ../web-api/datasource/postgresql/group.sql:/docker-entrypoint-initdb.d/2-group.sql
+      - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/3-test-member.sql
+    environment:
+      POSTGRES_DB: ameraiot
+      POSTGRES_USER: amera
+      POSTGRES_PASSWORD: amera
+    networks:
+      - amera-net
+volumes:
+  web-api-python-packages: 
+    name: amera-web-api-python-packages
+networks:
+  amera-net: 
+    name: amera-net

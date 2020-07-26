@@ -1,0 +1,9 @@
+*.out
+*.jpg
+*.png
+*.pyc
+*.db
+*.bin
+*.txt
+.DS_Store
+old*.py

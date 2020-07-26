@@ -1,0 +1,18 @@
+ALTER TABLE member_file
+  ADD COLUMN file_ivalue varchar(33);
+
+ALTER TABLE invite
+  ADD COLUMN create_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  ADD COLUMN update_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  ADD COLUMN group_id INT NULL REFERENCES member_group (id),
+  ADD COLUMN country VARCHAR (255) NULL,
+  ADD COLUMN phone_number VARCHAR (255) NULL;
+
+ALTER TABLE member
+    ADD COLUMN date_of_birth DATE NOT NULL DEFAULT CURRENT_DATE;
+    
+ALTER TABLE shared_file
+  ALTER COLUMN group_id TYPE INT USING group_id::INTEGER,
+  ALTER COLUMN group_id DROP NOT NULL,
+  ALTER COLUMN shared_member_id DROP NOT NULL,
+  ADD CONSTRAINT shared_file_group_fk FOREIGN KEY (group_id) REFERENCES member_group (id);
