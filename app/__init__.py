@@ -18,6 +18,7 @@ from app.resources.group import MemberGroupResource, GroupMembershipResource, Gr
 from app.resources.file_sharing import FileStorage, FileStorageDetail, \
     ShareFile, ShareFileDetail, DownloadStorageFile, DownloadSharedFile
 from app.resources.system import SystemActivitySessionResource, SystemActivityInviteResource
+from app.resources.language import LanguageResource
 from app.resources.static import StaticResource
 # from app.resources.memberfile import MemberFile
 # from app.resources.keygen import KeyGenResource, KeyGenFileUpload
@@ -101,3 +102,5 @@ def _setup_routes(app):
 
     app.add_route("/system/activity/invite", SystemActivityInviteResource())
     app.add_route("/system/activity/session", SystemActivitySessionResource())
+
+    app.add_route("/languages", LanguageResource())

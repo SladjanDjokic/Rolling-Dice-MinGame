@@ -1,0 +1,21 @@
+name: Create New Tag
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  create-new-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+        name: Master Branch Checkout
+        with:
+          fetch-depth: "0"
+      - uses: anothrNick/github-tag-action@1.17.2
+        name: Bump version and push tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.AMERA_ACTIONS }}
+          DEFAULT_BUMP: minor
+          WITH_V: true

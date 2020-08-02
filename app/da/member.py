@@ -69,6 +69,7 @@ class MemberDA (object):
                     "status": status,
                     "first_name": first_name,
                     "last_name": last_name,
+                    "member_name": f'{first_name} {last_name}'
                 }
 
                 members.append(member)

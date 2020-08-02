@@ -3,6 +3,9 @@ try:
     import json
 except ImportError:
     import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 if not ujson:
@@ -30,3 +33,10 @@ def parser(obj):
             ' not JSON serializable'
         ).format(type(obj), repr(obj))
         raise TypeError(msg)
+
+
+def load(data):
+    return ujson.load(data)
+
+def dump(data, file):
+    return ujson.dump(data, file, indent=4, sort_keys=True)

@@ -1,0 +1,22 @@
+name: Docker Build
+
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+        name: Master Branch Checkout
+      - uses: mr-smithers-excellent/docker-build-push@v3
+        name: Build & Push Web API Container
+        with:
+          image: amera-web-api
+          registry: 615749211894.dkr.ecr.us-east-2.amazonaws.com
+          dockerfile: Dockerfile.dev
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.ECR_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.ECR_SECRET_ACCESS_KEY }}

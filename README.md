@@ -2,6 +2,10 @@
 
 This API is for the purposes of supporting Amera's Web API
 
+## Run
+
+Run `docker-compose up -d` from the root of the directory.   This depends on the `web`, `web-share` directories, and starts PostgreSQL and a nginx proxy for all applications
+
 ## Dependencies
 
 * gettext includes `envsubst`

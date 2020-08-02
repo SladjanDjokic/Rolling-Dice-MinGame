@@ -245,7 +245,8 @@ class GroupMembershipDA (object):
                         "first_name": elem[1],
                         "last_name": elem[2],
                         "email": elem[3],
-                        "joined_date": elem[4]
+                        "joined_date": elem[4],
+                        "member_name": f'{elem[1]} {elem[2]}'
                     }
                     members.append(member)
             return members
