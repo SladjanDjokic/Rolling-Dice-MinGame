@@ -1,4 +1,4 @@
-version: '3.6'
+version: "3.8"
 services:
   amera-nginx:
     container_name: amera-nginx
@@ -7,7 +7,7 @@ services:
     ports:
       - 9000:9000
       - 9443:443
-    command: [nginx-debug, '-g', 'daemon off;']
+    command: [nginx-debug, "-g", "daemon off;"]
     networks:
       - amera-net
     volumes:
@@ -33,7 +33,7 @@ services:
     volumes:
       - ../web:/app
       - web-main-python-packages:/root/.local/share
-    command: ['pipenv', 'run', 'dev']
+    command: ["pipenv", "run", "dev"]
   amera-web-share:
     container_name: amera-web-share
     image: amera-web-share:latest
@@ -52,7 +52,7 @@ services:
     volumes:
       - ../web-share:/home/node/app
     stdin_open: true
-    command: ['yarn', 'start']
+    command: ["yarn", "start"]
   amera-web-api:
     container_name: amera-web-api
     image: amera-web-api:latest
@@ -69,8 +69,8 @@ services:
     volumes:
       - ../web-api:/app
       - web-api-python-packages:/root/.local/share
-    command: ['pipenv', 'run', 'docker']
-    # env_file: 
+    command: ["pipenv", "run", "docker"]
+    # env_file:
     #   - ".env.development"
   amera-web-db:
     container_name: amera-web-db
@@ -88,17 +88,20 @@ services:
       - ../web-api/datasource/postgresql/scheduler.sql:/docker-entrypoint-initdb.d/5-1-scheduler.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-08-15-schedulersetting.sql:/docker-entrypoint-initdb.d/5-2-schema-updates-2020-08-15-schedulersetting.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/6-test-schedule.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-08-09.sql:/docker-entrypoint-initdb.d/5-1-schema-updates.sql
     environment:
       POSTGRES_DB: ameraiot
       POSTGRES_USER: amera
       POSTGRES_PASSWORD: amera
     networks:
       - amera-net
+    ports:
+      - 5432:5432
 volumes:
-  web-api-python-packages: 
+  web-api-python-packages:
     name: amera-web-api-python-packages
   web-main-python-packages:
     name: amera-web-main-python-packages
 networks:
-  amera-net: 
+  amera-net:
     name: amera-net
