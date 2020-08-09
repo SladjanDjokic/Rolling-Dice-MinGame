@@ -18,39 +18,38 @@ class FileStorageDA(object):
 
     @classmethod
     def store_file_to_storage(cls, file):
-        if file is None:
-            return None
-        
-        try:
-            file_id = str(int(datetime.datetime.now().timestamp() * 1000))
-            # file_name = file_id + "." + file.filename.split(".")[-1]
-            file_name = file_id + "-" + file.filename
-            file_path = cls.refile_path + "/" + file_name
+        file_id = str(int(datetime.datetime.now().timestamp() * 1000))
+        # file_name = file_id + "." + file.filename.split(".")[-1]
+        file_name = file_id + "-" + file.filename
+        file_path = cls.refile_path + "/" + file_name
 
-            logger.debug("Filename: {}".format(file_name))
-            logger.debug("Filepath: {}".format(file_path))
+        logger.debug("Filename: {}".format(file_name))
+        logger.debug("Filepath: {}".format(file_path))
 
-            temp_file_path = file_path + "~"
-            with open(temp_file_path, "wb") as f:
-                f.write(file.file.read())
-            # file has been fully saved to disk move it into place
-            os.rename(temp_file_path, file_path)
+        temp_file_path = file_path + "~"
+        with open(temp_file_path, "wb") as f:
+            f.write(file.file.read())
+        # file has been fully saved to disk move it into place
+        os.rename(temp_file_path, file_path)
 
-            storage_engine = "S3"
-            bucket = settings.get("storage.s3.bucket")
-            s3_location = settings.get("storage.s3.file_location_host")
+        storage_engine = "S3"
+        bucket = settings.get("storage.s3.bucket")
+        s3_location = settings.get("storage.s3.file_location_host")
 
-            uploaded = cls.upload_to_aws(file_path, bucket, file_name)
-            if uploaded:
-                s3_location = f"{s3_location}/{file_name}"
-                file_id = cls.create_file_storage_entry(
-                    s3_location, storage_engine, "available")
-                os.remove(file_path)
-                return file_id
-            else:
-                return None
-        except AttributeError:
-            return None
+        uploaded = cls.upload_to_aws(file_path, bucket, file_name)
+
+        # We are picking filesize here since it is where we work with file system
+        file_size_bytes = os.path.getsize(file_path)
+        logger.debug("File size in bytes: {}".format(file_size_bytes))
+
+        if uploaded:
+            s3_location = f"{s3_location}/{file_name}"
+            file_id = cls.create_file_storage_entry(
+                s3_location, storage_engine, "available")
+            os.remove(file_path)
+            return (file_id, file_size_bytes)
+        else:
+            return (None, None)
 
     @classmethod
     def upload_to_aws(cls, local_file, bucket, s3_file):
@@ -90,14 +89,14 @@ class FileStorageDA(object):
         return file_id[0][0]
 
     @classmethod
-    def create_member_file_entry(cls, file_id, file_name, member_id, status, category = None, iv=None, commit=True):
+    def create_member_file_entry(cls, file_id, file_name, member_id, status, file_size_bytes, iv=None, commit=True):
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query = ("""
             INSERT INTO member_file
-            (file_id, file_name, member_id, status, categories, file_ivalue)
-            VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
+            (file_id, file_name, member_id, status, categories, file_ivalue, file_size_bytes)
+            VALUES (%s, %s, %s, %s, '', %s, %s)
         """)
-        params = (file_id, file_name, member_id, status, category, iv)
+        params = (file_id, file_name, member_id, status, iv, file_size_bytes)
         cls.source.execute(query, params)
 
         if cls.source.has_results():
@@ -205,6 +204,7 @@ class FileStorageDA(object):
                 file_storage_engine.create_date as created_date,
                 file_storage_engine.update_date as updated_date,
                 member_file.file_name as file_name,
+                member_file.file_size_bytes as file_size_bytes,
                 member_file.categories as categories
             FROM file_storage_engine
             LEFT JOIN member_file ON file_storage_engine.id = member_file.file_id
@@ -221,7 +221,8 @@ class FileStorageDA(object):
                 created_date,
                 updated_date,
                 file_name,
-                categories,
+                file_size_bytes,
+                categories
             ) in cls.source.cursor:
                 file_detail = {
                     "file_id": file_id,
@@ -231,6 +232,7 @@ class FileStorageDA(object):
                     "created_date": datetime.datetime.strftime(created_date, "%Y-%m-%d %H:%M:%S"),
                     "updated_date": datetime.datetime.strftime(updated_date, "%Y-%m-%d %H:%M:%S"),
                     "file_name": file_name,
+                    "file_size_bytes": file_size_bytes,
                     "categories": categories,
                     "member_first_name": member.get("first_name"),
                     "member_last_name": member.get("last_name"),
@@ -257,14 +259,16 @@ class FileStorageDA(object):
         #         bucket_name = settings.get("bucket")
         #         delete = cls.remove_aws_object(bucket_name, item_key)
 
-        current_time_with_timezone = datetime.datetime.now(tzlocal()).isoformat().replace("T", " ")
+        current_time_with_timezone = datetime.datetime.now(
+            tzlocal()).isoformat().replace("T", " ")
         query = ("""
             UPDATE file_storage_engine
             SET status = %s, update_date = %s
             WHERE id = %s AND status = %s
         """)
 
-        params = ("deleted", current_time_with_timezone, file_id, "available", )
+        params = ("deleted", current_time_with_timezone,
+                  file_id, "available", )
         res = cls.source.execute(query, params)
         try:
             if commit:
@@ -329,7 +333,8 @@ class FileStorageDA(object):
             "s3",
             region_name=settings.get("services.aws.region_name"),
             aws_access_key_id=settings.get("services.aws.access_key_id"),
-            aws_secret_access_key=settings.get("services.aws.secret_access_key")
+            aws_secret_access_key=settings.get(
+                "services.aws.secret_access_key")
         )
 
 
@@ -345,7 +350,8 @@ class ShareFileDA(object):
         else:
             filter_key = 'shared_member_id'
             filter_value = shared_member_id
-        exist = cls.check_shared_exist(file_id, member_id, filter_key, filter_value)
+        exist = cls.check_shared_exist(
+            file_id, member_id, filter_key, filter_value)
         if exist:
             return False
         else:

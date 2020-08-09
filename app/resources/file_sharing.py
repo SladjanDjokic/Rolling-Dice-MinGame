@@ -27,10 +27,11 @@ class FileStorage(object):
             for index in range(0, file_count):
                 file = req.get_param(f'file{index}')
                 iv = req.get_param(f'file{index}.iv')
-                file_id = FileStorageDA().store_file_to_storage(file)
+                (file_id, file_size_bytes) = FileStorageDA(
+                ).store_file_to_storage(file)
                 status = 'available'
                 res = FileStorageDA().create_member_file_entry(
-                    file_id, file.filename, member_id, status, category, iv)
+                    file_id=file_id, file_name=file.filename, member_id=member_id, status=status, file_size_bytes=file_size_bytes, iv=iv)
                 if not res:
                     raise "Unable to create member_file_entry"
                 member_file = FileStorageDA().get_member_file(member, file_id)
@@ -41,7 +42,7 @@ class FileStorage(object):
                 "data": member_files,
                 "description": "File uploaded successfully",
                 "success": True
-            })  
+            })
         except Exception as e:
             resp.body = json.dumps({
                 "message": e,
@@ -184,7 +185,8 @@ class ShareFile(object):
             session = validate_session(session_id)
             member_id = session["member_id"]
             if member_id:
-                (shared_key_list, ) = request.get_json_or_form("shared_key_list", req=req)
+                (shared_key_list, ) = request.get_json_or_form(
+                    "shared_key_list", req=req)
                 removed_key_list = list()
                 for shared_key in shared_key_list:
                     removed_key = ShareFileDA().remove_sharing(shared_key)
