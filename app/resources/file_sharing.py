@@ -26,12 +26,18 @@ class FileStorage(object):
             member_files = list()
             for index in range(0, file_count):
                 file = req.get_param(f'file{index}')
+                file_size_bytes = req.get_param(f'file{index}_size')
+                file_name = file.filename
+                # Will be '' for a non folder upload
+                # form_relative_key = req.get_param(
+                # f'file{index}_relative_path')
+                # file_key_path = form_relative_key if form_relative_key != '' else file_name
                 iv = req.get_param(f'file{index}.iv')
-                (file_id, file_size_bytes) = FileStorageDA(
+                file_id = FileStorageDA(
                 ).store_file_to_storage(file)
                 status = 'available'
                 res = FileStorageDA().create_member_file_entry(
-                    file_id=file_id, file_name=file.filename, member_id=member_id, status=status, file_size_bytes=file_size_bytes, iv=iv)
+                    file_id=file_id, file_name=file_name, member_id=member_id, status=status, file_size_bytes=file_size_bytes, iv=iv)
                 if not res:
                     raise "Unable to create member_file_entry"
                 member_file = FileStorageDA().get_member_file(member, file_id)

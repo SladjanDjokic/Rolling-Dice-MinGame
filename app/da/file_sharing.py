@@ -8,6 +8,7 @@ from botocore.exceptions import NoCredentialsError, ClientError
 
 from app.util.db import source
 from app.config import settings
+from app.util.os import safe_open
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +21,19 @@ class FileStorageDA(object):
     def store_file_to_storage(cls, file):
         file_id = str(int(datetime.datetime.now().timestamp() * 1000))
         # file_name = file_id + "." + file.filename.split(".")[-1]
-        file_name = file_id + "-" + file.filename
-        file_path = cls.refile_path + "/" + file_name
+        # Отрезать от имени файла путь к папке
+        keyed_filename = file.filename
+        (dirname, filename) = os.path.split(keyed_filename)
+        file_name = file_id + "-" + filename
+        dir_path = cls.refile_path + "/" + dirname + "/"
+        file_path = dir_path + file_name
 
         logger.debug("Filename: {}".format(file_name))
         logger.debug("Filepath: {}".format(file_path))
 
+        # Use utility to create folder if it doesn't exist'
         temp_file_path = file_path + "~"
-        with open(temp_file_path, "wb") as f:
+        with safe_open(temp_file_path, "wb") as f:
             f.write(file.file.read())
         # file has been fully saved to disk move it into place
         os.rename(temp_file_path, file_path)
@@ -36,20 +42,17 @@ class FileStorageDA(object):
         bucket = settings.get("storage.s3.bucket")
         s3_location = settings.get("storage.s3.file_location_host")
 
-        uploaded = cls.upload_to_aws(file_path, bucket, file_name)
+        uploaded = cls.upload_to_aws(file_path, bucket, keyed_filename)
 
-        # We are picking filesize here since it is where we work with file system
-        file_size_bytes = os.path.getsize(file_path)
-        logger.debug("File size in bytes: {}".format(file_size_bytes))
-
+        # Handle keyed filenames here
         if uploaded:
-            s3_location = f"{s3_location}/{file_name}"
+            s3_location = f"{s3_location}/{keyed_filename}"
             file_id = cls.create_file_storage_entry(
                 s3_location, storage_engine, "available")
             os.remove(file_path)
-            return (file_id, file_size_bytes)
+            return file_id
         else:
-            return (None, None)
+            return None
 
     @classmethod
     def upload_to_aws(cls, local_file, bucket, s3_file):
