@@ -1,5 +1,6 @@
 import os
 import datetime
+from urllib.parse import urlparse
 from dateutil.tz import tzlocal
 import secrets
 import logging
@@ -21,7 +22,6 @@ class FileStorageDA(object):
     def store_file_to_storage(cls, file):
         file_id = str(int(datetime.datetime.now().timestamp() * 1000))
         # file_name = file_id + "." + file.filename.split(".")[-1]
-        # Отрезать от имени файла путь к папке
         keyed_filename = file.filename
         (dirname, filename) = os.path.split(keyed_filename)
         file_name = file_id + "-" + filename
@@ -303,7 +303,10 @@ class FileStorageDA(object):
                 file_ivalue = file[1]
                 if not file_ivalue:
                     file_ivalue = ""
-                item_key = file_url.split("/")[3]
+                #  url is "https://file-testing.s3.us-east-2.amazonaws.com/folder1/foldder2/file.ext"
+                item_key = urlparse(file_url).path
+                # logger.info("item key", item_key)
+                # item_key = file_url.split("/")[3]
                 download = cls.download_aws_object(
                     bucket_name, item_key, file_ivalue)
                 if download:
@@ -325,14 +328,18 @@ class FileStorageDA(object):
         """
         s3 = cls.aws_s3_client()
         static_path = os.path.join(os.getcwd(), "static")
-        if not os.path.exists(static_path):
-            os.mkdir(static_path)
-
-        file_path = f"{static_path}/{item_key}"
+        (dirname, filename) = os.path.split(item_key)
+        dirname = dirname if dirname != "/" else ''
+        dir_path = f"{static_path}{dirname}"
+        if not os.path.exists(dir_path):
+            os.mkdir(dir_path)
+        file_path = f"{dir_path}/{filename}"
         if file_ivalue:
-            file_path = f"{static_path}/{item_key}{file_ivalue}"
-        s3.download_file(bucket_name, item_key, item_key)
-        os.replace(item_key, file_path)
+            file_path = f"{dir_path}/{filename}{file_ivalue}"
+        logging.info('Static path', file_path)
+        logging.info('iTEM KEY', item_key)
+        s3.download_file(bucket_name, item_key.lstrip('/'), file_path)
+        # os.replace(item_key, file_path)
         return True
 
     @staticmethod
