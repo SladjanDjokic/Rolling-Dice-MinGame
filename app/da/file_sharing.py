@@ -118,6 +118,7 @@ class FileStorageDA(object):
                 member_file.file_id as file_id,
                 member_file.file_name as file_name,
                 member_file.categories as categories,
+                member_file.file_size_bytes as file_size_bytes,
                 file_storage_engine.storage_engine_id as file_link,
                 file_storage_engine.storage_engine as storage_engine,
                 file_storage_engine.status as status,
@@ -138,6 +139,7 @@ class FileStorageDA(object):
                 file_id,
                 file_name,
                 categories,
+                file_size_bytes,
                 file_link,
                 storage_engine,
                 status,
@@ -148,6 +150,7 @@ class FileStorageDA(object):
                     "file_id": file_id,
                     "file_name": file_name,
                     "categories": categories,
+                    "file_size_bytes": file_size_bytes,
                     "file_url": file_link,
                     "storage_engine": storage_engine,
                     "status": status,
@@ -165,6 +168,7 @@ class FileStorageDA(object):
                     member_file.file_id as file_id,
                     member_file.file_name as file_name,
                     member_file.categories as categories,
+                    member_file.file_size_bytes as file_size_bytes,
                     CASE WHEN 
                         (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '')
                         THEN 'unencrypted'
@@ -187,11 +191,12 @@ class FileStorageDA(object):
                     "file_id": entry_da[0],
                     "file_name": entry_da[1],
                     "categories": entry_da[2],
-                    "file_status": entry_da[3],
-                    "storage_engine": entry_da[4],
-                    "status": entry_da[5],
+                    "file_size_bytes": entry_da[3],
+                    "file_status": entry_da[4],
+                    "storage_engine": entry_da[5],
+                    "status": entry_da[6],
                     "member": member["first_name"],
-                    "create_date": datetime.datetime.strftime(entry_da[6], "%Y-%m-%d %H:%M:%S")
+                    "create_date": datetime.datetime.strftime(entry_da[7], "%Y-%m-%d %H:%M:%S")
                 }
                 entry.append(entry_element)
             return entry
