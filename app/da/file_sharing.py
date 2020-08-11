@@ -305,8 +305,6 @@ class FileStorageDA(object):
                     file_ivalue = ""
                 #  url is "https://file-testing.s3.us-east-2.amazonaws.com/folder1/foldder2/file.ext"
                 item_key = urlparse(file_url).path
-                # logger.info("item key", item_key)
-                # item_key = file_url.split("/")[3]
                 download = cls.download_aws_object(
                     bucket_name, item_key, file_ivalue)
                 if download:
@@ -328,18 +326,25 @@ class FileStorageDA(object):
         """
         s3 = cls.aws_s3_client()
         static_path = os.path.join(os.getcwd(), "static")
+        temp_path = os.path.join(os.getcwd(), "temp")
+        for path in [static_path, temp_path]:
+            if not os.path.exists(path):
+                os.mkdir(path)
+        '''
+        If file is nested within a folder on s3, its key will look like "folder/another/filename.ext"
+        We want to address that when we download, but can't keep that folder structure in static i.e.
+        the path to file will be "static/filename.ext" and it's ok since we flush after download
+        '''
         (dirname, filename) = os.path.split(item_key)
-        dirname = dirname if dirname != "/" else ''
-        dir_path = f"{static_path}{dirname}"
-        if not os.path.exists(dir_path):
-            os.mkdir(dir_path)
-        file_path = f"{dir_path}/{filename}"
+        temp_file_path = f"{temp_path}/{filename}"
+        file_path = f"{static_path}/{filename}"
         if file_ivalue:
-            file_path = f"{dir_path}/{filename}{file_ivalue}"
-        logging.info('Static path', file_path)
-        logging.info('iTEM KEY', item_key)
-        s3.download_file(bucket_name, item_key.lstrip('/'), file_path)
-        # os.replace(item_key, file_path)
+            file_path = f"{static_path}/{filename}{file_ivalue}"
+            temp_file_path = f"{temp_path}/{filename}{file_ivalue}"
+        logger.info(
+            f"Item key for s3 request {item_key.lstrip('/')}, file path to store in static {file_path}")
+        s3.download_file(bucket_name, item_key.lstrip('/'), temp_file_path)
+        os.replace(temp_file_path, file_path)
         return True
 
     @staticmethod
