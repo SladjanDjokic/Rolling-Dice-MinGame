@@ -1,6 +1,6 @@
 import os
 import datetime
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 from dateutil.tz import tzlocal
 import secrets
 import logging
@@ -20,36 +20,38 @@ class FileStorageDA(object):
 
     @classmethod
     def store_file_to_storage(cls, file):
+        '''
+        We are saving nested "some_folder/some-file.ext" and unnested "some-file.ext" files.
+        Since we do this file-by-file - we ignore the file path during disk save, i.e. "some_folder/some-file.ext" => "some-file.ext"
+        But we keep that structure in aws
+        '''
         file_id = str(int(datetime.datetime.now().timestamp() * 1000))
         # file_name = file_id + "." + file.filename.split(".")[-1]
-        keyed_filename = file.filename
-        (dirname, filename) = os.path.split(keyed_filename)
-        file_name = file_id + "-" + filename
-        dir_path = cls.refile_path + "/" + dirname + "/"
-        file_path = dir_path + file_name
-
-        logger.debug("Filename: {}".format(file_name))
-        logger.debug("Filepath: {}".format(file_path))
+        (dirname, true_filename) = os.path.split(file.filename)
+        file_name = file_id + "-" + true_filename
+        local_path = f"{cls.refile_path}/{file_name}"
+        storage_key = f"{dirname}/{file_name}"
 
         # Use utility to create folder if it doesn't exist'
-        temp_file_path = file_path + "~"
+        temp_file_path = local_path + "~"
         with safe_open(temp_file_path, "wb") as f:
             f.write(file.file.read())
         # file has been fully saved to disk move it into place
-        os.rename(temp_file_path, file_path)
+        os.rename(temp_file_path, local_path)
 
         storage_engine = "S3"
         bucket = settings.get("storage.s3.bucket")
         s3_location = settings.get("storage.s3.file_location_host")
 
-        uploaded = cls.upload_to_aws(file_path, bucket, keyed_filename)
+        uploaded = cls.upload_to_aws(local_path, bucket, storage_key)
 
         # Handle keyed filenames here
         if uploaded:
-            s3_location = f"{s3_location}/{keyed_filename}"
+            # s3_location = f"{s3_location}/{storage_key}"
+            s3_file_location = urljoin(s3_location, storage_key)
             file_id = cls.create_file_storage_entry(
-                s3_location, storage_engine, "available")
-            os.remove(file_path)
+                s3_file_location, storage_engine, "available")
+            os.remove(local_path)
             return file_id
         else:
             return None
@@ -326,25 +328,21 @@ class FileStorageDA(object):
         """
         s3 = cls.aws_s3_client()
         static_path = os.path.join(os.getcwd(), "static")
-        temp_path = os.path.join(os.getcwd(), "temp")
-        for path in [static_path, temp_path]:
-            if not os.path.exists(path):
-                os.mkdir(path)
+        if not os.path.exists(static_path):
+            os.mkdir(static_path)
         '''
-        If file is nested within a folder on s3, its key will look like "folder/another/filename.ext"
+        If file is nested within a folder on s3, its key will look like "folder/another/121212-filename.ext"
         We want to address that when we download, but can't keep that folder structure in static i.e.
-        the path to file will be "static/filename.ext" and it's ok since we flush after download
+        the path to file will be "static/121212-filename.ext" 
         '''
         (dirname, filename) = os.path.split(item_key)
-        temp_file_path = f"{temp_path}/{filename}"
         file_path = f"{static_path}/{filename}"
         if file_ivalue:
-            file_path = f"{static_path}/{filename}{file_ivalue}"
-            temp_file_path = f"{temp_path}/{filename}{file_ivalue}"
-        logger.info(
-            f"Item key for s3 request {item_key.lstrip('/')}, file path to store in static {file_path}")
-        s3.download_file(bucket_name, item_key.lstrip('/'), temp_file_path)
-        os.replace(temp_file_path, file_path)
+            file_path = f"{static_path}/{filename}{file_ivalue}~"
+        # to feed s3.download with the correct key (having or not having /) depending on whether it is a nested key or not
+        key = item_key if dirname == '/' else item_key.lstrip('/')
+
+        s3.download_file(bucket_name, key, file_path)
         return True
 
     @staticmethod
