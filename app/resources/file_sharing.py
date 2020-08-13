@@ -27,7 +27,7 @@ class FileStorage(object):
             for index in range(0, file_count):
                 file = req.get_param(f'file{index}')
                 file_size_bytes = req.get_param(f'file{index}_size')
-                file_name = file.filename
+                file_name = req.get_param(f'file{index}_key')
                 # Will be '' for a non folder upload
                 # form_relative_key = req.get_param(
                 # f'file{index}_relative_path')
