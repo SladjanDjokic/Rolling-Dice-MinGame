@@ -124,7 +124,8 @@ class FileStorageDA(object):
                 file_storage_engine.storage_engine_id as file_link,
                 file_storage_engine.storage_engine as storage_engine,
                 file_storage_engine.status as status,
-                file_storage_engine.create_date as create_date,
+                file_storage_engine.create_date as created_date,
+                file_storage_engine.update_date as updated_date,
                 CASE WHEN 
                     (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '') 
                     THEN 'unencrypted'
@@ -145,7 +146,8 @@ class FileStorageDA(object):
                 file_link,
                 storage_engine,
                 status,
-                create_date,
+                created_date,
+                updated_date,
                 file_status,
             ) in cls.source.cursor:
                 member_file = {
@@ -157,7 +159,8 @@ class FileStorageDA(object):
                     "storage_engine": storage_engine,
                     "status": status,
                     "member": member["first_name"],
-                    "create_date": datetime.datetime.strftime(create_date, "%Y-%m-%d %H:%M:%S"),
+                    "created_date": datetime.datetime.strftime(created_date, "%Y-%m-%d %H:%M:%S"),
+                    "updated_date": datetime.datetime.strftime(updated_date, "%Y-%m-%d %H:%M:%S"),
                     "file_status": file_status
                 }
                 return member_file
@@ -178,7 +181,8 @@ class FileStorageDA(object):
                     END as file_status,
                     file_storage_engine.storage_engine as storage_engine,
                     file_storage_engine.status as status,
-                    file_storage_engine.create_date as create_date
+                    file_storage_engine.create_date as created_date,
+                    file_storage_engine.update_date as updated_date,
                 FROM member_file
                 LEFT JOIN file_storage_engine ON file_storage_engine.id = member_file.file_id
                 WHERE member_file.member_id = %s AND file_storage_engine.status = %s
@@ -198,7 +202,8 @@ class FileStorageDA(object):
                     "storage_engine": entry_da[5],
                     "status": entry_da[6],
                     "member": member["first_name"],
-                    "create_date": datetime.datetime.strftime(entry_da[7], "%Y-%m-%d %H:%M:%S")
+                    "created_date": datetime.datetime.strftime(entry_da[7], "%Y-%m-%d %H:%M:%S"),
+                    "updated_date": datetime.datetime.strftime(entry_da[8], "%Y-%m-%d %H:%M:%S")
                 }
                 entry.append(entry_element)
             return entry
