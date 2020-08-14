@@ -23,7 +23,6 @@ class FileStorage(object):
             return
         try:
             file_count = int(file_length)
-            member_files = list()
             for index in range(0, file_count):
                 file = req.get_param(f'file{index}')
                 file_size_bytes = req.get_param(f'file{index}_size')
@@ -42,12 +41,10 @@ class FileStorage(object):
                     # We are deleting duplicates if the user requested file overwrites
                     for file_id in file_ids_to_delete:
                         FileStorageDA().delete_file(file_id)
-                member_file = FileStorageDA().get_member_file(member, file_id)
 
-                member_files.insert(0, member_file)
-
+            # Since is is possible that some files are deleted after this upload, we have to push _all_ member files to front
             resp.body = json.dumps({
-                "data": member_files,
+                "data": FileStorageDA().get_member_files(member),
                 "description": "File uploaded successfully",
                 "success": True
             })

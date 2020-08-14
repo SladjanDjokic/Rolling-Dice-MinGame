@@ -174,15 +174,16 @@ class FileStorageDA(object):
                     member_file.file_name as file_name,
                     member_file.categories as categories,
                     member_file.file_size_bytes as file_size_bytes,
-                    CASE WHEN 
-                        (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '')
-                        THEN 'unencrypted'
-                        ELSE 'encrypted'
-                    END as file_status,
+                    file_storage_engine.storage_engine_id as file_link,
                     file_storage_engine.storage_engine as storage_engine,
                     file_storage_engine.status as status,
                     file_storage_engine.create_date as created_date,
                     file_storage_engine.update_date as updated_date,
+                    CASE WHEN 
+                        (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '')
+                        THEN 'unencrypted'
+                        ELSE 'encrypted'
+                    END as file_status
                 FROM member_file
                 LEFT JOIN file_storage_engine ON file_storage_engine.id = member_file.file_id
                 WHERE member_file.member_id = %s AND file_storage_engine.status = %s
@@ -198,12 +199,13 @@ class FileStorageDA(object):
                     "file_name": entry_da[1],
                     "categories": entry_da[2],
                     "file_size_bytes": entry_da[3],
-                    "file_status": entry_da[4],
+                    "file_link": entry_da[4],
                     "storage_engine": entry_da[5],
                     "status": entry_da[6],
-                    "member": member["first_name"],
                     "created_date": datetime.datetime.strftime(entry_da[7], "%Y-%m-%d %H:%M:%S"),
-                    "updated_date": datetime.datetime.strftime(entry_da[8], "%Y-%m-%d %H:%M:%S")
+                    "updated_date": datetime.datetime.strftime(entry_da[8], "%Y-%m-%d %H:%M:%S"),
+                    "file_status": entry_da[9],
+                    "member": member["first_name"]
                 }
                 entry.append(entry_element)
             return entry
@@ -274,7 +276,7 @@ class FileStorageDA(object):
         #         bucket_name = settings.get("bucket")
         #         delete = cls.remove_aws_object(bucket_name, item_key)
 
-        logger.info(f"Deleting {file_id}")
+        # logger.info(f"Deleting {file_id}")
         current_time_with_timezone = datetime.datetime.now(
             tzlocal()).isoformat().replace("T", " ")
         query = ("""
