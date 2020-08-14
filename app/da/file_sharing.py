@@ -274,6 +274,7 @@ class FileStorageDA(object):
         #         bucket_name = settings.get("bucket")
         #         delete = cls.remove_aws_object(bucket_name, item_key)
 
+        logger.info(f"Deleting {file_id}")
         current_time_with_timezone = datetime.datetime.now(
             tzlocal()).isoformat().replace("T", " ")
         query = ("""

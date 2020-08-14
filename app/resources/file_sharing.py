@@ -28,10 +28,8 @@ class FileStorage(object):
                 file = req.get_param(f'file{index}')
                 file_size_bytes = req.get_param(f'file{index}_size')
                 file_name = req.get_param(f'file{index}_key')
-                # Will be '' for a non folder upload
-                # form_relative_key = req.get_param(
-                # f'file{index}_relative_path')
-                # file_key_path = form_relative_key if form_relative_key != '' else file_name
+                file_ids_to_delete = json.loads(req.get_param(
+                    f'file{index}_replace_file_ids'))
                 iv = req.get_param(f'file{index}.iv')
                 file_id = FileStorageDA(
                 ).store_file_to_storage(file)
@@ -40,6 +38,10 @@ class FileStorage(object):
                     file_id=file_id, file_name=file_name, member_id=member_id, status=status, file_size_bytes=file_size_bytes, iv=iv)
                 if not res:
                     raise "Unable to create member_file_entry"
+                if len(file_ids_to_delete) > 0:
+                    # We are deleting duplicates if the user requested file overwrites
+                    for file_id in file_ids_to_delete:
+                        FileStorageDA().delete_file(file_id)
                 member_file = FileStorageDA().get_member_file(member, file_id)
 
                 member_files.insert(0, member_file)
