@@ -2,16 +2,15 @@ import logging
 import datetime
 
 from app.util.db import source
-from app.exceptions.data import DuplicateKeyError, DataMissingError,\
+from app.exceptions.data import DuplicateKeyError, DataMissingError, \
     RelationshipReferenceError
-from app.exceptions.invite import InviteExistsError, InviteDataMissingError,\
+from app.exceptions.invite import InviteExistsError, InviteDataMissingError, \
     InviteInvalidInviterError
 
 logger = logging.getLogger(__name__)
 
 
-class InviteDA (object):
-
+class InviteDA(object):
     source = source
 
     @classmethod
@@ -50,7 +49,8 @@ class InviteDA (object):
         query = ("""
         SELECT
             id, invite_key, email, expiration,
-            first_name, last_name, inviter_member_id
+            first_name, last_name, inviter_member_id,
+            country, phone_number, registered_member_id
         FROM invite
         WHERE invite_key = %s
         """)
@@ -59,9 +59,10 @@ class InviteDA (object):
         cls.source.execute(query, params)
         if cls.source.has_results():
             (
-                id, invite_key, email, 
-                expiration, first_name, 
-                last_name, inviter_member_id
+                id, invite_key, email,
+                expiration, first_name,
+                last_name, inviter_member_id,
+                country, phone_number, registered_member_id
             ) = cls.source.cursor.fetchone()
             invite = {
                 "id": id,
@@ -71,6 +72,9 @@ class InviteDA (object):
                 "first_name": first_name,
                 "last_name": last_name,
                 "inviter_member_id": inviter_member_id,
+                "country": country,
+                "phone_number": phone_number,
+                "registered_member_id": registered_member_id
             }
             return invite
 
@@ -113,7 +117,7 @@ class InviteDA (object):
 
     @classmethod
     def get_invites(cls, search_key, page_size=None, page_number=None):
-        
+
         query = ("""
         SELECT
             invite.id,
@@ -138,11 +142,11 @@ class InviteDA (object):
             invite.email LIKE %s
             OR invite.first_name LIKE %s
             OR invite.last_name LIKE %s
-           
+
             OR member.first_name LIKE %s
             OR member.last_name LIKE %s
             OR member.email LIKE %s
-           
+
             OR member_group.group_name LIKE %s
         """)
 
@@ -156,11 +160,11 @@ class InviteDA (object):
             invite.email LIKE %s
             OR invite.first_name LIKE %s
             OR invite.last_name LIKE %s
-           
+
             OR member.first_name LIKE %s
             OR member.last_name LIKE %s
             OR member.email LIKE %s
-           
+
             OR member_group.group_name LIKE %s
         """)
 
@@ -171,8 +175,8 @@ class InviteDA (object):
 
         count = 0
         if cls.source.has_results():
-            ( count, ) = cls.source.cursor.fetchone()
-        
+            (count,) = cls.source.cursor.fetchone()
+
         if page_size and page_number:
             query += """LIMIT %s OFFSET %s"""
             offset = 0
@@ -185,21 +189,21 @@ class InviteDA (object):
         cls.source.execute(query, params)
         if cls.source.has_results():
             for (
-                id,
-                invite_key,
-                email, 
-                expiration,
-                first_name,
-                last_name,
-                inviter_member_id,
-                registered_member_id,
-                create_date,
-                update_date,
-                inviter_first_name,
-                inviter_last_name,
-                inviter_email,
-                group_id,
-                group_name
+                    id,
+                    invite_key,
+                    email,
+                    expiration,
+                    first_name,
+                    last_name,
+                    inviter_member_id,
+                    registered_member_id,
+                    create_date,
+                    update_date,
+                    inviter_first_name,
+                    inviter_last_name,
+                    inviter_email,
+                    group_id,
+                    group_name
             ) in cls.source.cursor:
                 invite = {
                     "id": id,
@@ -220,4 +224,4 @@ class InviteDA (object):
                 }
                 invites.append(invite)
 
-        return { "activities": invites, "count": count }
+        return {"activities": invites, "count": count}

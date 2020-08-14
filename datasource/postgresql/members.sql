@@ -125,3 +125,26 @@ CREATE TABLE shared_file (
   create_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   update_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- member_contact table
+CREATE TABLE contact (
+  id SERIAL PRIMARY KEY,
+  member_id INT NOT NULL REFERENCES member (id),
+  contact_member_id INT NOT NULL REFERENCES member (id),
+  first_name VARCHAR(100) NULL,
+  last_name VARCHAR(100) NULL,
+  country VARCHAR (255) NULL,
+  cell_phone VARCHAR(100) NULL,
+  office_phone VARCHAR(100) NULL,
+  home_phone VARCHAR(100) NULL,
+  email VARCHAR(255) NULL,
+  personal_email VARCHAR(255) NULL,
+  company_name VARCHAR(100) NULL,
+  company_phone VARCHAR(100) NULL,
+  company_web_site VARCHAR(255) NULL,
+  company_email VARCHAR(255) NULL,
+  company_bio VARCHAR(255) NULL,
+  contact_role VARCHAR(100) NULL,
+  create_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

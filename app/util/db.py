@@ -3,6 +3,7 @@ import psycopg2 as connector
 from pprint import pformat
 from psycopg2 import errorcodes
 from psycopg2.extras import LoggingConnection
+import psycopg2.extras as extras
 
 from app.config import settings
 from app.exceptions.data import DataMissingError, DuplicateKeyError, \
@@ -65,11 +66,14 @@ class DataSource (object):
         def get_last_row_id(self):
             return self.cursor.fetchone()[0]
 
-        def execute(self, query, params):
+        def execute(self, query, params, bulk_insert=False):
             try:
                 if not self.cursor:
                     self.connect()
-                return self.cursor.execute(query, params)
+                if bulk_insert:
+                    return extras.execute_values(self.cursor, query, params)
+                else:
+                    return self.cursor.execute(query, params)
             except connector.errors.UniqueViolation as err:
                 self.rollback()
                 raise DuplicateKeyError from err
@@ -79,7 +83,7 @@ class DataSource (object):
             except connector.errors.ForeignKeyViolation as err:
                 self.rollback()
                 raise RelationshipReferenceError from err
-            except Exception:
+            except Exception as e:
                 logger.exception("[FIXME]: Unknown Exception")
                 try:
                     self.rollback()

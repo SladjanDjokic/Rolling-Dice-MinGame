@@ -6,8 +6,9 @@ from falcon_multipart.middleware import MultipartMiddleware
 
 from app.config import parser, settings
 from app.middleware import CrossDomain  # , JSONTranslator
-from app.resources.member import MemberRegisterResource, MemberResource, MemberSearchResource, MemberGroupSearchResource
-from app.resources.invite import MemberInviteResource
+from app.resources.member import MemberRegisterResource, MemberResource, MemberSearchResource, \
+    MemberGroupSearchResource, MemberContactResource, ContactMembersResource
+from app.resources.invite import MemberInviteResource, ValidInviteResource
 from app.resources.login import MemberLoginResource
 from app.resources.logout import MemberLogoutResource
 from app.resources.session import SessionResource, ValidateSessionResource
@@ -79,10 +80,16 @@ def _setup_routes(app):
     app.add_route("/member/logout", MemberLogoutResource())
     app.add_route("/member/invite", MemberInviteResource())
     app.add_route("/member/invite/{invite_key:uuid}", MemberInviteResource())
-    app.add_route("/member/register/{invite_key:uuid}", MemberRegisterResource())  # noqa: E501
+    app.add_route("/valid-invite/{invite_key:uuid}", ValidInviteResource())
+    app.add_route("/member/register", MemberRegisterResource())  # noqa: E501
+    # This route is commneted out to prevent any registrations someone may be sniffing out
+    # This will be enabled later on
+    # app.add_route("/member/register", MemberRegistrationResource())  # noqa: E501
     app.add_route("/member/search", MemberSearchResource())
     app.add_route("/member/group/search", MemberGroupSearchResource())
     app.add_route("/member/{username}", MemberResource())
+    app.add_route("/member/contact", MemberContactResource())
+    app.add_route("/member-contacts", ContactMembersResource())
     app.add_route('/session/{session_id}', SessionResource)
     app.add_route("/valid-session", ValidateSessionResource())
     # app.add_route("/cloud/files", MemberFile())

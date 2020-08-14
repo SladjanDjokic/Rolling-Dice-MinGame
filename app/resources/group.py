@@ -10,6 +10,7 @@ from app.util.session import get_session_cookie, validate_session
 from app.config import settings
 import app.util.email as sendmail
 
+from app.da.file_sharing import FileStorageDA
 from app.da.group import GroupDA, GroupMembershipDA, GroupMemberInviteDA
 from app.da.member import MemberDA
 from app.exceptions.group import GroupExists, MemberNotFound, MemberExists
@@ -23,14 +24,28 @@ logger = logging.getLogger(__name__)
 
 
 class MemberGroupResource(object):
-    @staticmethod
-    def on_post(req, resp):
-        (group_leader_id, group_name) = request.get_json_or_form("groupLeaderId", "groupName", req=req)
-        group_exist = GroupDA().get_group_by_name_and_leader_id(group_leader_id, group_name)
+    def on_post(self, req, resp):
+        (name, pin, members, exchange_option) = request.get_json_or_form(
+            "name", "pin", "members", "exchangeOption", req=req)
+        
+        session_id = get_session_cookie(req)
+        logging.debug("==================> >>>>>>>>>>>>>")
+        logging.debug(session_id)
+        session = validate_session(session_id)
+        group_leader_id = session["member_id"]
+        logging.debug(group_leader_id)
+        
+        group_exist = GroupDA().get_group_by_name_and_leader_id(group_leader_id, name)
+        members = json.loads(members)
+        
         if group_exist:
-            raise GroupExists(group_name)
+            raise GroupExists(name)
         else:
-            group_id = GroupDA().create_group(group_leader_id, group_name)
+            file = req.get_param('picture')
+            file_id = FileStorageDA().store_file_to_storage(file)
+            group_id = GroupDA().create_expanded_group(group_leader_id, name, file_id, pin, exchange_option)
+            GroupMembershipDA().bulk_create_group_membership(group_leader_id, group_id, members)
+            # self.bulk_create_invite(group_leader_id, group_id, members, req)
             group = list()
             new_group = GroupDA().get_group(group_id)
             group.insert(0, new_group)
@@ -49,6 +64,57 @@ class MemberGroupResource(object):
             "message": "All Group",
             "success": True
         }, default_parser=json.parser)
+
+    def bulk_create_invite(self, inviter_member_id, group_id, members, req):
+
+        expiration = datetime.now() + relativedelta(months=+1)
+
+        for member_id in members:
+
+            invite_key = uuid.uuid4().hex
+
+            member = MemberDA.get_member(member_id)
+            member_contact = MemberDA.get_member_contact(member_id)
+            member_location = MemberDA.get_member_location(member_id)
+
+            if member is None:
+                continue
+
+            invite_params = {
+                "registered_member_id": member_id,
+                "email": member["email"],
+                "first_name": member["first_name"],
+                "last_name": member["last_name"],
+                "inviter_member_id": inviter_member_id,
+                "invite_key": invite_key,
+                "group_id": group_id,
+                "country": member_location["country"] if member_location else None,
+                "phone_number": member_contact["phone_number"] if member_contact else None,
+                "expiration": expiration
+            }
+            try:
+                invite_id = GroupMemberInviteDA().create_invite(**invite_params)
+                register_url = settings.get(
+                    "web.member_invite_register_url"
+                ).format(invite_key)
+
+                register_url = urljoin(request.get_url_base(req), register_url)
+
+                # GroupMemberInviteResource._send_email(
+                #     email=email,
+                #     first_name=first_name,
+                #     invite_key=invite_key,
+                #     register_url=register_url
+                # )
+
+            except sendmail.EmailAuthError:
+                continue
+            except InviteExistsError:
+                continue
+            except InviteDataMissingError:
+                continue
+            except InviteInvalidInviterError:
+                continue
 
 
 class GroupDetailResource(object):

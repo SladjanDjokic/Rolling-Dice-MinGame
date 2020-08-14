@@ -34,6 +34,7 @@ class MemberExists(falcon.HTTPConflict):
         result["email"] = self._email
         return result
 
+
 # HTTP Response Error to throw when member data missing
 class MemberDataMissing(falcon.HTTPUnprocessableEntity):
 
@@ -45,4 +46,30 @@ class MemberDataMissing(falcon.HTTPUnprocessableEntity):
     def to_dict(self, obj_type=dict):
         result = super().to_dict(obj_type)
         result["success"] = False
+        return result
+
+
+# HTTP Response Error to throw when an member contact is duplicate
+class MemberContactExists(falcon.HTTPConflict):
+
+    def __init__(self, email):
+        description = (
+            'Contact already exists'
+        )
+        super().__init__(description=description)
+        self._email = email
+
+
+class MemberPasswordMismatch(falcon.HTTPUnprocessableEntity):
+
+    def __init__(self):
+        title = "Passwords do not match"
+        description = "Please make sure the passwords match"
+        super().__init__(title=title, description=description)
+
+    def to_dict(self, obj_type=dict):
+        result = super().to_dict(obj_type)
+        result["success"] = False
+        result["exists"] = True
+        result["email"] = self._email
         return result

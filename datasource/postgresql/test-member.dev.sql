@@ -6,11 +6,15 @@ INSERT INTO member
         ('donald@email.com', 'taylor', 'user', 'donald@email.com',  crypt('password', gen_salt('bf'))),
         ('long@email.com', 'long-user-first-name-test-case', 'scenario', 'long@email.com',  crypt('password', gen_salt('bf')));
 
+INSERT INTO file_storage_engine
+        (storage_engine_id, storage_engine, status)
+        VALUES
+        ('', 's3test', 'not available');
 
 INSERT INTO member_group
-        (group_leader_id, group_name)
+        (group_leader_id, group_name, picture_file_id, pin, exchange_option)
         VALUES
-        (1, 'Amera lot');
+        (1, 'Amera lot', 1, '123456', 'MOST_SECURE');
 
 INSERT INTO member_group_membership
         (group_id, member_id)

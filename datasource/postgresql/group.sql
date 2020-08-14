@@ -1,3 +1,5 @@
+
+
 CREATE TABLE member_group (
 -- Member Group table
     id SERIAL PRIMARY KEY,

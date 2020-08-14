@@ -21,7 +21,7 @@ class SessionDA (object):
         WHERE username = %s AND password = crypt(%s, password)
         """)
 
-        params = (username, password)
+        params = (username.lower(), password)
         cls.source.execute(query, params)
         if cls.source.has_results():
             (id, email, first_name, last_name, username,

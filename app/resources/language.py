@@ -12,7 +12,7 @@ class LanguageResource(object):
 
     def on_get(self, req, resp):
 
-        languages = ['de', 'en-US', 'es', 'ja', 'ko', 'zh']
+        languages = ['de', 'en-US', 'es', 'ja', 'ko', 'zh', 'ru']
 
         data = {}
         for language in languages:

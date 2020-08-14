@@ -44,6 +44,9 @@ class MemberInviteResource(object):
             "email": email,
             "first_name": first_name,
             "last_name": last_name,
+            "registered_member_id": None,
+            "phone_number": None,
+            "country": None,
             "inviter_member_id": inviter_member_id,
             "invite_key": invite_key,
             "expiration": expiration
@@ -123,3 +126,39 @@ class MemberInviteResource(object):
                 "invite_key": invite_key,
                 "register_url": register_url
             })
+
+
+class ValidInviteResource(object):
+
+    def on_get(self, req, resp, invite_key):
+        if not invite_key:
+            raise InviteKeyMissing()
+
+        # We store the key in hex format in the database
+        invite_key = invite_key.hex
+
+        logger.debug("Invite Key: {}".format(invite_key))
+        logger.debug(invite_key)
+
+        invite = InviteDA.get_invite(invite_key)
+
+        logger.debug("Invite: {}".format(invite))
+
+        if not invite:
+            raise InviteNotFound(invite_key)
+
+        if invite['registered_member_id']:
+            raise InviteExpired(invite_key)
+
+        utc_expiration = invite["expiration"].replace(tzinfo=timezone.utc)
+        utc_now = datetime.now(timezone.utc)
+
+        if utc_now > utc_expiration:
+            logger.debug((
+                "Expiration Datetime: {} (UTC) is "
+                "past current Datetime: {} (UTC)"
+            ).format(
+                utc_expiration, utc_now))
+            raise InviteExpired(invite_key)
+
+        resp.body = json.dumps(invite, default_parser=str)

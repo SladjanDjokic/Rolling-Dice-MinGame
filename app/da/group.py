@@ -1,5 +1,7 @@
 import logging
 
+import uuid
+from dateutil.relativedelta import relativedelta
 from app.util.db import source
 from app.exceptions.data import DuplicateKeyError, DataMissingError,\
     RelationshipReferenceError
@@ -131,7 +133,23 @@ class GroupDA (object):
             cls.source.commit()
 
         return id
+    
+    @classmethod
+    def create_expanded_group(cls, member_id, group_name, picture_file_id, pin, exchange_option, commit=True):
+        query = ("""
+            INSERT INTO member_group (group_leader_id, group_name, picture_file_id, pin, exchange_option)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
+        """)
 
+        params = (member_id, group_name, picture_file_id, pin, exchange_option)
+        
+        cls.source.execute(query, params)
+        id = cls.source.get_last_row_id()
+        if commit:
+            cls.source.commit()
+
+        return id
 
 class GroupMembershipDA (object):
 
@@ -162,6 +180,25 @@ class GroupMembershipDA (object):
             if commit:
                 cls.source.commit()
             return id
+        except Exception as e:
+            return None
+    @classmethod
+    def bulk_create_group_membership(cls, group_leader_id, group_id, members, commit=True):
+        try:
+            query = ("""
+                INSERT INTO member_group_membership (group_id, member_id, status)
+                VALUES %s
+            """)
+
+            members = filter(lambda x: x != group_leader_id, members)
+
+            params = [(group_id, x, 'invited') for x in members]
+            params = tuple(params)
+
+            cls.source.execute(query, params, True)
+            
+            if commit:
+                cls.source.commit()
         except Exception as e:
             return None
 
@@ -339,6 +376,7 @@ class GroupMemberInviteDA (object):
         )
         try:
             cls.source.execute(query, params)
+
             invite_id = cls.source.get_last_row_id()
 
             if commit:

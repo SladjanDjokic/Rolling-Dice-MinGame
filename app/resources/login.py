@@ -51,7 +51,7 @@ class MemberLoginResource(object):
             except SessionExistsError:
                 continue
 
-        set_session_cookie(resp, session_id, expiration_datetime)
+        set_session_cookie(req, resp, session_id, expiration_datetime)
 
         resp.body = json.dumps({
             "session_id": session_id
