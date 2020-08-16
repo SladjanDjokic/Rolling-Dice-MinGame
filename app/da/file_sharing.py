@@ -9,7 +9,7 @@ from botocore.exceptions import NoCredentialsError, ClientError
 
 from app.util.db import source
 from app.config import settings
-from app.util.os import safe_open
+from app.util.filestorage import safe_open, add_ts_to_file_key
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +98,8 @@ class FileStorageDA(object):
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query = ("""
             INSERT INTO member_file
-            (file_id, file_name, member_id, status, categories, file_ivalue, file_size_bytes)
+            (file_id, file_name, member_id, status,
+             categories, file_ivalue, file_size_bytes)
             VALUES (%s, %s, %s, %s, '', %s, %s)
         """)
         params = (file_id, file_name, member_id, status, iv, file_size_bytes)
@@ -126,8 +127,8 @@ class FileStorageDA(object):
                 file_storage_engine.status as status,
                 file_storage_engine.create_date as created_date,
                 file_storage_engine.update_date as updated_date,
-                CASE WHEN 
-                    (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '') 
+                CASE WHEN
+                    (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '')
                     THEN 'unencrypted'
                     ELSE 'encrypted'
                 END as file_status
@@ -179,7 +180,7 @@ class FileStorageDA(object):
                     file_storage_engine.status as status,
                     file_storage_engine.create_date as created_date,
                     file_storage_engine.update_date as updated_date,
-                    CASE WHEN 
+                    CASE WHEN
                         (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '')
                         THEN 'unencrypted'
                         ELSE 'encrypted'
@@ -222,6 +223,7 @@ class FileStorageDA(object):
                 file_storage_engine.update_date as updated_date,
                 member_file.file_name as file_name,
                 member_file.file_size_bytes as file_size_bytes,
+                member_file.file_ivalue as file_iv_value,
                 member_file.categories as categories
             FROM file_storage_engine
             LEFT JOIN member_file ON file_storage_engine.id = member_file.file_id
@@ -239,6 +241,7 @@ class FileStorageDA(object):
                 updated_date,
                 file_name,
                 file_size_bytes,
+                file_iv_value,
                 categories
             ) in cls.source.cursor:
                 file_detail = {
@@ -250,6 +253,7 @@ class FileStorageDA(object):
                     "updated_date": datetime.datetime.strftime(updated_date, "%Y-%m-%d %H:%M:%S"),
                     "file_name": file_name,
                     "file_size_bytes": file_size_bytes,
+                    "file_iv_value": file_iv_value,
                     "categories": categories,
                     "member_first_name": member.get("first_name"),
                     "member_last_name": member.get("last_name"),
@@ -299,7 +303,7 @@ class FileStorageDA(object):
     def store_file_to_static(cls, file_id):
         query = ("""
                     SELECT storage_engine_id as file_url, member_file.file_ivalue as file_ivalue
-                    FROM file_storage_engine 
+                    FROM file_storage_engine
                         LEFT OUTER JOIN member_file ON (file_storage_engine.id = member_file.file_id)
                     WHERE file_storage_engine.id = %s
                 """)
@@ -323,12 +327,70 @@ class FileStorageDA(object):
                 print(e)
 
     @classmethod
+    def rename_file(cls, member, file_id, new_file_name):
+        """
+            First we create a copy with a new name,
+            and then we delete the old file
+            Important to remember that file_name is not an s3 key (which is '/folder/folder2/12121212121-filename.ext').
+            1) Find old s3 key by filestorage.file_id
+            2) Create a copy with new filename, log it to to DB
+            3) Remove the old one from storage and log this in DB
+            3) Send the updated FileList to front
+        """
+        details = cls.get_file_detail(
+            member, file_id)
+        file_location = details["file_location"]
+        status = details["status"]
+        iv = details["file_iv_value"],
+        file_size_bytes = details["file_size_bytes"],
+        storage_engine = details["storage_engine"]
+
+        old_file_key = urlparse(file_location).path
+        # Important to remember that file_name is not an s3 key (which is something like '/folder/folder2/12121212121-filename.ext').
+        # We need to generate another timestamp prefix
+        new_key = add_ts_to_file_key(new_file_name)
+        bucket = settings.get("storage.s3.bucket")
+        s3_location = settings.get("storage.s3.file_location_host")
+        new_file_location = urljoin(s3_location, new_key)
+
+        logger.debug(
+            f"Old file key was {old_file_key}, new one will be {new_key}, location + key will be {new_file_location}")
+
+        # Create a copy in storage
+        renamed = cls.copy_aws_object(bucket, old_file_key, new_key)
+
+        if renamed:
+            # Register it in Database, first the storage entries
+            new_file_id = cls.create_file_storage_entry(
+                new_file_location, storage_engine, status)
+            # Then the member file entries, we match all properties but add new id and file_name ( key)
+            res = cls.create_member_file_entry(
+                new_file_id, new_file_name, member["member_id"], status, file_size_bytes, iv)
+            if not res:
+                raise "Unable to create member_file_entry"
+            # Delete to old one using our regular routine
+            cls.delete_file(file_id)
+            return True
+
+    @classmethod
     def remove_aws_object(cls, bucket_name, item_key):
         """ Provide bucket name and item key, remove from S3
         """
         s3 = cls.aws_s3_client()
         delete = s3.delete_object(Bucket=bucket_name, Key=item_key)
         return True
+
+    @classmethod
+    def copy_aws_object(cls, bucket_name, old_key, new_key):
+        """ Will create a copy replacing old_key with new_key
+        """
+        try:
+            s3 = cls.aws_s3_client()
+            s3.copy(CopySource={'Bucket': bucket_name,
+                                'Key': old_key}, Bucket=bucket_name, Key=new_key)
+            return True
+        except Exception as e:
+            raise
 
     @classmethod
     def download_aws_object(cls, bucket_name, item_key, file_ivalue=None):
@@ -341,7 +403,7 @@ class FileStorageDA(object):
         '''
         If file is nested within a folder on s3, its key will look like "folder/another/121212-filename.ext"
         We want to address that when we download, but can't keep that folder structure in static i.e.
-        the path to file will be "static/121212-filename.ext" 
+        the path to file will be "static/121212-filename.ext"
         '''
         (dirname, filename) = os.path.split(item_key)
         file_path = f"{static_path}/{filename}"
@@ -415,8 +477,8 @@ class ShareFileDA(object):
                 member_file.file_name as file_name,
                 member.first_name as shared_member_first_name,
                 member.last_name as shared_member_last_name,
-                CASE WHEN 
-                    (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '') 
+                CASE WHEN
+                    (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '')
                     THEN 'unencrypted'
                     ELSE 'encrypted'
                 END as file_status,
@@ -426,7 +488,7 @@ class ShareFileDA(object):
             LEFT JOIN file_storage_engine ON file_storage_engine.id = shared_file.file_id
             LEFT JOIN member_file ON member_file.file_id = shared_file.file_id
             LEFT JOIN member ON member.id = shared_file.shared_member_id
-            WHERE shared_file.member_id = %s AND file_storage_engine.status = %s AND shared_member_id IS NOT NULL 
+            WHERE shared_file.member_id = %s AND file_storage_engine.status = %s AND shared_member_id IS NOT NULL
             ORDER BY shared_file.create_date DESC
         """)
         params = (member.get("member_id"), "available", )

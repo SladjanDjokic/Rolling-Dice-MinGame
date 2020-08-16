@@ -1,11 +1,14 @@
 import mimetypes
 
+import logging
 import app.util.json as json
 import app.util.request as request
 from app.da.member import MemberDA
 from app.da.file_sharing import FileStorageDA, ShareFileDA
 from app.util.session import get_session_cookie, validate_session
 from app.exceptions.file_sharing import FileShareExists, FileNotFound
+
+logger = logging.getLogger(__name__)
 
 
 class FileStorage(object):
@@ -67,6 +70,37 @@ class FileStorage(object):
         else:
             resp.body = json.dumps({
                 "description": "Can not get files for un-exising member",
+                "success": False
+            })
+
+    @staticmethod
+    def on_put(req, resp):
+        data_dict = req.media
+        member_id = data_dict["memberId"]
+        file_id = data_dict["fileId"]
+        new_file_name = data_dict["newKey"]
+        member = MemberDA().get_member(member_id)
+        if not member:
+            resp.body = json.dumps({
+                "message": "Member does not exist",
+                "status": "warning",
+                "success": False
+            })
+            return
+        try:
+            logger.debug(
+                f"Will attempt to rename file with Id {file_id} to {new_file_name}")
+            rename_success = FileStorageDA().rename_file(member, file_id, new_file_name)
+            member_files = FileStorageDA().get_member_files(member)
+            resp.body = json.dumps({
+                "data": member_files if member_files else [],
+                "description": 'Synced successfully',
+                "success": True
+            })
+
+        except Exception as e:
+            resp.body = json.dumps({
+                "message": e,
                 "success": False
             })
 
