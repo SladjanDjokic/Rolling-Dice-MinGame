@@ -329,48 +329,17 @@ class FileStorageDA(object):
     @classmethod
     def rename_file(cls, member, file_id, new_file_name):
         """
-            First we create a copy with a new name,
-            and then we delete the old file
-            Important to remember that file_name is not an s3 key (which is '/folder/folder2/12121212121-filename.ext').
-            1) Find old s3 key by filestorage.file_id
-            2) Create a copy with new filename, log it to to DB
-            3) Remove the old one from storage and log this in DB
-            3) Send the updated FileList to front
+            We don't touch the actual file nor its path in storage (for performance reasons), we do only change the displayed filename in member_files table .
         """
-        details = cls.get_file_detail(
-            member, file_id)
-        file_location = details["file_location"]
-        status = details["status"]
-        iv = details["file_iv_value"],
-        file_size_bytes = details["file_size_bytes"],
-        storage_engine = details["storage_engine"]
+        query = ("""
+            UPDATE member_file
+            SET file_name = %s
+            WHERE file_id = %s
+        """)
+        params = (new_file_name, file_id)
+        cls.source.execute(query, params)
 
-        old_file_key = s3fy_filekey(urlparse(file_location).path)
-        # Important to remember that file_name is not an s3 key (which is something like '/folder/folder2/12121212121-filename.ext').
-        # We need to generate another timestamp prefix
-        new_key = s3fy_filekey(timestampify_filekey(new_file_name))
-        bucket = settings.get("storage.s3.bucket")
-        s3_location = settings.get("storage.s3.file_location_host")
-        new_file_location = urljoin(s3_location, new_key)
-
-        logger.debug(
-            f"Old file key was {old_file_key}, new one will be {new_key}, location + key will be {new_file_location}")
-
-        # Create a copy in storage
-        renamed = cls.copy_aws_object(bucket, old_file_key, new_key)
-
-        if renamed:
-            # Register it in Database, first the storage entries
-            new_file_id = cls.create_file_storage_entry(
-                new_file_location, storage_engine, status)
-            # Then the member file entries, we match all properties but add new id and file_name ( key)
-            res = cls.create_member_file_entry(
-                new_file_id, new_file_name, member["member_id"], status, file_size_bytes, iv)
-            if not res:
-                raise "Unable to create member_file_entry"
-            # Delete to old one using our regular routine
-            cls.delete_file(file_id)
-            return True
+        return True
 
     @classmethod
     def remove_aws_object(cls, bucket_name, item_key):
