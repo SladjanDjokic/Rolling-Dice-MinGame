@@ -22,9 +22,15 @@ def safe_open(path, rights):
     return open(path, rights)
 
 
-def add_ts_to_file_key(file_path):
+def timestampify_filekey(file_path):
     file_id = str(int(datetime.datetime.now().timestamp() * 1000))
     (dirname, true_filename) = os.path.split(file_path)
     file_name = file_id + "-" + true_filename
     storage_key = f"{dirname}/{file_name}"
     return storage_key
+
+
+def s3fy_filekey(file_key):
+    # boto3 methods accepts a file key without '/' in the beggining
+    key = file_key.lstrip('/') if file_key.startswith('/') else file_key
+    return key

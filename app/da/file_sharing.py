@@ -9,7 +9,7 @@ from botocore.exceptions import NoCredentialsError, ClientError
 
 from app.util.db import source
 from app.config import settings
-from app.util.filestorage import safe_open, add_ts_to_file_key
+from app.util.filestorage import safe_open, timestampify_filekey, s3fy_filekey
 
 logger = logging.getLogger(__name__)
 
@@ -345,10 +345,10 @@ class FileStorageDA(object):
         file_size_bytes = details["file_size_bytes"],
         storage_engine = details["storage_engine"]
 
-        old_file_key = urlparse(file_location).path
+        old_file_key = s3fy_filekey(urlparse(file_location).path)
         # Important to remember that file_name is not an s3 key (which is something like '/folder/folder2/12121212121-filename.ext').
         # We need to generate another timestamp prefix
-        new_key = add_ts_to_file_key(new_file_name)
+        new_key = s3fy_filekey(timestampify_filekey(new_file_name))
         bucket = settings.get("storage.s3.bucket")
         s3_location = settings.get("storage.s3.file_location_host")
         new_file_location = urljoin(s3_location, new_key)
@@ -384,6 +384,8 @@ class FileStorageDA(object):
     def copy_aws_object(cls, bucket_name, old_key, new_key):
         """ Will create a copy replacing old_key with new_key
         """
+        logging.debug(
+            f"Will try to access old key {old_key} and change it to {new_key}")
         try:
             s3 = cls.aws_s3_client()
             s3.copy(CopySource={'Bucket': bucket_name,
@@ -409,9 +411,7 @@ class FileStorageDA(object):
         file_path = f"{static_path}/{filename}"
         if file_ivalue:
             file_path = f"{static_path}/{filename}{file_ivalue}~"
-        # to feed s3.download with the correct key (having or not having /) depending on whether it is a nested key or not
-        key = item_key if dirname == '/' else item_key.lstrip('/')
-
+        key = s3fy_filekey(item_key)
         s3.download_file(bucket_name, key, file_path)
         return True
 
