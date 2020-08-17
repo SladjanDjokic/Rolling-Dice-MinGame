@@ -77,8 +77,7 @@ class FileStorage(object):
     def on_put(req, resp):
         data_dict = req.media
         member_id = data_dict["memberId"]
-        file_id = data_dict["fileId"]
-        new_file_name = data_dict["newKey"]
+
         member = MemberDA().get_member(member_id)
         if not member:
             resp.body = json.dumps({
@@ -88,9 +87,12 @@ class FileStorage(object):
             })
             return
         try:
-            logger.debug(
-                f"Will attempt to rename file with Id {file_id} to {new_file_name}")
-            rename_success = FileStorageDA().rename_file(member, file_id, new_file_name)
+            for file_to_rename in data_dict["renameItems"]:
+                file_id = file_to_rename["fileId"]
+                new_file_name = file_to_rename["newKey"]
+                logger.debug(
+                    f"Will attempt to rename file with Id {file_id} to {new_file_name}")
+                rename_success = FileStorageDA().rename_file(member, file_id, new_file_name)
             member_files = FileStorageDA().get_member_files(member)
             resp.body = json.dumps({
                 "data": member_files if member_files else [],
