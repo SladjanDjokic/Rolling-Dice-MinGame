@@ -513,15 +513,24 @@ class ShareFileDA(object):
         query = ("""
             SELECT
                 shared_file.file_id as file_id,
-                shared_file.shared_unique_key as shared_key,
+                shared_file.shared_unique_key as shared_key, 
                 member_file.file_name as file_name,
+                member_file.file_size_bytes as file_size_bytes,
+                CASE WHEN
+                    (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '')
+                    THEN 'unencrypted'
+                    ELSE 'encrypted'
+                END as file_status,
                 member_group.group_name as group_name,
                 member_group.id as group_id,
-                shared_file.create_date as shared_date
+                shared_file.update_date as updated_date,  
+                member.last_name as last_name,
+                member.first_name as first_name
             FROM shared_file
             LEFT JOIN file_storage_engine ON file_storage_engine.id = shared_file.file_id
             LEFT JOIN member_file ON member_file.file_id = shared_file.file_id
             LEFT JOIN member_group ON member_group.id = shared_file.group_id
+            LEFT JOIN member ON member.id = shared_file.member_id
             WHERE shared_file.member_id = %s AND file_storage_engine.status = %s AND group_id IS NOT NULL
             ORDER BY shared_file.create_date DESC
         """)
@@ -533,9 +542,13 @@ class ShareFileDA(object):
                     "file_id": file[0],
                     "shared_key": file[1],
                     "file_name": file[2],
-                    "group_name": file[3],
-                    "group_id": file[4],
-                    "shared_date": file[5]
+                    "file_size_bytes": file[3],
+                    "file_status": file[4],
+                    "group_name": file[5],
+                    "group_id": file[6],
+                    "updated_date": file[7],
+                    "last_name": file[8],
+                    "first_name": file[9],
                 }
                 shared_files.append(elem)
 
@@ -555,13 +568,22 @@ class ShareFileDA(object):
                 shared_file.file_id as file_id,
                 shared_file.shared_unique_key as shared_key,
                 member_file.file_name as file_name,
+                member_file.file_size_bytes as file_size_bytes,
+                  CASE WHEN
+                    (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '')
+                    THEN 'unencrypted'
+                    ELSE 'encrypted'
+                END as file_status,
                 member_group.group_name as group_name,
                 member_group.id as group_id,
-                shared_file.create_date as shared_date
+                shared_file.update_date as updated_date,  
+                member.last_name as last_name,
+                member.first_name as first_name
             FROM shared_file
             LEFT JOIN file_storage_engine ON file_storage_engine.id = shared_file.file_id
             LEFT JOIN member_file ON member_file.file_id = shared_file.file_id
             LEFT JOIN member_group ON member_group.id = shared_file.group_id
+            LEFT JOIN member ON member.id = shared_file.member_id
             WHERE shared_file.group_id in (""" + include_member_group_id_list + """) AND file_storage_engine.status = %s
             ORDER BY shared_file.create_date DESC
         """)
@@ -573,9 +595,13 @@ class ShareFileDA(object):
                     "file_id": file[0],
                     "shared_key": file[1],
                     "file_name": file[2],
-                    "group_name": file[3],
-                    "group_id": file[4],
-                    "shared_date": file[5]
+                    "file_size_bytes": file[3],
+                    "file_status": file[4],
+                    "group_name": file[5],
+                    "group_id": file[6],
+                    "updated_date": file[7],
+                    "last_name": file[8],
+                    "first_name": file[9],
                 }
                 shared_files.append(elem)
         return shared_files
