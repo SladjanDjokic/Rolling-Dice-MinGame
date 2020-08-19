@@ -31,6 +31,7 @@ def timestampify_filekey(file_path):
 
 
 def s3fy_filekey(file_key):
-    # boto3 methods accepts a file key without '/' in the beggining
-    key = file_key.lstrip('/') if file_key.startswith('/') else file_key
+    # boto3 methods accepts a file key without '/' in the beggining when it is a nested key and /filekey.ext when it is a root file key
+    (dirname, file_name) = os.path.split(file_key)
+    key = file_key.lstrip('/') if dirname != '/' else file_key
     return key

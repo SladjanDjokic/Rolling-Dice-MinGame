@@ -317,8 +317,10 @@ class FileStorageDA(object):
                 file_ivalue = file[1]
                 if not file_ivalue:
                     file_ivalue = ""
+
                 #  url is "https://file-testing.s3.us-east-2.amazonaws.com/folder1/foldder2/file.ext"
                 item_key = urlparse(file_url).path
+
                 download = cls.download_aws_object(
                     bucket_name, item_key, file_ivalue)
                 if download:
@@ -381,6 +383,8 @@ class FileStorageDA(object):
         if file_ivalue:
             file_path = f"{static_path}/{filename}{file_ivalue}~"
         key = s3fy_filekey(item_key)
+        # logger.debug(
+        # f"Obi wan, we will download file from this bucket {bucket_name}, and this item key {key}")
         s3.download_file(bucket_name, key, file_path)
         return True
 
