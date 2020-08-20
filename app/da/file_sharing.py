@@ -443,20 +443,24 @@ class ShareFileDA(object):
     @classmethod
     def get_shared_files(cls, member):
         shared_files = list()
+        # Shared BY me
         query = ("""
             SELECT
                 shared_file.file_id as file_id,
                 shared_file.shared_unique_key as shared_key,
+                shared_file.member_id as sharer_member_id,
                 member_file.file_name as file_name,
-                member.first_name as shared_member_first_name,
-                member.last_name as shared_member_last_name,
+                member.first_name as consumer_first_name,
+                member.last_name as consumer_last_name,
                 CASE WHEN
                     (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '')
                     THEN 'unencrypted'
                     ELSE 'encrypted'
                 END as file_status,
-                member.email as shared_member_email,
-                shared_file.create_date as shared_date
+                member.email as consumer_email,
+                shared_file.create_date as shared_date,
+                shared_file.shared_member_id as consumer_member_id,
+                member_file.file_size_bytes as file_size_bytes
             FROM shared_file
             LEFT JOIN file_storage_engine ON file_storage_engine.id = shared_file.file_id
             LEFT JOIN member_file ON member_file.file_id = shared_file.file_id
@@ -471,23 +475,37 @@ class ShareFileDA(object):
                 elem = {
                     "file_id": file[0],
                     "shared_key": file[1],
-                    "file_name": file[2],
-                    "member": member.get("first_name"),
-                    "shared_member": file[3],
-                    "shared_member_email": file[6],
-                    "shared_date": file[7]
+                    "sharer_member_id": file[2],
+                    "sharer_first_name": member.get("first_name"),
+                    "sharer_last_name": member.get("last_name"),
+                    "file_name": file[3],
+                    "consumer_first_name": file[4],
+                    "consumer_last_name": file[5],
+                    "file_status": file[6],
+                    "consumer_email": file[7],
+                    "shared_date": file[8],
+                    "consumer_member_id": file[9],
+                    "file_size_bytes": file[10]
                 }
                 shared_files.append(elem)
+        # Shared WITH me
         query = ("""
             SELECT
                 shared_file.file_id as file_id,
                 shared_file.shared_unique_key as shared_key,
-                
+                shared_file.member_id as sharer_member_id,
                 member_file.file_name as file_name,
-                member.first_name as shared_member_first_name,
-                member.last_name as shared_member_last_name,
+                member.first_name as consumer_first_name,
+                member.last_name as consumer_last_name,
+                CASE WHEN
+                    (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '')
+                    THEN 'unencrypted'
+                    ELSE 'encrypted'
+                END as file_status,
                 member.email as shared_member_email,
-                shared_file.create_date as shared_date
+                shared_file.create_date as shared_date,
+                shared_file.shared_member_id as consumer_member_id,
+                member_file.file_size_bytes as file_size_bytes
             FROM shared_file
             LEFT JOIN file_storage_engine ON file_storage_engine.id = shared_file.file_id
             LEFT JOIN member_file ON member_file.file_id = shared_file.file_id
@@ -502,11 +520,17 @@ class ShareFileDA(object):
                 elem = {
                     "file_id": file[0],
                     "shared_key": file[1],
-                    "file_name": file[2],
-                    "member": member.get("first_name"),
-                    "shared_member": file[3],
-                    "shared_member_email": file[5],
-                    "shared_date": file[6]
+                    "sharer_member_id": file[2],
+                    "sharer_first_name": file[4],
+                    "sharer_first_name": file[5],
+                    "file_name": file[3],
+                    "consumer_first_name": member.get("first_name"),
+                    "consumer_last_name": member.get("last_name"),
+                    "file_status": file[6],
+                    "consumer_email": member.get("email"),
+                    "shared_date": file[8],
+                    "consumer_member_id": member.get("member_id"),
+                    "file_size_bytes": file[10]
                 }
                 shared_files.append(elem)
         return shared_files
