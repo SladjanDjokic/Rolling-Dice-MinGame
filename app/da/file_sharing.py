@@ -333,15 +333,19 @@ class FileStorageDA(object):
         """
             We don't touch the actual file nor its path in storage (for performance reasons), we do only change the displayed filename in member_files table .
         """
-        query = ("""
-            UPDATE member_file
-            SET file_name = %s
-            WHERE file_id = %s
-        """)
-        params = (new_file_name, file_id)
-        cls.source.execute(query, params)
-
-        return True
+        try:
+            query = ("""
+                        UPDATE member_file
+                        SET file_name = %s
+                        WHERE file_id = %s
+                    """)
+            params = (new_file_name, file_id,)
+            cls.source.execute(query, params)
+            if cls.source.has_results():
+                cls.source.commit()
+                return True
+        except Exception as e:
+            logger.debug(e.message)
 
     @classmethod
     def remove_aws_object(cls, bucket_name, item_key):
