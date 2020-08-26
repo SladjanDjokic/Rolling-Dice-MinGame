@@ -94,15 +94,16 @@ class FileStorageDA(object):
         return file_id[0][0]
 
     @classmethod
-    def create_member_file_entry(cls, file_id, file_name, member_id, status, file_size_bytes, iv=None, commit=True):
+    def create_member_file_entry(cls, file_id, file_name, member_id, status, file_size_bytes, category=None, iv=None, commit=True):
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query = ("""
             INSERT INTO member_file
             (file_id, file_name, member_id, status,
              categories, file_ivalue, file_size_bytes)
-            VALUES (%s, %s, %s, %s, '', %s, %s) RETURNING id
+            VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
         """)
-        params = (file_id, file_name, member_id, status, iv, file_size_bytes)
+        params = (file_id, file_name, member_id,
+                  status, category, iv, file_size_bytes)
         cls.source.execute(query, params)
 
         if cls.source.has_results():
