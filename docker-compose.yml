@@ -88,7 +88,6 @@ services:
       - ../web-api/datasource/postgresql/scheduler.sql:/docker-entrypoint-initdb.d/5-1-scheduler.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-08-15-schedulersetting.sql:/docker-entrypoint-initdb.d/5-2-schema-updates-2020-08-15-schedulersetting.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/6-test-schedule.sql
-      - ../web-api/datasource/postgresql/schema-updates-2020-08-09.sql:/docker-entrypoint-initdb.d/5-1-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-08-09-2.sql:/docker-entrypoint-initdb.d/6-1-schema-updates.sql
     environment:
       POSTGRES_DB: ameraiot
