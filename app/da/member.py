@@ -4,8 +4,10 @@ import datetime
 from app.util.db import source
 from app.util.config import settings
 
-logger = logging.getLogger(__name__)
+from app.exceptions.data import DuplicateKeyError, DataMissingError, RelationshipReferenceError
+from app.exceptions.member import ForgotDuplicateDataError
 
+logger = logging.getLogger(__name__)
 
 class MemberDA(object):
     source = source
@@ -21,6 +23,37 @@ class MemberDA(object):
     @classmethod
     def get_member_by_email(cls, email):
         return cls.__get_member('email', email)
+        
+    @classmethod
+    def extractAvailableMembers(cls, event_invite_to_list):        
+        res = []        
+        if len(event_invite_to_list) == 0:
+            return res
+        
+        separator = ','
+        strCanidateList = separator.join(map(str, event_invite_to_list))
+        logger.debug("strCanidateList: {}".format(strCanidateList))
+
+        query = ("""
+            select id from member where member.id = ANY ('{""" + strCanidateList + """}'::int[])
+        """)
+
+        logger.debug("query: {}".format(query))
+
+        params = ()
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            for entry_da in cls.source.cursor.fetchall():
+                res.append(entry_da[0])        
+        return res
+    
+    @classmethod
+    def get_password_reset_info_by_email(cls, email):
+        return cls.__get_password_reset_info('email', email)
+
+    @classmethod
+    def get_password_reset_info_by_forgot_key(cls, forgot_key):
+        return cls.__get_password_reset_info('forgot_key', forgot_key)
 
     @classmethod
     def get_members(cls, member_id, search_key, page_size=None, page_number=None):
@@ -218,7 +251,42 @@ class MemberDA(object):
         return None
 
     @classmethod
-    def register(cls, email, username, password, first_name,
+    def __get_password_reset_info(cls, key, value):
+        query = ("""
+        SELECT
+            id,
+            member_id,
+            email,
+            forgot_key,
+            expiration
+        FROM forgot_password
+        WHERE {} = %s
+        """.format(key))
+
+        params = (value,)
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            for (
+                id,
+                member_id,
+                email,
+                forgot_key,
+                expiration
+            ) in cls.source.cursor:
+                forgot_password = {
+                    "id": id,
+                    "member_id": member_id,
+                    "email": email,
+                    "forgot_key": forgot_key,
+                    "expiration": expiration
+                }
+
+                return forgot_password
+
+        return None
+
+    @classmethod
+    def register(cls, email, username, password, first_name, 
                  last_name, date_of_birth, phone_number,
                  country, city, street, postal, state, province,
                  commit=True):
@@ -230,14 +298,12 @@ class MemberDA(object):
         VALUES (%s, %s, crypt(%s, gen_salt('bf')), %s, %s, %s)
         RETURNING id
         """)
-
         query_member_contact = ("""
         INSERT INTO member_contact
         (member_id, phone_number, email)
         VALUES (%s, %s, %s)
         RETURNING id
         """)
-
         query_member_location = ("""
         INSERT INTO member_location
         (member_id, street, city, state, province, postal, country)
@@ -251,14 +317,25 @@ class MemberDA(object):
         params_member = (email, username, password, first_name, last_name, date_of_birth)
         cls.source.execute(query_member, params_member)
         id = cls.source.get_last_row_id()
-
-        # store member contact info
+        
+        #store member contact info
         params_member_contact = (id, phone_number, email)
         cls.source.execute(query_member_contact, params_member_contact)
-
-        # store member location info
+        
+        #store member location info
         params_member_location = (id, street, city, state, province, postal, country)
-        cls.source.execute(query_member_location, params_member_location)
+        cls.source.execute(query_member_location, params_member_location)        
+
+        if phone_number:
+            # store member contact info
+            params_member_contact = (id, phone_number, email)
+            cls.source.execute(query_member_contact, params_member_contact)
+
+        if street:
+            # store member location info
+            params_member_location = (id, street, city, state, province, postal, country)
+            cls.source.execute(query_member_location, params_member_location)
+
         # params_member_contact_info = (id, phone_number, email)
         # cls.source.execute(query_member_contact, params_member_contact_info)
 
@@ -348,6 +425,112 @@ class MemberDA(object):
                 return member
         return None
 
+    @classmethod
+    def __get_member_forgot_by_email(cls, key, value):
+        query = ("""
+            SELECT
+                id,
+                member_id,
+                email,
+                forgot_key,
+                expiration
+            FROM forgot_password
+            WHERE {} = %s
+            """.format(key))
+
+        params = (value,)
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            for (
+                id,
+                member_id,
+                email,
+                forgot_key,
+                expiration
+            ) in cls.source.cursor:
+                forgot_password = {
+                    "id": id,
+                    "member_id": member_id,
+                    "email": email,
+                    "forgot_key": forgot_key,
+                    "expiration": expiration
+                }
+
+                return forgot_password
+
+        return None
+
+    @classmethod
+    def create_forgot_password(cls, member_id, email, forgot_key,
+                            expiration, commit=True):
+
+        query = ("""
+        INSERT INTO forgot_password
+            (member_id, email, forgot_key, expiration)
+        VALUES (%s, %s, %s, %s)
+        RETURNING id
+        """)
+
+        params = (
+            member_id, email, forgot_key, expiration
+        )
+        cls.source.execute(query, params)
+
+        if commit:
+            cls.source.commit()
+        result = cls.get_password_reset_info_by_email(email)
+        return result
+
+    @classmethod
+    def delete_reset_password_info(cls, id, commit=True):
+        query = ("""
+            DELETE FROM forgot_password WHERE id = %s
+            """)
+
+        params = (id,)
+        res = cls.source.execute(query, params)
+        if commit:
+            cls.source.commit()
+
+        return res
+
+    @classmethod
+    def expire_reset_password_key(cls, expiration, forgot_key, commit=True):
+
+        query = ("""
+        UPDATE forgot_password SET
+            expiration = %s
+        WHERE forgot_key = %s
+        """)
+
+        params = (
+            expiration, forgot_key,
+        )
+        try:
+            cls.source.execute(query, params)
+
+            if commit:
+                cls.source.commit()
+        except DataMissingError as err:
+            raise DataMissingError from err
+
+    @classmethod
+    def update_member_password(cls, member_id, password, commit=True):
+        query = ("""
+        UPDATE member SET
+            password = crypt(%s, gen_salt('bf'))
+        WHERE id = %s
+        """)
+        params = (
+            password, member_id 
+        )
+        try:
+            cls.source.execute(query, params)
+
+            if commit:
+                cls.source.commit()
+        except DataMissingError as err:
+            raise DataMissingError from err
 
 
 class MemberContactDA(object):
@@ -378,7 +561,7 @@ class MemberContactDA(object):
                 contact.update_date as update_date
             FROM contact
             WHERE contact.member_id = %s
-            ORDER BY contact.update_date DESC
+            ORDER BY contact.first_name ASC
             """)
         get_contacts_params = (member_id,)
         cls.source.execute(get_contacts_query, get_contacts_params)
@@ -430,28 +613,33 @@ class MemberContactDA(object):
     def get_members(cls, member_id):
         members = list()
         get_members_query = ("""
-            SELECT
-                member.id as id,
-                member.first_name as first_name,
-                member.last_name as last_name,
-                contact.contact_member_id as contact_member_id
-            FROM member
-            LEFT JOIN contact ON member.id = contact.contact_member_id
-            WHERE member.id <> %s
-            """)
-        get_members_params = (member_id,)
+                SELECT 
+                    member.id as id,
+                    member.first_name as first_name,
+                    member.last_name as last_name,
+                    member.email as email,
+                    contact.contact_member_id as contact_member_id
+                FROM member
+                LEFT JOIN contact ON (member.id = contact.contact_member_id AND contact.member_id = %s)
+                WHERE member.id <> %s
+                ORDER BY member.first_name ASC
+                """)
+        get_members_params = (member_id,member_id,)
         cls.source.execute(get_members_query, get_members_params)
         if cls.source.has_results():
             for (
                     id,
                     first_name,
                     last_name,
+                    email,
                     contact_member_id
             ) in cls.source.cursor:
                 if not contact_member_id:
                     member = {
                         "id": id,
-                        "name": f'{first_name} {last_name}'
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "email": email
                     }
                     members.append(member)
         return members
@@ -574,4 +762,5 @@ class MemberContactDA(object):
             return contact_id
         except Exception as e:
             raise e
+
 

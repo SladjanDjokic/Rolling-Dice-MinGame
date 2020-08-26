@@ -26,7 +26,10 @@ services:
     volumes:
       - ../web-api/datasource/postgresql/members.sql:/docker-entrypoint-initdb.d/1-members.sql
       - ../web-api/datasource/postgresql/group.sql:/docker-entrypoint-initdb.d/2-group.sql
-      - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/3-test-member.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-07-21.sql:/docker-entrypoint-initdb.d/3-1-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-08-13.sql:/docker-entrypoint-initdb.d/3-2-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-08-14.sql:/docker-entrypoint-initdb.d/3-3-schema-updates.sql
+      - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/4-test-member.sql
     environment:
       POSTGRES_DB: ameraiot
       POSTGRES_USER: amera

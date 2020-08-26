@@ -212,6 +212,7 @@ class SessionDA (object):
                 username,
                 first_name,
                 last_name,
+                status,
                 create_date,
                 update_date,
                 expiration_date
@@ -259,6 +260,7 @@ class SessionDA (object):
                 username,
                 first_name,
                 last_name,
+                status,
                 create_date,
                 update_date,
                 expiration_date
@@ -269,6 +271,7 @@ class SessionDA (object):
                     "username": username,
                     "first_name": first_name,
                     "last_name": last_name,
+                    "status": status,
                     "create_date": create_date,
                     "update_date": update_date,
                     "expiration_date": expiration_date

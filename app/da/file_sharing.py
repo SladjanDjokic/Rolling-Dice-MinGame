@@ -18,32 +18,38 @@ class FileStorageDA(object):
 
     @classmethod
     def store_file_to_storage(cls, file):
-        file_id = str(int(datetime.datetime.now().timestamp() * 1000))
-        # file_name = file_id + "." + file.filename.split(".")[-1]
-        file_name = file_id + "-" + file.filename
-        file_path = cls.refile_path + "/" + file_name
+        if file is None:
+            return None
+        
+        try:
+            file_id = str(int(datetime.datetime.now().timestamp() * 1000))
+            # file_name = file_id + "." + file.filename.split(".")[-1]
+            file_name = file_id + "-" + file.filename
+            file_path = cls.refile_path + "/" + file_name
 
-        logger.debug("Filename: {}".format(file_name))
-        logger.debug("Filepath: {}".format(file_path))
+            logger.debug("Filename: {}".format(file_name))
+            logger.debug("Filepath: {}".format(file_path))
 
-        temp_file_path = file_path + "~"
-        with open(temp_file_path, "wb") as f:
-            f.write(file.file.read())
-        # file has been fully saved to disk move it into place
-        os.rename(temp_file_path, file_path)
+            temp_file_path = file_path + "~"
+            with open(temp_file_path, "wb") as f:
+                f.write(file.file.read())
+            # file has been fully saved to disk move it into place
+            os.rename(temp_file_path, file_path)
 
-        storage_engine = "S3"
-        bucket = settings.get("storage.s3.bucket")
-        s3_location = settings.get("storage.s3.file_location_host")
+            storage_engine = "S3"
+            bucket = settings.get("storage.s3.bucket")
+            s3_location = settings.get("storage.s3.file_location_host")
 
-        uploaded = cls.upload_to_aws(file_path, bucket, file_name)
-        if uploaded:
-            s3_location = f"{s3_location}/{file_name}"
-            file_id = cls.create_file_storage_entry(
-                s3_location, storage_engine, "available")
-            os.remove(file_path)
-            return file_id
-        else:
+            uploaded = cls.upload_to_aws(file_path, bucket, file_name)
+            if uploaded:
+                s3_location = f"{s3_location}/{file_name}"
+                file_id = cls.create_file_storage_entry(
+                    s3_location, storage_engine, "available")
+                os.remove(file_path)
+                return file_id
+            else:
+                return None
+        except AttributeError:
             return None
 
     @classmethod
@@ -84,20 +90,24 @@ class FileStorageDA(object):
         return file_id[0][0]
 
     @classmethod
-    def create_member_file_entry(cls, file_id, file_name, member_id, status, iv=None, commit=True):
+    def create_member_file_entry(cls, file_id, file_name, member_id, status, category = None, iv=None, commit=True):
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query = ("""
             INSERT INTO member_file
             (file_id, file_name, member_id, status, categories, file_ivalue)
-            VALUES (%s, %s, %s, %s, '', %s)
+            VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
         """)
-        params = (file_id, file_name, member_id, status,iv)
+        params = (file_id, file_name, member_id, status, category, iv)
         cls.source.execute(query, params)
+
+        if cls.source.has_results():
+            result = cls.source.cursor.fetchone()
+            id = result[0]
 
         if commit:
             cls.source.commit()
 
-        return True
+        return id
 
     @classmethod
     def get_member_file(cls, member, file_id):

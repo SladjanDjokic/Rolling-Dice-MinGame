@@ -95,7 +95,7 @@ class GroupDA (object):
         query = ("""
             SELECT *
             FROM member_group
-            WHERE group_leader_id = %s
+            WHERE group_leader_id = %s AND status = 'active'
             ORDER BY update_date DESC
         """)
         params = (group_leader_id,)
@@ -151,6 +151,22 @@ class GroupDA (object):
 
         return id
 
+    @classmethod
+    def change_group_status(cls, group_id, status, commit=True):
+        query = """
+            UPDATE member_group SET
+                status = %s
+            WHERE id = %s 
+        """
+        params = (status, group_id,)
+        try:
+            cls.source.execute(query, params)
+
+            if commit:
+                cls.source.commit()
+        except Exception as err:
+            raise err
+ 
 class GroupMembershipDA (object):
 
     source = source

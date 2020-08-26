@@ -1,13 +1,3 @@
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
--- CREATE USER amera;
--- CREATE DATABASE ameraiot;
-GRANT ALL PRIVILEGES ON DATABASE ameraiot TO amera;
--- On ameraiot database
--- GRANT ALL ON TABLES IN schema public TO amera;
--- GRANT ALL ON ALL SEQUENCES IN schema public TO amera;
-
-
-
 -- Possible Calendar_HolidayType
 CREATE TYPE calendar_holidaytype AS ENUM ('Local', 'State', 'Federal');
 
@@ -25,7 +15,6 @@ CREATE TYPE scheduler_dateformat AS ENUM ('MM/DD/YYYY', 'MM/DD/YY', 'YYYY/MM/DD'
 
 -- Possible Scheduler_TimeFormat
 CREATE TYPE scheduler_timeformat AS ENUM ('AM/PM', '24Hr');
-
 
 
 -- Member_Scheduler_Setting table

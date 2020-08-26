@@ -18,6 +18,8 @@ domains = [
 ]
 access_control_allow_origin = "auto"
 member_invite_register_url = "/member/invite/register/{}"
+member_forgot_password_url = "/login/reset/{}"
+forgot_password_expiration = 600
 
 [database]
 port = 5432

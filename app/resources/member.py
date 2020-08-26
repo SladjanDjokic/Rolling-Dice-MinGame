@@ -1,5 +1,6 @@
 import logging
 from datetime import timezone, datetime
+from uuid import UUID
 
 import app.util.json as json
 import app.util.request as request
@@ -7,8 +8,7 @@ from app.da.member import MemberDA, MemberContactDA
 from app.da.invite import InviteDA
 from app.da.group import GroupMembershipDA
 from app.util.session import get_session_cookie, validate_session
-from app.exceptions.member import MemberNotFound, MemberDataMissing, MemberExists, MemberContactExists
-from app.exceptions.member import MemberNotFound, MemberDataMissing, MemberExists, MemberPasswordMismatch
+from app.exceptions.member import MemberNotFound, MemberDataMissing, MemberExists, MemberContactExists, MemberPasswordMismatch
 from app.exceptions.invite import InviteNotFound, InviteExpired
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 
@@ -110,9 +110,8 @@ class MemberRegisterResource(object):
         'exempt_methods': ['POST']
     }
 
-    def on_post(self, req, resp):
+    def on_post(self, req, resp, invite_key=None):
         # We store the key in hex format in the database
-        invite_key = req.get_param('invite_key')
 
         (email, password, confirm_password,
          first_name, last_name, date_of_birth,
@@ -127,9 +126,9 @@ class MemberRegisterResource(object):
             raise MemberPasswordMismatch()
 
         if (not email or not password or
-            not first_name or not last_name or
-            not date_of_birth or not phone_number or
-            not country or not city or not street or not postal):
+            not first_name or not last_name): #  or
+#            not date_of_birth or not phone_number or
+#            not country or not city or not street or not postal):
 
             raise MemberDataMissing()
 
@@ -147,6 +146,11 @@ class MemberRegisterResource(object):
         if member:
             raise MemberExists(email)
 
+        member = MemberDA.get_member_by_email(email);
+        
+        if member:
+            raise MemberExists(email);
+        
         member_id = MemberDA.register(
             email=email, username=email, password=password,
             first_name=first_name, last_name=last_name,
@@ -158,6 +162,7 @@ class MemberRegisterResource(object):
 
         # Update the invite reference to the newly created member_id
         if invite_key:
+            invite_key = invite_key.hex           
             InviteDA.update_invite_registered_member(
                 invite_key=invite_key, registered_member_id=member_id
             )
@@ -207,36 +212,39 @@ class ContactMembersResource(object):
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
 
-        contact_member_id = req.get_param('contact_member_id')
-        contact_member = MemberDA().get_contact_member(contact_member_id)
+        contacts = list()
+        contact_member_id_list = req.get_param('member_id_list').split(',')
+        for contact_member_id in contact_member_id_list:
+            contact_member = MemberDA().get_contact_member(contact_member_id)
 
-        contact_member_params = {
-            "member_id": member_id,
-            "contact_member_id": contact_member_id,
-            "first_name": contact_member['first_name'],
-            "last_name": contact_member['last_name'],
-            "country": contact_member['country'],
-            "cell_phone": contact_member['cell_phone'],
-            "office_phone": '',
-            "home_phone": '',
-            "email": contact_member['email'],
-            "personal_email": '',
-            "company_name": '',
-            "company_phone": '',
-            "company_web_site": '',
-            "company_email": '',
-            "company_bio": '',
-            "contact_role": ''
-        }
+            contact_member_params = {
+                "member_id": member_id,
+                "contact_member_id": contact_member_id,
+                "first_name": contact_member['first_name'],
+                "last_name": contact_member['last_name'],
+                "country": contact_member['country'],
+                "cell_phone": contact_member['cell_phone'],
+                "office_phone": '',
+                "home_phone": '',
+                "email": contact_member['email'],
+                "personal_email": '',
+                "company_name": '',
+                "company_phone": '',
+                "company_web_site": '',
+                "company_email": '',
+                "company_bio": '',
+                "contact_role": ''
+            }
 
-        contact_id = MemberContactDA().create_member_contact(**contact_member_params)
-        logger.debug("New created contact_id: {}".format(contact_id))
-        contact = {}
-        if contact_id:
-            contact = MemberContactDA().get_member_contact(contact_id)
+            contact_id = MemberContactDA().create_member_contact(**contact_member_params)
+            logger.debug("New created contact_id: {}".format(contact_id))
+            contact = {}
+            if contact_id:
+                contact = MemberContactDA().get_member_contact(contact_id)
+            contacts.append(contact)
 
         resp.body = json.dumps({
-            "contact": contact,
+            "contacts": contacts,
             "success": True
         }, default_parser=json.parser)
 

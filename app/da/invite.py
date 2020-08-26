@@ -214,6 +214,7 @@ class InviteDA(object):
                     "last_name": last_name,
                     "inviter_member_id": inviter_member_id,
                     "registered_member_id": registered_member_id,
+                    "status": "Registered" if registered_member_id else "Unregistered",
                     "create_date": create_date,
                     "update_date": update_date,
                     "inviter_first_name": inviter_first_name,

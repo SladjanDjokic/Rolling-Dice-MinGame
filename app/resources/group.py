@@ -13,12 +13,13 @@ import app.util.email as sendmail
 from app.da.file_sharing import FileStorageDA
 from app.da.group import GroupDA, GroupMembershipDA, GroupMemberInviteDA
 from app.da.member import MemberDA
-from app.exceptions.group import GroupExists, MemberNotFound, MemberExists
+from app.exceptions.group import GroupExists, MemberNotFound, MemberExists, GroupNotFound
 from app.exceptions.invite import InviteExistsError, InviteDataMissingError,\
     InviteKeyMissing, InviteNotFound, InviteExists,\
     InviteExpired, InviteDataMissing, InviteInvalidInviterError,\
     InviteInvalidInviter, InviteEmailSystemFailure
 from app.exceptions.member import MemberExists
+from app.exceptions.session import ForbiddenSession
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +30,8 @@ class MemberGroupResource(object):
             "name", "pin", "members", "exchangeOption", req=req)
         
         session_id = get_session_cookie(req)
-        logging.debug("==================> >>>>>>>>>>>>>")
-        logging.debug(session_id)
         session = validate_session(session_id)
         group_leader_id = session["member_id"]
-        logging.debug(group_leader_id)
         
         group_exist = GroupDA().get_group_by_name_and_leader_id(group_leader_id, name)
         members = json.loads(members)
@@ -135,7 +133,24 @@ class GroupDetailResource(object):
         group['members'] = members
         group['total_member'] = len(members)
         return group
+    
+    def on_delete(self, req, resp, group_id=None):
+        session_id = get_session_cookie(req)
+        session = validate_session(session_id)
+        member_id = session["member_id"]
+        
+        group = GroupDA().get_group(group_id)
 
+        if not group:
+            raise GroupNotFound
+        if group["group_leader_id"] != member_id:
+            raise ForbiddenSession
+        GroupDA().change_group_status(group_id, 'deleted')
+        resp.body = json.dumps({
+            "data": group,
+            "description": "Group deleted successfully!",
+            "success": True
+        }, default_parser=json.parser)
 
 class GroupMembershipResource(object):
     @staticmethod

@@ -94,6 +94,15 @@ CREATE TABLE member_session (
   expiration_date TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
+-- Member forgot password table
+CREATE TABLE forgot_password (
+  id SERIAL PRIMARY KEY,
+  forgot_key VARCHAR(255) NOT NULL UNIQUE,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  expiration TIMESTAMP WITH TIME ZONE NOT NULL,
+  member_id INT REFERENCES member(id) NOT NULL
+);
+
 -- file storage engine table
 CREATE TABLE file_storage_engine (
   id SERIAL PRIMARY KEY,

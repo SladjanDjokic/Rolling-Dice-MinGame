@@ -22,5 +22,15 @@ class InvalidSessionError (Exception):
 class UnauthorizedSession(falcon.HTTPUnauthorized):
     def __init__(self):
         title = "Session is invalid"
-        description = "The is no longer a valid session"
+        description = "This is no longer a valid session"
+        super().__init__(title=title, description=description)
+
+# ------------
+# HTTP Errors
+# ------------
+# HTTP Response Error to throw when a permission is not allowed
+class ForbiddenSession(falcon.HTTPForbidden):
+    def __init__(self):
+        title = "Session is invalid"
+        description = "This is a session not allowed for the action"
         super().__init__(title=title, description=description)

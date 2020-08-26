@@ -17,6 +17,13 @@ class GroupNotFound(falcon.HTTPNotFound):
         super().__init__(description=description)
         self._group = group
 
+# HTTP Response Error to throw when a user is not found
+class GroupFound(falcon.HTTPNotFound):
+    def __init__(self, group):
+        title="Group Not Found",
+        description="The Group {} was not found".format(group)
+        super().__init__(description=description)
+        self._group = group
 
 # HTTP Response Error to throw when an invite is duplicate
 class GroupExists(falcon.HTTPConflict):

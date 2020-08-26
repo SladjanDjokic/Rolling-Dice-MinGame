@@ -11,8 +11,8 @@ from app.exceptions.file_sharing import FileShareExists, FileNotFound
 class FileStorage(object):
     @staticmethod
     def on_post(req, resp):
-        (member_id, file_length) = request.get_json_or_form(
-            "memberId", "fileLength", req=req)
+        (member_id, file_length, category) = request.get_json_or_form(
+            "memberId", "fileLength", "category", req=req)
         member = MemberDA().get_member(member_id)
         if not member:
             resp.body = json.dumps({
@@ -30,7 +30,7 @@ class FileStorage(object):
                 file_id = FileStorageDA().store_file_to_storage(file)
                 status = 'available'
                 res = FileStorageDA().create_member_file_entry(
-                    file_id, file.filename, member_id, status, iv)
+                    file_id, file.filename, member_id, status, category, iv)
                 if not res:
                     raise "Unable to create member_file_entry"
                 member_file = FileStorageDA().get_member_file(member, file_id)
