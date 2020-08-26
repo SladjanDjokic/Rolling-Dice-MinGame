@@ -100,7 +100,7 @@ class FileStorageDA(object):
             INSERT INTO member_file
             (file_id, file_name, member_id, status,
              categories, file_ivalue, file_size_bytes)
-            VALUES (%s, %s, %s, %s, '', %s, %s)
+            VALUES (%s, %s, %s, %s, '', %s, %s) RETURNING id
         """)
         params = (file_id, file_name, member_id, status, iv, file_size_bytes)
         cls.source.execute(query, params)
