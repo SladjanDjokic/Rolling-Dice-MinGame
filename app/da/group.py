@@ -3,16 +3,15 @@ import logging
 import uuid
 from dateutil.relativedelta import relativedelta
 from app.util.db import source
-from app.exceptions.data import DuplicateKeyError, DataMissingError,\
+from app.exceptions.data import DuplicateKeyError, DataMissingError, \
     RelationshipReferenceError
-from app.exceptions.invite import InviteExistsError, InviteDataMissingError,\
+from app.exceptions.invite import InviteExistsError, InviteDataMissingError, \
     InviteInvalidInviterError
 
 logger = logging.getLogger(__name__)
 
 
-class GroupDA (object):
-
+class GroupDA(object):
     source = source
 
     @classmethod
@@ -36,11 +35,11 @@ class GroupDA (object):
         cls.source.execute(query, params)
         if cls.source.has_results():
             for (
-                id,
-                group_leader_id,
-                group_name,
-                create_date,
-                update_date,
+                    id,
+                    group_leader_id,
+                    group_name,
+                    create_date,
+                    update_date,
             ) in cls.source.cursor:
                 group = {
                     "group_id": id,
@@ -92,15 +91,23 @@ class GroupDA (object):
 
     @classmethod
     def get_group_list_by_group_leader_id(cls, group_leader_id):
+        group_list = list()
         query = ("""
-            SELECT *
+            SELECT
+                member_group.id as group_id,
+                member_group.group_leader_id as group_leader_id,
+                member_group.group_name as group_name,
+                member_group.create_date as create_date,
+                member_group.update_date as update_date,
+                member.first_name as group_leader_first_name,
+                member.last_name as group_leader_last_name
             FROM member_group
-            WHERE group_leader_id = %s AND status = 'active'
-            ORDER BY update_date DESC
+            LEFT JOIN member ON member_group.group_leader_id = member.id
+            WHERE member_group.group_leader_id = %s AND member_group.status = 'active'
+            ORDER BY member_group.group_name ASC
         """)
         params = (group_leader_id,)
         cls.source.execute(query, params)
-        group_list = list()
         if cls.source.has_results():
             all_group = cls.source.cursor.fetchall()
             for row in all_group:
@@ -108,12 +115,11 @@ class GroupDA (object):
                     "group_id": row[0],
                     "group_leader_id": row[1],
                     "group_name": row[2],
+                    "group_leader_name": f'{row[5]} {row[6]}',
+                    "total_member": len(GroupMembershipDA().get_members_by_group_id(row[0])),
                     "create_date": row[3],
-                    "update_date": row[4]
+                    "update_date": row[4],
                 }
-                group_id = group['group_id']
-                members = GroupMembershipDA().get_members_by_group_id(group_id)
-                group['total_member'] = len(members)
                 group_list.append(group)
         return group_list
 
@@ -133,7 +139,7 @@ class GroupDA (object):
             cls.source.commit()
 
         return id
-    
+
     @classmethod
     def create_expanded_group(cls, member_id, group_name, picture_file_id, pin, exchange_option, commit=True):
         query = ("""
@@ -143,7 +149,7 @@ class GroupDA (object):
         """)
 
         params = (member_id, group_name, picture_file_id, pin, exchange_option)
-        
+
         cls.source.execute(query, params)
         id = cls.source.get_last_row_id()
         if commit:
@@ -166,9 +172,9 @@ class GroupDA (object):
                 cls.source.commit()
         except Exception as err:
             raise err
- 
-class GroupMembershipDA (object):
 
+
+class GroupMembershipDA(object):
     source = source
 
     @classmethod
@@ -179,7 +185,7 @@ class GroupMembershipDA (object):
                 FROM member_group
                 WHERE id = %s
             """)
-            params = (group_id, )
+            params = (group_id,)
             cls.source.execute(query, params)
             group_leader_id = cls.source.cursor.fetchone()[0]
             if group_leader_id == member_id:
@@ -198,6 +204,7 @@ class GroupMembershipDA (object):
             return id
         except Exception as e:
             return None
+
     @classmethod
     def bulk_create_group_membership(cls, group_leader_id, group_id, members, commit=True):
         try:
@@ -212,7 +219,7 @@ class GroupMembershipDA (object):
             params = tuple(params)
 
             cls.source.execute(query, params, True)
-            
+
             if commit:
                 cls.source.commit()
         except Exception as e:
@@ -288,7 +295,7 @@ class GroupMembershipDA (object):
                 LEFT JOIN member ON member_group_membership.member_id = member.id
                 WHERE member_group_membership.group_id = %s
             """)
-            params = (group_id, )
+            params = (group_id,)
             members = list()
             cls.source.execute(query, params)
             if cls.source.has_results():
@@ -336,7 +343,8 @@ class GroupMembershipDA (object):
 
             if page_size and page_number:
                 query += """LIMIT %s OFFSET %s"""
-                params = (group_id, like_search_key, like_search_key, like_search_key, like_search_key, page_size, (page_number-1)*page_size)
+                params = (group_id, like_search_key, like_search_key, like_search_key, like_search_key, page_size,
+                          (page_number - 1) * page_size)
 
             members = list()
             cls.source.execute(query, params)
@@ -360,7 +368,7 @@ class GroupMembershipDA (object):
                 DELETE FROM member_group_membership
                 WHERE group_id = %s AND member_id = %s
             """)
-            params = (group_id, member_id, )
+            params = (group_id, member_id,)
             res = cls.source.execute(query, params)
             if commit:
                 cls.source.commit()
@@ -370,8 +378,7 @@ class GroupMembershipDA (object):
             return None
 
 
-class GroupMemberInviteDA (object):
-
+class GroupMemberInviteDA(object):
     source = source
 
     @classmethod
