@@ -1,11 +1,14 @@
 import mimetypes
 
+import logging
 import app.util.json as json
 import app.util.request as request
 from app.da.member import MemberDA
 from app.da.file_sharing import FileStorageDA, ShareFileDA
 from app.util.session import get_session_cookie, validate_session
 from app.exceptions.file_sharing import FileShareExists, FileNotFound
+
+logger = logging.getLogger(__name__)
 
 
 class FileStorage(object):
@@ -23,25 +26,31 @@ class FileStorage(object):
             return
         try:
             file_count = int(file_length)
-            member_files = list()
             for index in range(0, file_count):
                 file = req.get_param(f'file{index}')
+                file_size_bytes = req.get_param(f'file{index}_size')
+                file_name = req.get_param(f'file{index}_key')
+                file_ids_to_delete = json.loads(req.get_param(
+                    f'file{index}_replace_file_ids'))
                 iv = req.get_param(f'file{index}.iv')
-                file_id = FileStorageDA().store_file_to_storage(file)
+                file_id = FileStorageDA(
+                ).store_file_to_storage(file)
                 status = 'available'
                 res = FileStorageDA().create_member_file_entry(
-                    file_id, file.filename, member_id, status, category, iv)
+                    file_id=file_id, file_name=file_name, member_id=member_id, status=status, file_size_bytes=file_size_bytes, iv=iv)
                 if not res:
                     raise "Unable to create member_file_entry"
-                member_file = FileStorageDA().get_member_file(member, file_id)
+                if len(file_ids_to_delete) > 0:
+                    # We are deleting duplicates if the user requested file overwrites
+                    for file_id in file_ids_to_delete:
+                        FileStorageDA().delete_file(file_id)
 
-                member_files.insert(0, member_file)
-
+            # Since is is possible that some files are deleted after this upload, we have to push _all_ member files to front
             resp.body = json.dumps({
-                "data": member_files,
+                "data": FileStorageDA().get_member_files(member),
                 "description": "File uploaded successfully",
                 "success": True
-            })  
+            })
         except Exception as e:
             resp.body = json.dumps({
                 "message": e,
@@ -61,6 +70,39 @@ class FileStorage(object):
         else:
             resp.body = json.dumps({
                 "description": "Can not get files for un-exising member",
+                "success": False
+            })
+
+    @staticmethod
+    def on_put(req, resp):
+        data_dict = req.media
+        member_id = data_dict["memberId"]
+
+        member = MemberDA().get_member(member_id)
+        if not member:
+            resp.body = json.dumps({
+                "message": "Member does not exist",
+                "status": "warning",
+                "success": False
+            })
+            return
+        try:
+            for file_to_rename in data_dict["renameItems"]:
+                file_id = file_to_rename["fileId"]
+                new_file_name = file_to_rename["newKey"]
+                logger.debug(
+                    f"Will attempt to rename file with Id {file_id} to {new_file_name}")
+                rename_success = FileStorageDA().rename_file(member, file_id, new_file_name)
+            member_files = FileStorageDA().get_member_files(member)
+            resp.body = json.dumps({
+                "data": member_files if member_files else [],
+                "description": 'Synced successfully',
+                "success": True
+            })
+
+        except Exception as e:
+            resp.body = json.dumps({
+                "message": e,
                 "success": False
             })
 
@@ -184,7 +226,8 @@ class ShareFile(object):
             session = validate_session(session_id)
             member_id = session["member_id"]
             if member_id:
-                (shared_key_list, ) = request.get_json_or_form("shared_key_list", req=req)
+                (shared_key_list, ) = request.get_json_or_form(
+                    "shared_key_list", req=req)
                 removed_key_list = list()
                 for shared_key in shared_key_list:
                     removed_key = ShareFileDA().remove_sharing(shared_key)

@@ -2,15 +2,16 @@ import os
 import falcon
 import mimetypes
 from pathlib import Path
+import logging
+
 
 class StaticResource(object):
     def on_get(self, req, resp, file_name):
         # do some sanity check on the filename
         file_path = f'{os.getcwd()}/static/{file_name}'
-
         file = Path(file_path)
         # iv = file.suffix
-        
+
         type = mimetypes.MimeTypes().guess_type(file_path)[0]
         resp.content_type = type
         resp.status = falcon.HTTP_200

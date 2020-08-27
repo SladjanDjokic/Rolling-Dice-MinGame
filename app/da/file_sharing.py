@@ -1,5 +1,6 @@
 import os
 import datetime
+from urllib.parse import urlparse, urljoin
 from dateutil.tz import tzlocal
 import secrets
 import logging
@@ -8,6 +9,7 @@ from botocore.exceptions import NoCredentialsError, ClientError
 
 from app.util.db import source
 from app.config import settings
+from app.util.filestorage import safe_open, timestampify_filekey, s3fy_filekey
 
 logger = logging.getLogger(__name__)
 
@@ -18,38 +20,40 @@ class FileStorageDA(object):
 
     @classmethod
     def store_file_to_storage(cls, file):
-        if file is None:
-            return None
-        
-        try:
-            file_id = str(int(datetime.datetime.now().timestamp() * 1000))
-            # file_name = file_id + "." + file.filename.split(".")[-1]
-            file_name = file_id + "-" + file.filename
-            file_path = cls.refile_path + "/" + file_name
+        '''
+        We are saving nested "some_folder/some-file.ext" and unnested "some-file.ext" files.
+        Since we do this file-by-file - we ignore the file path during disk save, i.e. "some_folder/some-file.ext" => "some-file.ext"
+        But we keep that structure in aws
+        '''
+        file_id = str(int(datetime.datetime.now().timestamp() * 1000))
+        # file_name = file_id + "." + file.filename.split(".")[-1]
+        (dirname, true_filename) = os.path.split(file.filename)
+        file_name = file_id + "-" + true_filename
+        local_path = f"{cls.refile_path}/{file_name}"
+        storage_key = f"{dirname}/{file_name}"
 
-            logger.debug("Filename: {}".format(file_name))
-            logger.debug("Filepath: {}".format(file_path))
+        # Use utility to create folder if it doesn't exist'
+        temp_file_path = local_path + "~"
+        with safe_open(temp_file_path, "wb") as f:
+            f.write(file.file.read())
+        # file has been fully saved to disk move it into place
+        os.rename(temp_file_path, local_path)
 
-            temp_file_path = file_path + "~"
-            with open(temp_file_path, "wb") as f:
-                f.write(file.file.read())
-            # file has been fully saved to disk move it into place
-            os.rename(temp_file_path, file_path)
+        storage_engine = "S3"
+        bucket = settings.get("storage.s3.bucket")
+        s3_location = settings.get("storage.s3.file_location_host")
 
-            storage_engine = "S3"
-            bucket = settings.get("storage.s3.bucket")
-            s3_location = settings.get("storage.s3.file_location_host")
+        uploaded = cls.upload_to_aws(local_path, bucket, storage_key)
 
-            uploaded = cls.upload_to_aws(file_path, bucket, file_name)
-            if uploaded:
-                s3_location = f"{s3_location}/{file_name}"
-                file_id = cls.create_file_storage_entry(
-                    s3_location, storage_engine, "available")
-                os.remove(file_path)
-                return file_id
-            else:
-                return None
-        except AttributeError:
+        # Handle keyed filenames here
+        if uploaded:
+            # s3_location = f"{s3_location}/{storage_key}"
+            s3_file_location = urljoin(s3_location, storage_key)
+            file_id = cls.create_file_storage_entry(
+                s3_file_location, storage_engine, "available")
+            os.remove(local_path)
+            return file_id
+        else:
             return None
 
     @classmethod
@@ -90,14 +94,16 @@ class FileStorageDA(object):
         return file_id[0][0]
 
     @classmethod
-    def create_member_file_entry(cls, file_id, file_name, member_id, status, category = None, iv=None, commit=True):
+    def create_member_file_entry(cls, file_id, file_name, member_id, status, file_size_bytes, category=None, iv=None, commit=True):
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query = ("""
             INSERT INTO member_file
-            (file_id, file_name, member_id, status, categories, file_ivalue)
-            VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
+            (file_id, file_name, member_id, status,
+             categories, file_ivalue, file_size_bytes)
+            VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
         """)
-        params = (file_id, file_name, member_id, status, category, iv)
+        params = (file_id, file_name, member_id,
+                  status, category, iv, file_size_bytes)
         cls.source.execute(query, params)
 
         if cls.source.has_results():
@@ -116,12 +122,14 @@ class FileStorageDA(object):
                 member_file.file_id as file_id,
                 member_file.file_name as file_name,
                 member_file.categories as categories,
+                member_file.file_size_bytes as file_size_bytes,
                 file_storage_engine.storage_engine_id as file_link,
                 file_storage_engine.storage_engine as storage_engine,
                 file_storage_engine.status as status,
-                file_storage_engine.create_date as create_date,
-                CASE WHEN 
-                    (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '') 
+                file_storage_engine.create_date as created_date,
+                file_storage_engine.update_date as updated_date,
+                CASE WHEN
+                    (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '')
                     THEN 'unencrypted'
                     ELSE 'encrypted'
                 END as file_status
@@ -136,21 +144,25 @@ class FileStorageDA(object):
                 file_id,
                 file_name,
                 categories,
+                file_size_bytes,
                 file_link,
                 storage_engine,
                 status,
-                create_date,
+                created_date,
+                updated_date,
                 file_status,
             ) in cls.source.cursor:
                 member_file = {
                     "file_id": file_id,
                     "file_name": file_name,
                     "categories": categories,
+                    "file_size_bytes": file_size_bytes,
                     "file_url": file_link,
                     "storage_engine": storage_engine,
                     "status": status,
                     "member": member["first_name"],
-                    "create_date": datetime.datetime.strftime(create_date, "%Y-%m-%d %H:%M:%S"),
+                    "created_date": datetime.datetime.strftime(created_date, "%Y-%m-%d %H:%M:%S"),
+                    "updated_date": datetime.datetime.strftime(updated_date, "%Y-%m-%d %H:%M:%S"),
                     "file_status": file_status
                 }
                 return member_file
@@ -163,14 +175,17 @@ class FileStorageDA(object):
                     member_file.file_id as file_id,
                     member_file.file_name as file_name,
                     member_file.categories as categories,
-                    CASE WHEN 
+                    member_file.file_size_bytes as file_size_bytes,
+                    file_storage_engine.storage_engine_id as file_link,
+                    file_storage_engine.storage_engine as storage_engine,
+                    file_storage_engine.status as status,
+                    file_storage_engine.create_date as created_date,
+                    file_storage_engine.update_date as updated_date,
+                    CASE WHEN
                         (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '')
                         THEN 'unencrypted'
                         ELSE 'encrypted'
-                    END as file_status,
-                    file_storage_engine.storage_engine as storage_engine,
-                    file_storage_engine.status as status,
-                    file_storage_engine.create_date as create_date
+                    END as file_status
                 FROM member_file
                 LEFT JOIN file_storage_engine ON file_storage_engine.id = member_file.file_id
                 WHERE member_file.member_id = %s AND file_storage_engine.status = %s
@@ -185,11 +200,14 @@ class FileStorageDA(object):
                     "file_id": entry_da[0],
                     "file_name": entry_da[1],
                     "categories": entry_da[2],
-                    "file_status": entry_da[3],
-                    "storage_engine": entry_da[4],
-                    "status": entry_da[5],
-                    "member": member["first_name"],
-                    "create_date": datetime.datetime.strftime(entry_da[6], "%Y-%m-%d %H:%M:%S")
+                    "file_size_bytes": entry_da[3],
+                    "file_link": entry_da[4],
+                    "storage_engine": entry_da[5],
+                    "status": entry_da[6],
+                    "created_date": datetime.datetime.strftime(entry_da[7], "%Y-%m-%d %H:%M:%S"),
+                    "updated_date": datetime.datetime.strftime(entry_da[8], "%Y-%m-%d %H:%M:%S"),
+                    "file_status": entry_da[9],
+                    "member": member["first_name"]
                 }
                 entry.append(entry_element)
             return entry
@@ -205,6 +223,8 @@ class FileStorageDA(object):
                 file_storage_engine.create_date as created_date,
                 file_storage_engine.update_date as updated_date,
                 member_file.file_name as file_name,
+                member_file.file_size_bytes as file_size_bytes,
+                member_file.file_ivalue as file_iv_value,
                 member_file.categories as categories
             FROM file_storage_engine
             LEFT JOIN member_file ON file_storage_engine.id = member_file.file_id
@@ -221,7 +241,9 @@ class FileStorageDA(object):
                 created_date,
                 updated_date,
                 file_name,
-                categories,
+                file_size_bytes,
+                file_iv_value,
+                categories
             ) in cls.source.cursor:
                 file_detail = {
                     "file_id": file_id,
@@ -231,6 +253,8 @@ class FileStorageDA(object):
                     "created_date": datetime.datetime.strftime(created_date, "%Y-%m-%d %H:%M:%S"),
                     "updated_date": datetime.datetime.strftime(updated_date, "%Y-%m-%d %H:%M:%S"),
                     "file_name": file_name,
+                    "file_size_bytes": file_size_bytes,
+                    "file_iv_value": file_iv_value,
                     "categories": categories,
                     "member_first_name": member.get("first_name"),
                     "member_last_name": member.get("last_name"),
@@ -257,14 +281,17 @@ class FileStorageDA(object):
         #         bucket_name = settings.get("bucket")
         #         delete = cls.remove_aws_object(bucket_name, item_key)
 
-        current_time_with_timezone = datetime.datetime.now(tzlocal()).isoformat().replace("T", " ")
+        # logger.info(f"Deleting {file_id}")
+        current_time_with_timezone = datetime.datetime.now(
+            tzlocal()).isoformat().replace("T", " ")
         query = ("""
             UPDATE file_storage_engine
             SET status = %s, update_date = %s
             WHERE id = %s AND status = %s
         """)
 
-        params = ("deleted", current_time_with_timezone, file_id, "available", )
+        params = ("deleted", current_time_with_timezone,
+                  file_id, "available", )
         res = cls.source.execute(query, params)
         try:
             if commit:
@@ -277,7 +304,7 @@ class FileStorageDA(object):
     def store_file_to_static(cls, file_id):
         query = ("""
                     SELECT storage_engine_id as file_url, member_file.file_ivalue as file_ivalue
-                    FROM file_storage_engine 
+                    FROM file_storage_engine
                         LEFT OUTER JOIN member_file ON (file_storage_engine.id = member_file.file_id)
                     WHERE file_storage_engine.id = %s
                 """)
@@ -291,13 +318,35 @@ class FileStorageDA(object):
                 file_ivalue = file[1]
                 if not file_ivalue:
                     file_ivalue = ""
-                item_key = file_url.split("/")[3]
+
+                #  url is "https://file-testing.s3.us-east-2.amazonaws.com/folder1/foldder2/file.ext"
+                item_key = urlparse(file_url).path
+
                 download = cls.download_aws_object(
                     bucket_name, item_key, file_ivalue)
                 if download:
                     return f"{item_key}{file_ivalue}"
             except Exception as e:
                 print(e)
+
+    @classmethod
+    def rename_file(cls, member, file_id, new_file_name):
+        """
+            We don't touch the actual file nor its path in storage (for performance reasons), we do only change the displayed filename in member_files table .
+        """
+        try:
+            query = ("""
+                        UPDATE member_file
+                        SET file_name = %s
+                        WHERE file_id = %s
+                    """)
+            params = (new_file_name, file_id,)
+            cls.source.execute(query, params)
+            if cls.source.has_results():
+                cls.source.commit()
+                return True
+        except Exception as e:
+            logger.debug(e.message)
 
     @classmethod
     def remove_aws_object(cls, bucket_name, item_key):
@@ -308,6 +357,20 @@ class FileStorageDA(object):
         return True
 
     @classmethod
+    def copy_aws_object(cls, bucket_name, old_key, new_key):
+        """ Will create a copy replacing old_key with new_key
+        """
+        logging.debug(
+            f"Will try to access old key {old_key} and change it to {new_key}")
+        try:
+            s3 = cls.aws_s3_client()
+            s3.copy(CopySource={'Bucket': bucket_name,
+                                'Key': old_key}, Bucket=bucket_name, Key=new_key)
+            return True
+        except Exception as e:
+            raise
+
+    @classmethod
     def download_aws_object(cls, bucket_name, item_key, file_ivalue=None):
         """ Provide bucket name and item key, remove from S3
         """
@@ -315,12 +378,19 @@ class FileStorageDA(object):
         static_path = os.path.join(os.getcwd(), "static")
         if not os.path.exists(static_path):
             os.mkdir(static_path)
-
-        file_path = f"{static_path}/{item_key}"
+        '''
+        If file is nested within a folder on s3, its key will look like "folder/another/121212-filename.ext"
+        We want to address that when we download, but can't keep that folder structure in static i.e.
+        the path to file will be "static/121212-filename.ext"
+        '''
+        (dirname, filename) = os.path.split(item_key)
+        file_path = f"{static_path}/{filename}"
         if file_ivalue:
-            file_path = f"{static_path}/{item_key}{file_ivalue}"
-        s3.download_file(bucket_name, item_key, item_key)
-        os.replace(item_key, file_path)
+            file_path = f"{static_path}/{filename}{file_ivalue}~"
+        key = s3fy_filekey(item_key)
+        # logger.debug(
+        # f"Obi wan, we will download file from this bucket {bucket_name}, and this item key {key}")
+        s3.download_file(bucket_name, key, file_path)
         return True
 
     @staticmethod
@@ -329,7 +399,8 @@ class FileStorageDA(object):
             "s3",
             region_name=settings.get("services.aws.region_name"),
             aws_access_key_id=settings.get("services.aws.access_key_id"),
-            aws_secret_access_key=settings.get("services.aws.secret_access_key")
+            aws_secret_access_key=settings.get(
+                "services.aws.secret_access_key")
         )
 
 
@@ -345,7 +416,8 @@ class ShareFileDA(object):
         else:
             filter_key = 'shared_member_id'
             filter_value = shared_member_id
-        exist = cls.check_shared_exist(file_id, member_id, filter_key, filter_value)
+        exist = cls.check_shared_exist(
+            file_id, member_id, filter_key, filter_value)
         if exist:
             return False
         else:
@@ -376,25 +448,29 @@ class ShareFileDA(object):
     @classmethod
     def get_shared_files(cls, member):
         shared_files = list()
+        # Shared BY me
         query = ("""
             SELECT
                 shared_file.file_id as file_id,
                 shared_file.shared_unique_key as shared_key,
+                shared_file.member_id as sharer_member_id,
                 member_file.file_name as file_name,
-                member.first_name as shared_member_first_name,
-                member.last_name as shared_member_last_name,
-                CASE WHEN 
-                    (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '') 
+                member.first_name as consumer_first_name,
+                member.last_name as consumer_last_name,
+                CASE WHEN
+                    (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '')
                     THEN 'unencrypted'
                     ELSE 'encrypted'
                 END as file_status,
-                member.email as shared_member_email,
-                shared_file.create_date as shared_date
+                member.email as consumer_email,
+                shared_file.create_date as shared_date,
+                shared_file.shared_member_id as consumer_member_id,
+                member_file.file_size_bytes as file_size_bytes
             FROM shared_file
             LEFT JOIN file_storage_engine ON file_storage_engine.id = shared_file.file_id
             LEFT JOIN member_file ON member_file.file_id = shared_file.file_id
             LEFT JOIN member ON member.id = shared_file.shared_member_id
-            WHERE shared_file.member_id = %s AND file_storage_engine.status = %s AND shared_member_id IS NOT NULL 
+            WHERE shared_file.member_id = %s AND file_storage_engine.status = %s AND shared_member_id IS NOT NULL
             ORDER BY shared_file.create_date DESC
         """)
         params = (member.get("member_id"), "available", )
@@ -404,23 +480,37 @@ class ShareFileDA(object):
                 elem = {
                     "file_id": file[0],
                     "shared_key": file[1],
-                    "file_name": file[2],
-                    "member": member.get("first_name"),
-                    "shared_member": file[3],
-                    "shared_member_email": file[6],
-                    "shared_date": file[7]
+                    "sharer_member_id": file[2],
+                    "sharer_first_name": member.get("first_name"),
+                    "sharer_last_name": member.get("last_name"),
+                    "file_name": file[3],
+                    "consumer_first_name": file[4],
+                    "consumer_last_name": file[5],
+                    "file_status": file[6],
+                    "consumer_email": file[7],
+                    "shared_date": file[8],
+                    "consumer_member_id": file[9],
+                    "file_size_bytes": file[10]
                 }
                 shared_files.append(elem)
+        # Shared WITH me
         query = ("""
             SELECT
                 shared_file.file_id as file_id,
                 shared_file.shared_unique_key as shared_key,
-                
+                shared_file.member_id as sharer_member_id,
                 member_file.file_name as file_name,
-                member.first_name as shared_member_first_name,
-                member.last_name as shared_member_last_name,
+                member.first_name as consumer_first_name,
+                member.last_name as consumer_last_name,
+                CASE WHEN
+                    (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '')
+                    THEN 'unencrypted'
+                    ELSE 'encrypted'
+                END as file_status,
                 member.email as shared_member_email,
-                shared_file.create_date as shared_date
+                shared_file.create_date as shared_date,
+                shared_file.shared_member_id as consumer_member_id,
+                member_file.file_size_bytes as file_size_bytes
             FROM shared_file
             LEFT JOIN file_storage_engine ON file_storage_engine.id = shared_file.file_id
             LEFT JOIN member_file ON member_file.file_id = shared_file.file_id
@@ -435,11 +525,17 @@ class ShareFileDA(object):
                 elem = {
                     "file_id": file[0],
                     "shared_key": file[1],
-                    "file_name": file[2],
-                    "member": member.get("first_name"),
-                    "shared_member": file[3],
-                    "shared_member_email": file[5],
-                    "shared_date": file[6]
+                    "sharer_member_id": file[2],
+                    "sharer_first_name": file[4],
+                    "sharer_first_name": file[5],
+                    "file_name": file[3],
+                    "consumer_first_name": member.get("first_name"),
+                    "consumer_last_name": member.get("last_name"),
+                    "file_status": file[6],
+                    "consumer_email": member.get("email"),
+                    "shared_date": file[8],
+                    "consumer_member_id": member.get("member_id"),
+                    "file_size_bytes": file[10]
                 }
                 shared_files.append(elem)
         return shared_files
@@ -450,15 +546,24 @@ class ShareFileDA(object):
         query = ("""
             SELECT
                 shared_file.file_id as file_id,
-                shared_file.shared_unique_key as shared_key,
+                shared_file.shared_unique_key as shared_key, 
                 member_file.file_name as file_name,
+                member_file.file_size_bytes as file_size_bytes,
+                CASE WHEN
+                    (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '')
+                    THEN 'unencrypted'
+                    ELSE 'encrypted'
+                END as file_status,
                 member_group.group_name as group_name,
                 member_group.id as group_id,
-                shared_file.create_date as shared_date
+                shared_file.update_date as updated_date,  
+                member.last_name as last_name,
+                member.first_name as first_name
             FROM shared_file
             LEFT JOIN file_storage_engine ON file_storage_engine.id = shared_file.file_id
             LEFT JOIN member_file ON member_file.file_id = shared_file.file_id
             LEFT JOIN member_group ON member_group.id = shared_file.group_id
+            LEFT JOIN member ON member.id = shared_file.member_id
             WHERE shared_file.member_id = %s AND file_storage_engine.status = %s AND group_id IS NOT NULL
             ORDER BY shared_file.create_date DESC
         """)
@@ -470,9 +575,13 @@ class ShareFileDA(object):
                     "file_id": file[0],
                     "shared_key": file[1],
                     "file_name": file[2],
-                    "group_name": file[3],
-                    "group_id": file[4],
-                    "shared_date": file[5]
+                    "file_size_bytes": file[3],
+                    "file_status": file[4],
+                    "group_name": file[5],
+                    "group_id": file[6],
+                    "updated_date": file[7],
+                    "last_name": file[8],
+                    "first_name": file[9],
                 }
                 shared_files.append(elem)
 
@@ -492,13 +601,22 @@ class ShareFileDA(object):
                 shared_file.file_id as file_id,
                 shared_file.shared_unique_key as shared_key,
                 member_file.file_name as file_name,
+                member_file.file_size_bytes as file_size_bytes,
+                  CASE WHEN
+                    (member_file.file_ivalue IS NULL OR member_file.file_ivalue = '')
+                    THEN 'unencrypted'
+                    ELSE 'encrypted'
+                END as file_status,
                 member_group.group_name as group_name,
                 member_group.id as group_id,
-                shared_file.create_date as shared_date
+                shared_file.update_date as updated_date,  
+                member.last_name as last_name,
+                member.first_name as first_name
             FROM shared_file
             LEFT JOIN file_storage_engine ON file_storage_engine.id = shared_file.file_id
             LEFT JOIN member_file ON member_file.file_id = shared_file.file_id
             LEFT JOIN member_group ON member_group.id = shared_file.group_id
+            LEFT JOIN member ON member.id = shared_file.member_id
             WHERE shared_file.group_id in (""" + include_member_group_id_list + """) AND file_storage_engine.status = %s
             ORDER BY shared_file.create_date DESC
         """)
@@ -510,9 +628,13 @@ class ShareFileDA(object):
                     "file_id": file[0],
                     "shared_key": file[1],
                     "file_name": file[2],
-                    "group_name": file[3],
-                    "group_id": file[4],
-                    "shared_date": file[5]
+                    "file_size_bytes": file[3],
+                    "file_status": file[4],
+                    "group_name": file[5],
+                    "group_id": file[6],
+                    "updated_date": file[7],
+                    "last_name": file[8],
+                    "first_name": file[9],
                 }
                 shared_files.append(elem)
         return shared_files
