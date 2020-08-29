@@ -32,7 +32,10 @@ class FileStorage(object):
                 file_name = req.get_param(f'file{index}_key')
                 file_ids_to_delete = json.loads(req.get_param(
                     f'file{index}_replace_file_ids'))
+                # Unencrypted fiels will have undefined
                 iv = req.get_param(f'file{index}_iv')
+                if iv == 'undefined':
+                    iv = None
                 file_id = FileStorageDA(
                 ).store_file_to_storage(file)
                 status = 'available'
