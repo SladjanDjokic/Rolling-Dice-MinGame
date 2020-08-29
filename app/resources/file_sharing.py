@@ -32,7 +32,7 @@ class FileStorage(object):
                 file_name = req.get_param(f'file{index}_key')
                 file_ids_to_delete = json.loads(req.get_param(
                     f'file{index}_replace_file_ids'))
-                iv = req.get_param(f'file{index}.iv')
+                iv = req.get_param(f'file{index}_iv')
                 file_id = FileStorageDA(
                 ).store_file_to_storage(file)
                 status = 'available'
