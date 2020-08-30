@@ -1,6 +1,18 @@
 import falcon
 
 
+# ------------
+# Application Errors
+# ------------
+
+# Application Error when unable to store file in storage
+class FileStorageUploadError (Exception):
+    pass
+
+
+# ------------
+# HTTP Errors
+# ------------
 class FileShareExists(falcon.HTTPConflict):
 
     def __init__(self):
@@ -18,6 +30,12 @@ class FileShareExists(falcon.HTTPConflict):
 
 class FileNotFound(falcon.HTTPNotFound):
     def __init__(self):
-        title="File Not Found",
-        description="File Not found"
+        description = "File Not found"
+        super().__init__(description=description)
+
+
+# "Unable to create member_file_entry"
+class FileUploadCreateException(falcon.HTTPUnprocessableEntity):
+    def __init__(self):
+        description = "Unable to create file in system"
         super().__init__(description=description)

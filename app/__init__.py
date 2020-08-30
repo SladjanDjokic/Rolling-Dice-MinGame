@@ -18,7 +18,7 @@ from app.resources.session import SessionResource, ValidateSessionResource
 from app.resources.file_sharing import FileStorage, FileStorageDetail, ShareFile, ShareFileDetail, \
     DownloadStorageFile, DownloadSharedFile
 from app.resources.group import MemberGroupResource, GroupMembershipResource, GroupDetailResource, \
-    GroupMemberInviteResource
+    GroupMemberInviteResource, GroupMembersResource
 from app.resources.file_sharing import FileStorage, FileStorageDetail, \
     ShareFile, ShareFileDetail, DownloadStorageFile, DownloadSharedFile
 from app.resources.system import SystemActivitySessionResource, SystemActivityInviteResource
@@ -119,6 +119,7 @@ def _setup_routes(app):
     app.add_route("/groups", MemberGroupResource())
     app.add_route("/groups/membership", GroupMembershipResource())
     app.add_route("/member/group/invite", GroupMemberInviteResource())
+    app.add_route("/member/group-members", GroupMembersResource())
 
     app.add_route("/system/activity/invite", SystemActivityInviteResource())
     app.add_route("/system/activity/session", SystemActivitySessionResource())

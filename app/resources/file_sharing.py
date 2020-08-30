@@ -6,7 +6,8 @@ import app.util.request as request
 from app.da.member import MemberDA
 from app.da.file_sharing import FileStorageDA, ShareFileDA
 from app.util.session import get_session_cookie, validate_session
-from app.exceptions.file_sharing import FileShareExists, FileNotFound
+from app.exceptions.file_sharing import FileShareExists, FileNotFound, \
+    FileUploadCreateException, FileStorageUploadError
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,9 @@ class FileStorage(object):
     def on_post(req, resp):
         (member_id, file_length, category) = request.get_json_or_form(
             "memberId", "fileLength", "category", req=req)
+
         member = MemberDA().get_member(member_id)
+
         if not member:
             resp.body = json.dumps({
                 "message": "Member does not exist",
@@ -24,32 +27,52 @@ class FileStorage(object):
                 "success": False
             })
             return
+
         try:
             file_count = int(file_length)
             for index in range(0, file_count):
+
                 file = req.get_param(f'file{index}')
                 file_size_bytes = req.get_param(f'file{index}_size')
                 file_name = req.get_param(f'file{index}_key')
+
                 file_ids_to_delete = json.loads(req.get_param(
                     f'file{index}_replace_file_ids'))
                 iv = req.get_param(f'file{index}.iv')
-                file_id = FileStorageDA(
-                ).store_file_to_storage(file)
+
+                file_id = FileStorageDA().store_file_to_storage(file)
                 status = 'available'
+
+                logger.debug(f'FILE STORAGE IDENTIFIER: {file_id}')
+
                 res = FileStorageDA().create_member_file_entry(
-                    file_id=file_id, file_name=file_name, member_id=member_id, status=status, file_size_bytes=file_size_bytes, iv=iv)
+                    file_id=file_id,
+                    file_name=file_name,
+                    member_id=member_id,
+                    status=status,
+                    file_size_bytes=file_size_bytes,
+                    iv=iv
+                )
                 if not res:
-                    raise "Unable to create member_file_entry"
+                    raise FileUploadCreateException
+
                 if len(file_ids_to_delete) > 0:
-                    # We are deleting duplicates if the user requested file overwrites
+                    # We are deleting duplicates if the user
+                    # requested file overwrites
                     for file_id in file_ids_to_delete:
                         FileStorageDA().delete_file(file_id)
 
-            # Since is is possible that some files are deleted after this upload, we have to push _all_ member files to front
+            # Since is is possible that some files are deleted after this
+            # upload, we have to push _all_ member files to front
             resp.body = json.dumps({
                 "data": FileStorageDA().get_member_files(member),
                 "description": "File uploaded successfully",
                 "success": True
+            }, default_parser=json.parser)
+        except FileStorageUploadError as e:
+            resp.body = json.dumps({
+                "message": e,
+                "success": False
             })
         except Exception as e:
             resp.body = json.dumps({
@@ -66,7 +89,7 @@ class FileStorage(object):
             resp.body = json.dumps({
                 "data": member_files if member_files else [],
                 "success": True
-            })
+            }, default_parser=json.parser)
         else:
             resp.body = json.dumps({
                 "description": "Can not get files for un-exising member",
@@ -98,7 +121,7 @@ class FileStorage(object):
                 "data": member_files if member_files else [],
                 "description": 'Synced successfully',
                 "success": True
-            })
+            }, default_parser=json.parser)
 
         except Exception as e:
             resp.body = json.dumps({
@@ -117,8 +140,8 @@ class FileStorage(object):
                 "data": file_id_list,
                 "description": "File removed successfully",
                 "success": True
-            })
-        except Exception as e:
+            }, default_parser=json.parser)
+        except Exception:
             resp.body = json.dumps({
                 "description": "Something went wrong",
                 "success": False
@@ -136,7 +159,7 @@ class FileStorageDetail(object):
                 "data": file_detail,
                 "status": "success",
                 "success": True
-            })
+            }, default_parser=json.parser)
         else:
             resp.body = json.dumps({
                 "message": "Can not get file for un-exising member",
@@ -155,7 +178,7 @@ class DownloadStorageFile(object):
                 "message": "",
                 "status": "Success",
                 "success": True
-            })
+            }, default_parser=json.parser)
         else:
             resp.body = json.dumps({
                 "message": "Something Went Wrong",
@@ -190,7 +213,7 @@ class ShareFile(object):
                     "data": shared_file_id_list,
                     "description": "File Shared successfully",
                     "success": True
-                })
+                }, default_parser=json.parser)
             else:
                 raise FileShareExists()
         except Exception as e:
@@ -255,7 +278,7 @@ class ShareFileDetail(object):
             resp.body = json.dumps({
                 "data": shared_file_detail,
                 "success": True
-            })
+            }, default_parser=json.parser)
         else:
             resp.body = json.dumps({
                 "message": "Can not get shared files for un-exising member",
@@ -275,7 +298,7 @@ class DownloadSharedFile(object):
                     "message": "File Downloaded successfully",
                     "status": "Success",
                     "success": True
-                })
+                }, default_parser=json.parser)
             else:
                 resp.body = json.dumps({
                     "message": "File does not exist",

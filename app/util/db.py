@@ -64,12 +64,17 @@ class DataSource (object):
             return self.conn.start_transaction()
 
         def get_last_row_id(self):
-            return self.cursor.fetchone()[0]
+            result = self.cursor.fetchone()
+            logger.debug(f"QUERY RESULT: {result}")
+            return result[0]
 
         def execute(self, query, params, bulk_insert=False):
             try:
                 if not self.cursor:
                     self.connect()
+                logger.debug(f"BULK_INSERT: {bulk_insert}")
+                logger.debug(f"EXECUTE_QUERY: {query}")
+                logger.debug(f"EXECUTE_PARAMS: {params}")
                 if bulk_insert:
                     return extras.execute_values(self.cursor, query, params)
                 else:
@@ -83,7 +88,7 @@ class DataSource (object):
             except connector.errors.ForeignKeyViolation as err:
                 self.rollback()
                 raise RelationshipReferenceError from err
-            except Exception as e:
+            except Exception:
                 logger.exception("[FIXME]: Unknown Exception")
                 try:
                     self.rollback()

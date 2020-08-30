@@ -1,15 +1,16 @@
 import os
 import datetime
 from urllib.parse import urlparse, urljoin
-from dateutil.tz import tzlocal
+# from dateutil.tz import tzlocal
 import secrets
 import logging
 import boto3
-from botocore.exceptions import NoCredentialsError, ClientError
+from botocore.exceptions import NoCredentialsError  # , ClientError
 
 from app.util.db import source
 from app.config import settings
-from app.util.filestorage import safe_open, timestampify_filekey, s3fy_filekey
+from app.util.filestorage import safe_open, s3fy_filekey
+from app.exceptions.file_sharing import FileStorageUploadError
 
 logger = logging.getLogger(__name__)
 
@@ -45,16 +46,18 @@ class FileStorageDA(object):
 
         uploaded = cls.upload_to_aws(local_path, bucket, storage_key)
 
+        if not uploaded:
+            raise FileStorageUploadError
+
         # Handle keyed filenames here
-        if uploaded:
-            # s3_location = f"{s3_location}/{storage_key}"
-            s3_file_location = urljoin(s3_location, storage_key)
-            file_id = cls.create_file_storage_entry(
-                s3_file_location, storage_engine, "available")
-            os.remove(local_path)
-            return file_id
-        else:
-            return None
+        s3_file_location = urljoin(s3_location, storage_key)
+
+        file_id = cls.create_file_storage_entry(
+            s3_file_location, storage_engine, "available")
+
+        os.remove(local_path)
+
+        return file_id
 
     @classmethod
     def upload_to_aws(cls, local_file, bucket, s3_file):
@@ -72,29 +75,33 @@ class FileStorageDA(object):
             return False
 
     @classmethod
-    def create_file_storage_entry(cls, file_path, storage_engine, status, commit=True):
+    def create_file_storage_entry(cls, file_path, storage_engine, status,
+                                  commit=True):
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query = ("""
             INSERT INTO file_storage_engine
             (storage_engine_id, storage_engine, status)
             VALUES (%s, %s, %s)
+            RETURNING id
         """)
+
         params = (file_path, storage_engine, status, )
         cls.source.execute(query, params)
 
+        logger.debug(
+            f"[create_file_storage_entry] COMMIT TRANSACTION: {commit}")
         if commit:
             cls.source.commit()
 
-        # get id just committed
-        query = ("""
-            SELECT currval(pg_get_serial_sequence('file_storage_engine','id'))
-        """)
-        cls.source.execute(query, ("", ))
-        file_id = cls.source.cursor.fetchall()
-        return file_id[0][0]
+        id = cls.source.get_last_row_id()
+        logger.debug(
+            f"[create_file_storage_entry] TRANSACTION IDENTIFIER: {id}")
+
+        return id
 
     @classmethod
-    def create_member_file_entry(cls, file_id, file_name, member_id, status, file_size_bytes, category=None, iv=None, commit=True):
+    def create_member_file_entry(cls, file_id, file_name, member_id, status,
+                                 file_size_bytes, category=None, iv=None, commit=True):
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query = ("""
             INSERT INTO member_file
@@ -106,12 +113,14 @@ class FileStorageDA(object):
                   status, category, iv, file_size_bytes)
         cls.source.execute(query, params)
 
-        if cls.source.has_results():
-            result = cls.source.cursor.fetchone()
-            id = result[0]
-
+        logger.debug(
+            f"[create_member_file_entry] COMMIT TRANSACTION: {commit}")
         if commit:
             cls.source.commit()
+
+        id = cls.source.get_last_row_id()
+        logger.debug(
+            f"[create_member_file_entry] TRANSACTION IDENTIFIER: {id}")
 
         return id
 
@@ -161,8 +170,8 @@ class FileStorageDA(object):
                     "storage_engine": storage_engine,
                     "status": status,
                     "member": member["first_name"],
-                    "created_date": datetime.datetime.strftime(created_date, "%Y-%m-%d %H:%M:%S"),
-                    "updated_date": datetime.datetime.strftime(updated_date, "%Y-%m-%d %H:%M:%S"),
+                    "created_date": created_date,
+                    "updated_date": updated_date,
                     "file_status": file_status
                 }
                 return member_file
@@ -204,8 +213,8 @@ class FileStorageDA(object):
                     "file_link": entry_da[4],
                     "storage_engine": entry_da[5],
                     "status": entry_da[6],
-                    "created_date": datetime.datetime.strftime(entry_da[7], "%Y-%m-%d %H:%M:%S"),
-                    "updated_date": datetime.datetime.strftime(entry_da[8], "%Y-%m-%d %H:%M:%S"),
+                    "created_date": entry_da[7],
+                    "updated_date": entry_da[8],
                     "file_status": entry_da[9],
                     "member": member["first_name"]
                 }
@@ -250,8 +259,8 @@ class FileStorageDA(object):
                     "file_location": file_location,
                     "storage_engine": storage_engine,
                     "status": status,
-                    "created_date": datetime.datetime.strftime(created_date, "%Y-%m-%d %H:%M:%S"),
-                    "updated_date": datetime.datetime.strftime(updated_date, "%Y-%m-%d %H:%M:%S"),
+                    "created_date": created_date,
+                    "updated_date": updated_date,
                     "file_name": file_name,
                     "file_size_bytes": file_size_bytes,
                     "file_iv_value": file_iv_value,
@@ -282,22 +291,19 @@ class FileStorageDA(object):
         #         delete = cls.remove_aws_object(bucket_name, item_key)
 
         # logger.info(f"Deleting {file_id}")
-        current_time_with_timezone = datetime.datetime.now(
-            tzlocal()).isoformat().replace("T", " ")
         query = ("""
             UPDATE file_storage_engine
-            SET status = %s, update_date = %s
+            SET status = %s, update_date = CURRENT_TIMESTAMP
             WHERE id = %s AND status = %s
         """)
 
-        params = ("deleted", current_time_with_timezone,
-                  file_id, "available", )
-        res = cls.source.execute(query, params)
+        params = ("deleted", file_id, "available", )
+        cls.source.execute(query, params)
         try:
             if commit:
                 cls.source.commit()
                 return True
-        except Exception as e:
+        finally:
             return False
 
     @classmethod
@@ -546,7 +552,7 @@ class ShareFileDA(object):
         query = ("""
             SELECT
                 shared_file.file_id as file_id,
-                shared_file.shared_unique_key as shared_key, 
+                shared_file.shared_unique_key as shared_key,
                 member_file.file_name as file_name,
                 member_file.file_size_bytes as file_size_bytes,
                 CASE WHEN
@@ -556,7 +562,7 @@ class ShareFileDA(object):
                 END as file_status,
                 member_group.group_name as group_name,
                 member_group.id as group_id,
-                shared_file.update_date as updated_date,  
+                shared_file.update_date as updated_date,
                 member.last_name as last_name,
                 member.first_name as first_name
             FROM shared_file
@@ -609,7 +615,7 @@ class ShareFileDA(object):
                 END as file_status,
                 member_group.group_name as group_name,
                 member_group.id as group_id,
-                shared_file.update_date as updated_date,  
+                shared_file.update_date as updated_date,
                 member.last_name as last_name,
                 member.first_name as first_name
             FROM shared_file

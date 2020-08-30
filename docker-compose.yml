@@ -1,28 +1,63 @@
 version: "3.8"
 services:
+  # amera-dns:
+  #   container_name: amera-dns
+  #   image: andyshinn/dnsmasq:latest
+  #   command: >
+  #    --log-queries 
+  #    --log-facility=- 
+  #    --address=/dev.amera.local/127.0.0.1
+  #   ports:
+  #     - 53:53
+  #     - 53:53/udp
+  #   cap_add:
+  #     - NET_ADMIN
+  #   networks:
+  #     - amera-net
+  # socat:
+  #   image: alpine/socat
+  #   command: tcp-listen:80,fork,reuseaddr tcp-connect:host.docker.internal:9000
+  #   environment:
+  #     - VIRTUAL_HOST=dev.amera.local
+  #     - VIRTUAL_PORT=80
+  #   expose:
+  #     - 80
   amera-nginx:
     container_name: amera-nginx
     image: nginx:alpine
     restart: always
+    logging:
+      options:
+        max-size: "500k"
+        max-file: "1"
     ports:
       - 9000:9000
       - 9443:443
-    command: [nginx-debug, "-g", "daemon off;"]
+    # command: [nginx-debug, "-g", "daemon off;"] # Uncomment if want to enable debug mode
     networks:
-      - amera-net
+      amera-net:
+        aliases:
+          - amera-tmp
+          # - amera-web-share
+          - amera-web-auth
+          # - amera-web-main
     volumes:
       - ../web:/app/main:ro
       - ../web-share:/app/share:ro
       - ../web-api/config/dev-nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - amera-web-main
+      # - amera-dns
       - amera-web-api
-      - amera-web-share
+      # - amera-web-auth
       - amera-web-db
   amera-web-main:
     container_name: amera-web-main
     image: amera-web-main:latest
     restart: always
+    logging:
+      options:
+        max-size: "500k"
+        max-file: "1"
     build:
       context: ../web
       dockerfile: Dockerfile.dev
@@ -38,6 +73,10 @@ services:
     container_name: amera-web-share
     image: amera-web-share:latest
     restart: always
+    logging:
+      options:
+        max-size: "500k"
+        max-file: "1"
     user: node
     build:
       context: ../web-share
@@ -53,10 +92,35 @@ services:
       - ../web-share:/home/node/app
     stdin_open: true
     command: ["yarn", "start"]
+  # amera-web-auth:
+  #   container_name: amera-web-auth
+  #   image: amera-web-auth:latest
+  #   restart: always
+  #   logging:
+  #     options:
+  #       max-size: "500k"
+  #       max-file: "1"
+  #   build:
+  #     context: ../web-api
+  #     dockerfile: Dockerfile.dev
+  #   depends_on:
+  #     - amera-web-db
+  #   networks:
+  #     - amera-net
+  #   expose:
+  #     - 5000
+  #   volumes:
+  #     - ../web-api:/app
+  #     - web-api-python-packages:/root/.local/share
+  #   command: ['pipenv', 'run', 'docker']
   amera-web-api:
     container_name: amera-web-api
     image: amera-web-api:latest
     restart: always
+    logging:
+      options:
+        max-size: "500k"
+        max-file: "1"
     build:
       context: ../web-api
       dockerfile: Dockerfile.dev
@@ -69,26 +133,29 @@ services:
     volumes:
       - ../web-api:/app
       - web-api-python-packages:/root/.local/share
-    command: ["pipenv", "run", "docker"]
-    # env_file:
-    #   - ".env.development"
+    command: ['pipenv', 'run', 'docker']
   amera-web-db:
     container_name: amera-web-db
     image: postgres:latest
     ports:
       - "49000:5432"
     restart: always
+    logging:
+      options:
+        max-size: "500k"
+        max-file: "1"
     volumes:
       - ../web-api/datasource/postgresql/members.sql:/docker-entrypoint-initdb.d/1-members.sql
       - ../web-api/datasource/postgresql/group.sql:/docker-entrypoint-initdb.d/2-group.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-07-21.sql:/docker-entrypoint-initdb.d/3-1-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-08-13.sql:/docker-entrypoint-initdb.d/3-2-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-08-14.sql:/docker-entrypoint-initdb.d/3-3-schema-updates.sql
-      - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/4-test-member.sql
-      - ../web-api/datasource/postgresql/scheduler.sql:/docker-entrypoint-initdb.d/5-1-scheduler.sql
-      - ../web-api/datasource/postgresql/schema-updates-2020-08-15-schedulersetting.sql:/docker-entrypoint-initdb.d/5-2-schema-updates-2020-08-15-schedulersetting.sql
-      - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/6-test-schedule.sql
-      - ../web-api/datasource/postgresql/schema-updates-2020-08-09-2.sql:/docker-entrypoint-initdb.d/6-1-schema-updates.sql
+      - ../web-api/datasource/postgresql/scheduler.sql:/docker-entrypoint-initdb.d/4-scheduler.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-08-15-schedulersetting.sql:/docker-entrypoint-initdb.d/5-1-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-08-26.sql:/docker-entrypoint-initdb.d/5-2-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-08-29.sql:/docker-entrypoint-initdb.d/5-3-schema-updates.sql
+      - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/6-test-member.sql
+      - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/7-test-schedule.sql
     environment:
       POSTGRES_DB: ameraiot
       POSTGRES_USER: amera

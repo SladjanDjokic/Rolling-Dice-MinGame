@@ -9,6 +9,7 @@ from app.exceptions.member import ForgotDuplicateDataError
 
 logger = logging.getLogger(__name__)
 
+
 class MemberDA(object):
     source = source
 
@@ -23,6 +24,52 @@ class MemberDA(object):
     @classmethod
     def get_member_by_email(cls, email):
         return cls.__get_member('email', email)
+
+    @classmethod
+    def get_all_members(cls, member_id):
+        members = list()
+        get_all_members_query = """
+            SELECT
+                id,
+                email,
+                create_date,
+                update_date,
+                username,
+                status,
+                first_name,
+                last_name
+            FROM member
+            WHERE id <> %s
+        """
+
+        get_all_members_params = (member_id, )
+        cls.source.execute(get_all_members_query, get_all_members_params)
+        if cls.source.has_results():
+            for (
+                    member_id,
+                    email,
+                    create_date,
+                    update_date,
+                    username,
+                    status,
+                    first_name,
+                    last_name,
+            ) in cls.source.cursor:
+                member = {
+                    "member_id": member_id,
+                    "email": email,
+                    "create_date": create_date,
+                    "update_date": update_date,
+                    "username": username,
+                    "status": status,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "member_name": f'{first_name} {last_name}'
+                }
+
+                members.append(member)
+
+        return members
         
     @classmethod
     def extractAvailableMembers(cls, event_invite_to_list):        

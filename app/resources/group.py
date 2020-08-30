@@ -20,6 +20,7 @@ from app.exceptions.invite import InviteExistsError, InviteDataMissingError,\
     InviteInvalidInviter, InviteEmailSystemFailure
 from app.exceptions.member import MemberExists
 from app.exceptions.session import ForbiddenSession
+from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 
 logger = logging.getLogger(__name__)
 
@@ -152,6 +153,7 @@ class GroupDetailResource(object):
             "success": True
         }, default_parser=json.parser)
 
+
 class GroupMembershipResource(object):
     @staticmethod
     def on_post(req, resp):
@@ -273,3 +275,23 @@ class GroupMemberInviteResource(object):
                 "invite_key": invite_key,
                 "register_url": register_url
             })
+
+
+class GroupMembersResource(object):
+    @staticmethod
+    def on_get(req, resp):
+
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+
+            members = MemberDA.get_all_members(member_id)
+
+            resp.body = json.dumps({
+                "members": members,
+                "success": True
+            }, default_parser=json.parser)
+
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err

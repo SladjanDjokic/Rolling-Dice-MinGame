@@ -23,11 +23,12 @@ meinheld = "==1.0.1"
 falcon-multipart = "==0.2.0"
 falcon-auth = {git = "https://github.com/loanzen/falcon-auth",ref = "v2.0.1"}
 pillow = "*"
-cryptography = "*"
 psycopg2 = "*"
 jinja2 = "*"
 boto3 = "*"
 pytz = "*"
+cryptography = "*"
+requests = "*"
 
 [requires]
 python_version = "3.6"
