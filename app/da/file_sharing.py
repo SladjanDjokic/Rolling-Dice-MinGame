@@ -33,6 +33,9 @@ class FileStorageDA(object):
         local_path = f"{cls.refile_path}/{file_name}"
         storage_key = f"{dirname}/{file_name}"
 
+        logger.debug("Filename: {}".format(file_name))
+        logger.debug("Filepath: {}".format(local_path))
+
         # Use utility to create folder if it doesn't exist'
         temp_file_path = local_path + "~"
         with safe_open(temp_file_path, "wb") as f:
@@ -132,6 +135,7 @@ class FileStorageDA(object):
                 member_file.file_name as file_name,
                 member_file.categories as categories,
                 member_file.file_size_bytes as file_size_bytes,
+                member_file.file_ivalue as file_ivalue,
                 file_storage_engine.storage_engine_id as file_link,
                 file_storage_engine.storage_engine as storage_engine,
                 file_storage_engine.status as status,
@@ -154,6 +158,7 @@ class FileStorageDA(object):
                 file_name,
                 categories,
                 file_size_bytes,
+                file_ivalue,
                 file_link,
                 storage_engine,
                 status,
@@ -166,6 +171,7 @@ class FileStorageDA(object):
                     "file_name": file_name,
                     "categories": categories,
                     "file_size_bytes": file_size_bytes,
+                    "file_ivalue": file_ivalue,
                     "file_url": file_link,
                     "storage_engine": storage_engine,
                     "status": status,
@@ -185,6 +191,7 @@ class FileStorageDA(object):
                     member_file.file_name as file_name,
                     member_file.categories as categories,
                     member_file.file_size_bytes as file_size_bytes,
+                    member_file.file_ivalue as file_ivalue,
                     file_storage_engine.storage_engine_id as file_link,
                     file_storage_engine.storage_engine as storage_engine,
                     file_storage_engine.status as status,
@@ -233,7 +240,7 @@ class FileStorageDA(object):
                 file_storage_engine.update_date as updated_date,
                 member_file.file_name as file_name,
                 member_file.file_size_bytes as file_size_bytes,
-                member_file.file_ivalue as file_iv_value,
+                member_file.file_ivalue as file_ivalue,
                 member_file.categories as categories
             FROM file_storage_engine
             LEFT JOIN member_file ON file_storage_engine.id = member_file.file_id
@@ -251,7 +258,7 @@ class FileStorageDA(object):
                 updated_date,
                 file_name,
                 file_size_bytes,
-                file_iv_value,
+                file_ivalue,
                 categories
             ) in cls.source.cursor:
                 file_detail = {
@@ -263,7 +270,7 @@ class FileStorageDA(object):
                     "updated_date": updated_date,
                     "file_name": file_name,
                     "file_size_bytes": file_size_bytes,
-                    "file_iv_value": file_iv_value,
+                    "file_ivalue": file_ivalue,
                     "categories": categories,
                     "member_first_name": member.get("first_name"),
                     "member_last_name": member.get("last_name"),
@@ -290,7 +297,7 @@ class FileStorageDA(object):
         #         bucket_name = settings.get("bucket")
         #         delete = cls.remove_aws_object(bucket_name, item_key)
 
-        # logger.info(f"Deleting {file_id}")
+        logger.info(f"Deleting {file_id}")
         query = ("""
             UPDATE file_storage_engine
             SET status = %s, update_date = CURRENT_TIMESTAMP
@@ -392,7 +399,7 @@ class FileStorageDA(object):
         (dirname, filename) = os.path.split(item_key)
         file_path = f"{static_path}/{filename}"
         if file_ivalue:
-            file_path = f"{static_path}/{filename}{file_ivalue}~"
+            file_path = f"{static_path}/{filename}{file_ivalue}"
         key = s3fy_filekey(item_key)
         # logger.debug(
         # f"Obi wan, we will download file from this bucket {bucket_name}, and this item key {key}")
@@ -552,7 +559,7 @@ class ShareFileDA(object):
         query = ("""
             SELECT
                 shared_file.file_id as file_id,
-                shared_file.shared_unique_key as shared_key,
+                shared_file.shared_unique_key as shared_key, 
                 member_file.file_name as file_name,
                 member_file.file_size_bytes as file_size_bytes,
                 CASE WHEN

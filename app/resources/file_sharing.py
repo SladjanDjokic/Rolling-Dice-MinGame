@@ -1,5 +1,3 @@
-import mimetypes
-
 import logging
 import app.util.json as json
 import app.util.request as request
@@ -8,6 +6,8 @@ from app.da.file_sharing import FileStorageDA, ShareFileDA
 from app.util.session import get_session_cookie, validate_session
 from app.exceptions.file_sharing import FileShareExists, FileNotFound, \
     FileUploadCreateException, FileStorageUploadError
+
+logger = logging.getLogger(__name__)
 
 logger = logging.getLogger(__name__)
 
@@ -34,25 +34,26 @@ class FileStorage(object):
 
                 file = req.get_param(f'file{index}')
                 file_size_bytes = req.get_param(f'file{index}_size')
-                file_name = req.get_param(f'file{index}_key')
+                # file_name = req.get_param(f'file{index}_key')
 
                 file_ids_to_delete = json.loads(req.get_param(
                     f'file{index}_replace_file_ids'))
-                iv = req.get_param(f'file{index}.iv')
-
-                file_id = FileStorageDA().store_file_to_storage(file)
+                # Unencrypted fiels will have undefined
+                iv = req.get_param(f'file{index}_iv')
+                if iv == 'undefined':
+                    iv = None
+                file_id = FileStorageDA(
+                ).store_file_to_storage(file)
                 status = 'available'
-
                 logger.debug(f'FILE STORAGE IDENTIFIER: {file_id}')
 
                 res = FileStorageDA().create_member_file_entry(
                     file_id=file_id,
-                    file_name=file_name,
+                    file_name=file.filename,
                     member_id=member_id,
                     status=status,
                     file_size_bytes=file_size_bytes,
-                    iv=iv
-                )
+                    iv=iv)
                 if not res:
                     raise FileUploadCreateException
 
@@ -100,7 +101,6 @@ class FileStorage(object):
     def on_put(req, resp):
         data_dict = req.media
         member_id = data_dict["memberId"]
-
         member = MemberDA().get_member(member_id)
         if not member:
             resp.body = json.dumps({
@@ -113,9 +113,11 @@ class FileStorage(object):
             for file_to_rename in data_dict["renameItems"]:
                 file_id = file_to_rename["fileId"]
                 new_file_name = file_to_rename["newKey"]
-                logger.debug(
-                    f"Will attempt to rename file with Id {file_id} to {new_file_name}")
-                rename_success = FileStorageDA().rename_file(member, file_id, new_file_name)
+
+                logger.debug(("Will attempt to rename file with "
+                              f"Id {file_id} to {new_file_name}"))
+
+                FileStorageDA().rename_file(member, file_id, new_file_name)
             member_files = FileStorageDA().get_member_files(member)
             resp.body = json.dumps({
                 "data": member_files if member_files else [],
@@ -190,8 +192,8 @@ class DownloadStorageFile(object):
 class ShareFile(object):
     @staticmethod
     def on_post(req, resp):
-        (file_id_list, group_id, shared_member_id) = request.get_json_or_form("file_id_list", "group_id",
-                                                                              "shared_member_id", req=req)
+        (file_id_list, group_id, shared_member_id) = request.get_json_or_form(
+            "file_id_list", "group_id", "shared_member_id", req=req)
         try:
             session_id = get_session_cookie(req)
             session = validate_session(session_id)
@@ -238,7 +240,8 @@ class ShareFile(object):
             }, default_parser=json.parser)
         else:
             resp.body = json.dumps({
-                "description": "Can not get shared files for un-existing member",
+                "description": ("Can not get shared files "
+                                "for un-existing member"),
                 "success": False
             })
 
