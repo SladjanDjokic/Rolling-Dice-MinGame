@@ -123,6 +123,7 @@ class FileStorageDA(object):
                 member_file.file_name as file_name,
                 member_file.categories as categories,
                 member_file.file_size_bytes as file_size_bytes,
+                member_file.file_ivalue as file_ivalue,
                 file_storage_engine.storage_engine_id as file_link,
                 file_storage_engine.storage_engine as storage_engine,
                 file_storage_engine.status as status,
@@ -145,6 +146,7 @@ class FileStorageDA(object):
                 file_name,
                 categories,
                 file_size_bytes,
+                file_ivalue,
                 file_link,
                 storage_engine,
                 status,
@@ -157,6 +159,7 @@ class FileStorageDA(object):
                     "file_name": file_name,
                     "categories": categories,
                     "file_size_bytes": file_size_bytes,
+                    "file_ivalue": file_ivalue,
                     "file_url": file_link,
                     "storage_engine": storage_engine,
                     "status": status,
@@ -176,6 +179,7 @@ class FileStorageDA(object):
                     member_file.file_name as file_name,
                     member_file.categories as categories,
                     member_file.file_size_bytes as file_size_bytes,
+                    member_file.file_ivalue as file_ivalue,
                     file_storage_engine.storage_engine_id as file_link,
                     file_storage_engine.storage_engine as storage_engine,
                     file_storage_engine.status as status,
@@ -201,12 +205,13 @@ class FileStorageDA(object):
                     "file_name": entry_da[1],
                     "categories": entry_da[2],
                     "file_size_bytes": entry_da[3],
-                    "file_link": entry_da[4],
-                    "storage_engine": entry_da[5],
-                    "status": entry_da[6],
-                    "created_date": datetime.datetime.strftime(entry_da[7], "%Y-%m-%d %H:%M:%S"),
-                    "updated_date": datetime.datetime.strftime(entry_da[8], "%Y-%m-%d %H:%M:%S"),
-                    "file_status": entry_da[9],
+                    "file_ivalue": entry_da[4],
+                    "file_link": entry_da[5],
+                    "storage_engine": entry_da[6],
+                    "status": entry_da[7],
+                    "created_date": datetime.datetime.strftime(entry_da[8], "%Y-%m-%d %H:%M:%S"),
+                    "updated_date": datetime.datetime.strftime(entry_da[9], "%Y-%m-%d %H:%M:%S"),
+                    "file_status": entry_da[10],
                     "member": member["first_name"]
                 }
                 entry.append(entry_element)
@@ -224,7 +229,7 @@ class FileStorageDA(object):
                 file_storage_engine.update_date as updated_date,
                 member_file.file_name as file_name,
                 member_file.file_size_bytes as file_size_bytes,
-                member_file.file_ivalue as file_iv_value,
+                member_file.file_ivalue as file_ivalue,
                 member_file.categories as categories
             FROM file_storage_engine
             LEFT JOIN member_file ON file_storage_engine.id = member_file.file_id
@@ -242,7 +247,7 @@ class FileStorageDA(object):
                 updated_date,
                 file_name,
                 file_size_bytes,
-                file_iv_value,
+                file_ivalue,
                 categories
             ) in cls.source.cursor:
                 file_detail = {
@@ -254,7 +259,7 @@ class FileStorageDA(object):
                     "updated_date": datetime.datetime.strftime(updated_date, "%Y-%m-%d %H:%M:%S"),
                     "file_name": file_name,
                     "file_size_bytes": file_size_bytes,
-                    "file_iv_value": file_iv_value,
+                    "file_ivalue": file_ivalue,
                     "categories": categories,
                     "member_first_name": member.get("first_name"),
                     "member_last_name": member.get("last_name"),
@@ -386,7 +391,7 @@ class FileStorageDA(object):
         (dirname, filename) = os.path.split(item_key)
         file_path = f"{static_path}/{filename}"
         if file_ivalue:
-            file_path = f"{static_path}/{filename}{file_ivalue}~"
+            file_path = f"{static_path}/{filename}{file_ivalue}"
         key = s3fy_filekey(item_key)
         # logger.debug(
         # f"Obi wan, we will download file from this bucket {bucket_name}, and this item key {key}")
