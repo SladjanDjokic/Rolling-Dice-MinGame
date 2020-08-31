@@ -217,12 +217,13 @@ class FileStorageDA(object):
                     "file_name": entry_da[1],
                     "categories": entry_da[2],
                     "file_size_bytes": entry_da[3],
-                    "file_link": entry_da[4],
-                    "storage_engine": entry_da[5],
-                    "status": entry_da[6],
-                    "created_date": entry_da[7],
-                    "updated_date": entry_da[8],
-                    "file_status": entry_da[9],
+                    "file_ivalue": entry_da[4],
+                    "file_link": entry_da[5],
+                    "storage_engine": entry_da[6],
+                    "status": entry_da[7],
+                    "created_date": entry_da[8],
+                    "updated_date": entry_da[9],
+                    "file_status": entry_da[10],
                     "member": member["first_name"]
                 }
                 entry.append(entry_element)

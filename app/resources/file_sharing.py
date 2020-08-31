@@ -34,7 +34,7 @@ class FileStorage(object):
 
                 file = req.get_param(f'file{index}')
                 file_size_bytes = req.get_param(f'file{index}_size')
-                # file_name = req.get_param(f'file{index}_key')
+                file_name = req.get_param(f'file{index}_key')
 
                 file_ids_to_delete = json.loads(req.get_param(
                     f'file{index}_replace_file_ids'))
@@ -49,7 +49,7 @@ class FileStorage(object):
 
                 res = FileStorageDA().create_member_file_entry(
                     file_id=file_id,
-                    file_name=file.filename,
+                    file_name=file_name,
                     member_id=member_id,
                     status=status,
                     file_size_bytes=file_size_bytes,
