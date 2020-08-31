@@ -217,7 +217,7 @@ class FileStorageDA(object):
                     "file_name": entry_da[1],
                     "categories": entry_da[2],
                     "file_size_bytes": entry_da[3],
-                    "file_ivalue": entry_da[4]
+                    "file_ivalue": entry_da[4],
                     "file_link": entry_da[5],
                     "storage_engine": entry_da[6],
                     "status": entry_da[7],
