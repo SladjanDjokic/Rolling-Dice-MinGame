@@ -29,10 +29,13 @@ class MemberGroupResource(object):
     def on_post(self, req, resp):
         (name, pin, members, exchange_option) = request.get_json_or_form(
             "name", "pin", "members", "exchangeOption", req=req)
-        
-        session_id = get_session_cookie(req)
-        session = validate_session(session_id)
-        group_leader_id = session["member_id"]
+
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            group_leader_id = session["member_id"]
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
         
         group_exist = GroupDA().get_group_by_name_and_leader_id(group_leader_id, name)
         members = json.loads(members)
@@ -56,7 +59,12 @@ class MemberGroupResource(object):
 
     @staticmethod
     def on_get(req, resp):
-        group_leader_id = req.get_param('groupLeaderId')
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            group_leader_id = session["member_id"]
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
         group_list = GroupDA().get_group_list_by_group_leader_id(group_leader_id)
         resp.body = json.dumps({
             "data": group_list,
@@ -173,7 +181,13 @@ class GroupMembershipResource(object):
 
     @staticmethod
     def on_get(req, resp):
-        member_id = req.get_param('member_id')
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+
         group_list = GroupMembershipDA().get_group_by_member_id(member_id)
         resp.body = json.dumps({
             "data": group_list,

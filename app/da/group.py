@@ -254,14 +254,15 @@ class GroupMembershipDA(object):
                     group = {
                         "group_id": elem[0],
                         "group_name": elem[1],
-                        "group_created_date": elem[2],
-                        "group_updated_date": elem[3],
+                        "group_create_date": elem[2],
+                        "group_update_date": elem[3],
                         "group_leader_id": elem[4],
+                        "group_leader_name": f'{elem[5]} {elem[6]}',
                         "group_leader_first_name": elem[5],
                         "group_leader_last_name": elem[6],
                         "group_leader_email": elem[7],
-                        "group_membership_create_date": elem[8],
-                        "group_membership_update_date": elem[9]
+                        "create_date": elem[8],
+                        "update_date": elem[9]
                     }
                     group_id = group['group_id']
                     members = cls.get_members_by_group_id(group_id)
