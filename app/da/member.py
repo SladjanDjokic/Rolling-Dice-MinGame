@@ -591,22 +591,31 @@ class MemberContactDA(object):
                 contact.id as id,
                 contact.contact_member_id as contact_member_id,
                 contact.first_name as first_name,
+                member.middle_name as middle_name,
                 contact.last_name as last_name,
                 contact.cell_phone as cell_phone,
                 contact.office_phone as office_phone,
                 contact.home_phone as home_phone,
                 contact.email as email,
                 contact.personal_email as personal_email,
+                member.company_name as company,
+                member.job_title as title,
                 contact.company_name as company_name,
                 contact.company_phone as company_phone,
                 contact.company_web_site as company_web_site,
                 contact.company_email as company_email,
                 contact.company_bio as company_bio,
-                contact.country as country,
                 contact.contact_role as role,
                 contact.create_date as create_date,
-                contact.update_date as update_date
+                contact.update_date as update_date,
+                member_location.city as city,
+                member_location.state as state,
+                member_location.province as province,
+                member_location.country as country
             FROM contact
+            LEFT JOIN member ON member.id = contact.contact_member_id
+            LEFT JOIN member_location ON member_location.member_id = contact.contact_member_id
+            LEFT JOIN member_contact ON member_contact.member_id = contact.contact_member_id
             WHERE contact.member_id = %s
             ORDER BY contact.first_name ASC
             """)
@@ -617,6 +626,7 @@ class MemberContactDA(object):
                     id,
                     contact_member_id,
                     first_name,
+                    middle_name,
                     last_name,
                     cell_phone,
                     office_phone,
@@ -624,34 +634,45 @@ class MemberContactDA(object):
                     email,
                     personal_email,
                     company_name,
+                    company,
+                    title,
                     company_phone,
                     company_web_site,
                     company_email,
                     company_bio,
-                    country,
                     role,
                     create_date,
-                    update_date
+                    update_date,
+                    city,
+                    state,
+                    province,
+                    country
             ) in cls.source.cursor:
                 contact = {
                     "id": id,
                     "contact_member_id": contact_member_id,
                     "first_name": first_name,
+                    "middle_name": middle_name,
                     "last_name": last_name,
                     "member_name": f'{first_name} {last_name}',
                     "cell_phone": cell_phone,
                     "office_phone": office_phone,
                     "home_phone": home_phone,
                     "email": email,
+                    "company": company,
+                    "title": title,
                     "company_name": company_name,
                     "company_phone": company_phone,
                     "company_web_site": company_web_site,
                     "company_email": company_email,
                     "company_bio": company_bio,
-                    "country": country,
                     "role": role,
                     "create_date": create_date,
                     "update_date": update_date,
+                    "city": city,
+                    "state": state,
+                    "province": province,
+                    "country": country
                 }
                 contacts.append(contact)
         return contacts
@@ -663,8 +684,11 @@ class MemberContactDA(object):
                 SELECT 
                     member.id as id,
                     member.first_name as first_name,
+                    member.middle_name as middle_name,
                     member.last_name as last_name,
                     member.email as email,
+                    member.company_name as company,
+                    member.job_title as title,
                     contact.contact_member_id as contact_member_id
                 FROM member
                 LEFT JOIN contact ON (member.id = contact.contact_member_id AND contact.member_id = %s)
@@ -677,16 +701,23 @@ class MemberContactDA(object):
             for (
                     id,
                     first_name,
+                    middle_name,
                     last_name,
                     email,
+                    company,
+                    title,
                     contact_member_id
             ) in cls.source.cursor:
                 if not contact_member_id:
                     member = {
                         "id": id,
                         "first_name": first_name,
+                        "middle_name": middle_name,
                         "last_name": last_name,
-                        "email": email
+                        "email": email,
+                        "company": company,
+                        "title": title,
+                        "contact_member_id": contact_member_id
                     }
                     members.append(member)
         return members

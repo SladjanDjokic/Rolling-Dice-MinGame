@@ -152,6 +152,7 @@ services:
       - ../web-api/datasource/postgresql/schema-updates-2020-08-15-schedulersetting.sql:/docker-entrypoint-initdb.d/5-1-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-08-26.sql:/docker-entrypoint-initdb.d/5-2-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-08-29.sql:/docker-entrypoint-initdb.d/5-3-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-09-01.sql:/docker-entrypoint-initdb.d/5-4-schema-updates.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/6-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/7-test-schedule.sql
     environment:
