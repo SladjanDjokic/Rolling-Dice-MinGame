@@ -365,14 +365,6 @@ class MemberDA(object):
         cls.source.execute(query_member, params_member)
         id = cls.source.get_last_row_id()
         
-        #store member contact info
-        params_member_contact = (id, phone_number, email)
-        cls.source.execute(query_member_contact, params_member_contact)
-        
-        #store member location info
-        params_member_location = (id, street, city, state, province, postal, country)
-        cls.source.execute(query_member_location, params_member_location)        
-
         if phone_number:
             # store member contact info
             params_member_contact = (id, phone_number, email)
@@ -382,13 +374,6 @@ class MemberDA(object):
             # store member location info
             params_member_location = (id, street, city, state, province, postal, country)
             cls.source.execute(query_member_location, params_member_location)
-
-        # params_member_contact_info = (id, phone_number, email)
-        # cls.source.execute(query_member_contact, params_member_contact_info)
-
-        # store member location info
-        # params_member_location = (id, street, city, state, province, postal, country)
-        # cls.source.execute(query_member_location, params_member_location)
 
         if commit:
             cls.source.commit()
@@ -614,8 +599,8 @@ class MemberContactDA(object):
                 member_location.country as country
             FROM contact
             LEFT JOIN member ON member.id = contact.contact_member_id
-            LEFT JOIN member_location ON member_location.member_id = contact.contact_member_id
-            LEFT JOIN member_contact ON member_contact.member_id = contact.contact_member_id
+            LEFT OUTER JOIN member_location ON member_location.member_id = contact.contact_member_id
+            LEFT OUTER JOIN member_contact ON member_contact.member_id = contact.contact_member_id
             WHERE contact.member_id = %s
             ORDER BY contact.first_name ASC
             """)
@@ -633,9 +618,9 @@ class MemberContactDA(object):
                     home_phone,
                     email,
                     personal_email,
-                    company_name,
                     company,
                     title,
+                    company_name,
                     company_phone,
                     company_web_site,
                     company_email,
