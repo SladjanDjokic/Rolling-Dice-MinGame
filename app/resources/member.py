@@ -116,11 +116,11 @@ class MemberRegisterResource(object):
         (email, password, confirm_password,
          first_name, middle_name, last_name, date_of_birth,
          phone_number, country, city, street,
-         postal, state, province) = request.get_json_or_form(
+         postal, state, province, company_name, job_title_id) = request.get_json_or_form(
             "email", "password", "confirm_password",
             "first_name", "middle_name", "last_name", "dob",
             "cell", "country", "city", "street", "postal_code",
-            "state", "province", req=req)
+            "state", "province", "company_name", "job_title_id", req=req)
 
         if password != confirm_password:
             raise MemberPasswordMismatch()
@@ -140,20 +140,16 @@ class MemberRegisterResource(object):
         logger.debug("Middle_name: {}".format(middle_name))
         logger.debug("Last_name: {}".format(last_name))
         logger.debug("Password: {}".format(password))
+        logger.debug("Company name: {}".format(company_name))
 
         member = MemberDA.get_member_by_email(email)
 
         if member:
             raise MemberExists(email)
 
-        # member = MemberDA.get_member_by_email(email)
-
-        # if member:
-        #     raise MemberExists(email)
-
         member_id = MemberDA.register(
             email=email, username=email, password=password,
-            first_name=first_name, middle_name=middle_name, last_name=last_name,
+            first_name=first_name, middle_name=middle_name, last_name=last_name, company_name=company_name, job_title_id=job_title_id,
             date_of_birth=date_of_birth, phone_number=phone_number,
             country=country, city=city, street=street, postal=postal,
             state=state, province=province, commit=True)
@@ -347,3 +343,22 @@ class MemberContactResource(object):
 
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
+
+
+class MemberJobTitles(object):
+    auth = {
+        'exempt_methods': ['GET']
+    }
+
+    def on_get(self, req, resp):
+        job_title_list = MemberDA().get_job_list()
+        if job_title_list:
+            resp.body = json.dumps({
+                "data": job_title_list,
+                "success": True
+            }, default_parser=json.parser)
+        else:
+            resp.body = json.dumps({
+                "description": "Could not get the job title list",
+                "success": False
+            }, default_parser=json.parser)

@@ -107,15 +107,19 @@ class MemberDA(object):
 
         query = """
             SELECT
-                id,
-                email,
-                create_date,
-                update_date,
-                username,
-                status,
-                first_name,
-                last_name
+                member.id as member_id,
+                member.email as email,
+                member.create_date as create_date,
+                member.update_date as update_date,
+                member.username as username,
+                member.status as status,
+                member.first_name as first_name,
+                member.middle_name as middle_name,
+                member.last_name as last_name, 
+                member.company_name as company_name, 
+                job_title.name as job_title
             FROM member
+            LEFT JOIN job_title ON job_title.id = member.job_title_id
             WHERE ( email LIKE %s OR username LIKE %s OR first_name LIKE %s OR last_name LIKE %s ) AND id <> %s
             """
 
@@ -139,7 +143,10 @@ class MemberDA(object):
                     username,
                     status,
                     first_name,
+                    middle_name,
                     last_name,
+                    company_name,
+                    job_title
             ) in cls.source.cursor:
                 member = {
                     "member_id": member_id,
@@ -149,8 +156,10 @@ class MemberDA(object):
                     "username": username,
                     "status": status,
                     "first_name": first_name,
+                    "middle_name": middle_name,
                     "last_name": last_name,
-                    "member_name": f'{first_name} {last_name}'
+                    "member_name": f'{first_name}{middle_name}{last_name}',
+                    "job_title": job_title
                 }
 
                 members.append(member)
@@ -335,15 +344,15 @@ class MemberDA(object):
 
     @classmethod
     def register(cls, email, username, password, first_name, middle_name,
-                 last_name, date_of_birth, phone_number,
+                 last_name, company_name, job_title_id, date_of_birth, phone_number,
                  country, city, street, postal, state, province,
                  commit=True):
 
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query_member = ("""
         INSERT INTO member
-        (email, username, password, first_name, middle_name, last_name, date_of_birth)
-        VALUES (%s, %s, crypt(%s, gen_salt('bf')), %s, %s, %s, %s)
+        (email, username, password, first_name, middle_name, last_name, date_of_birth, company_name, job_title_id)
+        VALUES (%s, %s, crypt(%s, gen_salt('bf')), %s, %s, %s, %s, %s, %s)
         RETURNING id
         """)
         query_member_contact = ("""
@@ -363,7 +372,7 @@ class MemberDA(object):
         # settings.get('MEMBER_KEY')
         # store member personal info
         params_member = (email, username, password, first_name,
-                         middle_name, last_name, date_of_birth)
+                         middle_name, last_name, date_of_birth, company_name, job_title_id)
         cls.source.execute(query_member, params_member)
         id = cls.source.get_last_row_id()
 
@@ -569,6 +578,28 @@ class MemberDA(object):
                 cls.source.commit()
         except DataMissingError as err:
             raise DataMissingError from err
+
+    @classmethod
+    def get_job_list(cls,):
+        query = """
+        SELECT 
+            id as job_title_id,
+            name as job_title
+        FROM job_title
+        """
+        params = ()
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            entry = list()
+            for entry_da in cls.source.cursor.fetchall():
+                entry_element = {
+                    "job_title_id": entry_da[0],
+                    "job_title": entry_da[1]
+                }
+                entry.append(entry_element)
+            # logger.debug('Sobchak', entry)
+            return entry
+        return None
 
 
 class MemberContactDA(object):

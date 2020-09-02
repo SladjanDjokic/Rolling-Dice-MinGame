@@ -4,8 +4,8 @@ services:
   #   container_name: amera-dns
   #   image: andyshinn/dnsmasq:latest
   #   command: >
-  #    --log-queries 
-  #    --log-facility=- 
+  #    --log-queries
+  #    --log-facility=-
   #    --address=/dev.amera.local/127.0.0.1
   #   ports:
   #     - 53:53
@@ -133,7 +133,7 @@ services:
     volumes:
       - ../web-api:/app
       - web-api-python-packages:/root/.local/share
-    command: ['pipenv', 'run', 'docker']
+    command: ["pipenv", "run", "docker"]
   amera-web-db:
     container_name: amera-web-db
     image: postgres:latest
@@ -152,9 +152,11 @@ services:
       - ../web-api/datasource/postgresql/schema-updates-2020-08-15-schedulersetting.sql:/docker-entrypoint-initdb.d/5-1-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-08-26.sql:/docker-entrypoint-initdb.d/5-2-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-08-29.sql:/docker-entrypoint-initdb.d/5-3-schema-updates.sql
+      - ../web-api/datasource/postgresql/job-title.sql:/docker-entrypoint-initdb.d/5-3-1-job-title.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-09-01.sql:/docker-entrypoint-initdb.d/5-4-schema-updates.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/6-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/7-test-schedule.sql
+      - ../web-api/datasource/postgresql/amera_tos.sql:/docker-entrypoint-initdb.d/8-amera_tos.sql
     environment:
       POSTGRES_DB: ameraiot
       POSTGRES_USER: amera

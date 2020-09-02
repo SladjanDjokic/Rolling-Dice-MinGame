@@ -7,12 +7,12 @@ from falcon_multipart.middleware import MultipartMiddleware
 from app.config import parser, settings
 from app.middleware import CrossDomain  # , JSONTranslator
 from app.resources.member import MemberRegisterResource, MemberResource, MemberSearchResource, \
-    MemberGroupSearchResource, MemberContactResource, ContactMembersResource
+    MemberGroupSearchResource, MemberContactResource, ContactMembersResource, MemberJobTitles
 from app.resources.invite import MemberInviteResource, ValidInviteResource
 from app.resources.login import MemberLoginResource
 from app.resources.forgot_password import MemberForgotPasswordResource
 from app.resources.reset_password import MemberResetPasswordResource
-from app.resources.change_password import MemberChangePasswordResource 
+from app.resources.change_password import MemberChangePasswordResource
 from app.resources.logout import MemberLogoutResource
 from app.resources.session import SessionResource, ValidateSessionResource
 from app.resources.file_sharing import FileStorage, FileStorageDetail, ShareFile, ShareFileDetail, \
@@ -87,7 +87,8 @@ def _setup_routes(app):
     # app.add_route("/demo/keygen", KeyGenResource())
     app.add_route("/member/login", MemberLoginResource())
     app.add_route("/member/forgot", MemberForgotPasswordResource())
-    app.add_route("/member/reset-password/{forgot_key:uuid}", MemberResetPasswordResource())
+    app.add_route(
+        "/member/reset-password/{forgot_key:uuid}", MemberResetPasswordResource())
     app.add_route("/member/change-password", MemberChangePasswordResource())
     app.add_route("/member/logout", MemberLogoutResource())
     app.add_route("/member/invite", MemberInviteResource())
@@ -95,6 +96,8 @@ def _setup_routes(app):
     app.add_route("/valid-invite/{invite_key:uuid}", ValidInviteResource())
     app.add_route("/member/register/{invite_key:uuid}", MemberRegisterResource())  # noqa: E501
     app.add_route("/member/register", MemberRegisterResource())  # noqa: E501
+    # get the job titles list
+    app.add_route("/member/register/job-title", MemberJobTitles())
     # This route is commneted out to prevent any registrations someone may be sniffing out
     # This will be enabled later on
     # app.add_route("/member/register", MemberRegistrationResource())  # noqa: E501
@@ -126,16 +129,24 @@ def _setup_routes(app):
 
     app.add_route("/languages", LanguageResource())
 
-    app.add_route("/member/scheduler/setting/set", MemberSchedulerSettingUpdateResource())
-    app.add_route("/member/scheduler/setting/get", MemberSchedulerSettingResource())
+    app.add_route("/member/scheduler/setting/set",
+                  MemberSchedulerSettingUpdateResource())
+    app.add_route("/member/scheduler/setting/get",
+                  MemberSchedulerSettingResource())
 
-    app.add_route("/member/schedule/event/add", MemberScheduleEventAddResource())
+    app.add_route("/member/schedule/event/add",
+                  MemberScheduleEventAddResource())
     app.add_route("/member/schedule/event/get", MemberScheduleEventResource())
 
-    app.add_route("/member/schedule/holiday/add", MemberScheduleHolidayAddResource())
-    app.add_route("/member/schedule/holiday/get", MemberScheduleHolidayResource())
+    app.add_route("/member/schedule/holiday/add",
+                  MemberScheduleHolidayAddResource())
+    app.add_route("/member/schedule/holiday/get",
+                  MemberScheduleHolidayResource())
 
     # app.add_route("/member/schedule/event-invite/add-single", MemberScheduleEventInviteAddSingleResource())
-    app.add_route("/member/schedule/event-invite/add", MemberScheduleEventInviteAddMultipleResource())
-    app.add_route("/member/schedule/event-invite/get", MemberScheduleEventInviteResource())
-    app.add_route("/member/schedule/event-invite/set-status", MemberScheduleEventInviteSetStatusResource())
+    app.add_route("/member/schedule/event-invite/add",
+                  MemberScheduleEventInviteAddMultipleResource())
+    app.add_route("/member/schedule/event-invite/get",
+                  MemberScheduleEventInviteResource())
+    app.add_route("/member/schedule/event-invite/set-status",
+                  MemberScheduleEventInviteSetStatusResource())
