@@ -70,13 +70,13 @@ class MemberDA(object):
                 members.append(member)
 
         return members
-        
+
     @classmethod
-    def extractAvailableMembers(cls, event_invite_to_list):        
-        res = []        
+    def extractAvailableMembers(cls, event_invite_to_list):
+        res = []
         if len(event_invite_to_list) == 0:
             return res
-        
+
         separator = ','
         strCanidateList = separator.join(map(str, event_invite_to_list))
         logger.debug("strCanidateList: {}".format(strCanidateList))
@@ -91,9 +91,9 @@ class MemberDA(object):
         cls.source.execute(query, params)
         if cls.source.has_results():
             for entry_da in cls.source.cursor.fetchall():
-                res.append(entry_da[0])        
+                res.append(entry_da[0])
         return res
-    
+
     @classmethod
     def get_password_reset_info_by_email(cls, email):
         return cls.__get_password_reset_info('email', email)
@@ -120,7 +120,8 @@ class MemberDA(object):
             """
 
         like_search_key = """%{}%""".format(search_key)
-        params = (like_search_key, like_search_key, like_search_key, like_search_key, member_id)
+        params = (like_search_key, like_search_key,
+                  like_search_key, like_search_key, member_id)
 
         if page_size and page_number:
             query += """LIMIT %s OFFSET %s"""
@@ -218,7 +219,7 @@ class MemberDA(object):
 
         like_search_key = """%{}%""".format(search_key)
         params = (
-        member_id, member_id, member_id, member_id, like_search_key, like_search_key, like_search_key, like_search_key)
+            member_id, member_id, member_id, member_id, like_search_key, like_search_key, like_search_key, like_search_key)
 
         if page_size and page_number:
             query += """LIMIT %s OFFSET %s"""
@@ -333,7 +334,7 @@ class MemberDA(object):
         return None
 
     @classmethod
-    def register(cls, email, username, password, first_name, 
+    def register(cls, email, username, password, first_name, middle_name,
                  last_name, date_of_birth, phone_number,
                  country, city, street, postal, state, province,
                  commit=True):
@@ -341,8 +342,8 @@ class MemberDA(object):
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query_member = ("""
         INSERT INTO member
-        (email, username, password, first_name, last_name, date_of_birth)
-        VALUES (%s, %s, crypt(%s, gen_salt('bf')), %s, %s, %s)
+        (email, username, password, first_name, middle_name, last_name, date_of_birth)
+        VALUES (%s, %s, crypt(%s, gen_salt('bf')), %s, %s, %s, %s)
         RETURNING id
         """)
         query_member_contact = ("""
@@ -361,10 +362,11 @@ class MemberDA(object):
         # AES_ENCRYPT(%s, UNHEX(SHA2(%s)))
         # settings.get('MEMBER_KEY')
         # store member personal info
-        params_member = (email, username, password, first_name, last_name, date_of_birth)
+        params_member = (email, username, password, first_name,
+                         middle_name, last_name, date_of_birth)
         cls.source.execute(query_member, params_member)
         id = cls.source.get_last_row_id()
-        
+
         if phone_number:
             # store member contact info
             params_member_contact = (id, phone_number, email)
@@ -372,7 +374,8 @@ class MemberDA(object):
 
         if street:
             # store member location info
-            params_member_location = (id, street, city, state, province, postal, country)
+            params_member_location = (
+                id, street, city, state, province, postal, country)
             cls.source.execute(query_member_location, params_member_location)
 
         if commit:
@@ -386,6 +389,7 @@ class MemberDA(object):
             SELECT
                 member.email as email,
                 member.first_name as first_name,
+                member.middle_name as middle_name,
                 member.last_name as last_name,
                 member_location.country as country,
                 member_contact.phone_number as cell_phone
@@ -401,6 +405,7 @@ class MemberDA(object):
             for (
                     email,
                     first_name,
+                    middle_name,
                     last_name,
                     country,
                     cell_phone,
@@ -408,6 +413,7 @@ class MemberDA(object):
                 member = {
                     "email": email,
                     "first_name": first_name,
+                    "middle_name": middle_name,
                     "last_name": last_name,
                     "country": country,
                     "cell_phone": cell_phone,
@@ -416,7 +422,7 @@ class MemberDA(object):
                 return member
 
         return None
-    
+
     @classmethod
     def get_member_contact(cls, member_id):
         query = """
@@ -429,7 +435,7 @@ class MemberDA(object):
         params = (member_id,)
         cls.source.execute(query, params)
         if cls.source.has_results():
-            for ( phone_number) in cls.source.cursor:
+            for (phone_number) in cls.source.cursor:
                 member = {
                     "phone_number": phone_number,
                 }
@@ -449,7 +455,7 @@ class MemberDA(object):
         params = (member_id,)
         cls.source.execute(query, params)
         if cls.source.has_results():
-            for ( country) in cls.source.cursor:
+            for (country) in cls.source.cursor:
                 member = {
                     "country": country,
                 }
@@ -494,7 +500,7 @@ class MemberDA(object):
 
     @classmethod
     def create_forgot_password(cls, member_id, email, forgot_key,
-                            expiration, commit=True):
+                               expiration, commit=True):
 
         query = ("""
         INSERT INTO forgot_password
@@ -554,7 +560,7 @@ class MemberDA(object):
         WHERE id = %s
         """)
         params = (
-            password, member_id 
+            password, member_id
         )
         try:
             cls.source.execute(query, params)
@@ -680,7 +686,7 @@ class MemberContactDA(object):
                 WHERE member.id <> %s
                 ORDER BY member.first_name ASC
                 """)
-        get_members_params = (member_id,member_id,)
+        get_members_params = (member_id, member_id,)
         cls.source.execute(get_members_query, get_members_params)
         if cls.source.has_results():
             for (
@@ -741,7 +747,7 @@ class MemberContactDA(object):
             FROM contact
             WHERE {} = %s
             """.format(key)
-                             )
+        )
 
         get_contact_params = (value,)
         cls.source.execute(get_contact_query, get_contact_params)
@@ -817,7 +823,8 @@ class MemberContactDA(object):
         )
 
         try:
-            cls.source.execute(create_member_contact_query, create_member_contact_params)
+            cls.source.execute(create_member_contact_query,
+                               create_member_contact_params)
             contact_id = cls.source.get_last_row_id()
 
             if commit:
@@ -825,5 +832,3 @@ class MemberContactDA(object):
             return contact_id
         except Exception as e:
             raise e
-
-

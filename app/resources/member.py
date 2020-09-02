@@ -114,11 +114,11 @@ class MemberRegisterResource(object):
         # We store the key in hex format in the database
 
         (email, password, confirm_password,
-         first_name, last_name, date_of_birth,
+         first_name, middle_name, last_name, date_of_birth,
          phone_number, country, city, street,
          postal, state, province) = request.get_json_or_form(
             "email", "password", "confirm_password",
-            "first_name", "last_name", "dob",
+            "first_name", "middle_name", "last_name", "dob",
             "cell", "country", "city", "street", "postal_code",
             "state", "province", req=req)
 
@@ -126,18 +126,18 @@ class MemberRegisterResource(object):
             raise MemberPasswordMismatch()
 
         if (not email or not password or
-            not first_name or not last_name): #  or
-#            not date_of_birth or not phone_number or
-#            not country or not city or not street or not postal):
+                not first_name or not last_name):  # or
+            #            not date_of_birth or not phone_number or
+            #            not country or not city or not street or not postal):
 
             raise MemberDataMissing()
 
         # logger.debug("invite_key: {}".format(invite_key))
 
-
         logger.debug("invite_key: {}".format(invite_key))
         logger.debug(": {}".format(email))
-        logger.debug("First_nEmailame: {}".format(first_name))
+        logger.debug("First_name: {}".format(first_name))
+        logger.debug("Middle_name: {}".format(middle_name))
         logger.debug("Last_name: {}".format(last_name))
         logger.debug("Password: {}".format(password))
 
@@ -146,14 +146,14 @@ class MemberRegisterResource(object):
         if member:
             raise MemberExists(email)
 
-        member = MemberDA.get_member_by_email(email);
-        
-        if member:
-            raise MemberExists(email);
-        
+        # member = MemberDA.get_member_by_email(email)
+
+        # if member:
+        #     raise MemberExists(email)
+
         member_id = MemberDA.register(
             email=email, username=email, password=password,
-            first_name=first_name, last_name=last_name,
+            first_name=first_name, middle_name=middle_name, last_name=last_name,
             date_of_birth=date_of_birth, phone_number=phone_number,
             country=country, city=city, street=street, postal=postal,
             state=state, province=province, commit=True)
@@ -162,7 +162,7 @@ class MemberRegisterResource(object):
 
         # Update the invite reference to the newly created member_id
         if invite_key:
-            invite_key = invite_key.hex           
+            invite_key = invite_key.hex
             InviteDA.update_invite_registered_member(
                 invite_key=invite_key, registered_member_id=member_id
             )
@@ -318,7 +318,8 @@ class MemberContactResource(object):
             "contact_role": role
         }
 
-        member_contact_id = MemberContactDA().create_member_contact(**new_member_contact_params)
+        member_contact_id = MemberContactDA().create_member_contact(**
+                                                                    new_member_contact_params)
         logger.debug("New created contact_id: {}".format(member_contact_id))
         member_contact = {}
         if member_contact_id:
