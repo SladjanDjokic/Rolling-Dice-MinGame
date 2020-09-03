@@ -5,6 +5,7 @@ from uuid import UUID
 import app.util.json as json
 import app.util.request as request
 from app.da.member import MemberDA, MemberContactDA
+from app.da.file_sharing import FileStorageDA
 from app.da.invite import InviteDA
 from app.da.group import GroupMembershipDA
 from app.util.session import get_session_cookie, validate_session
@@ -116,11 +117,11 @@ class MemberRegisterResource(object):
         (email, password, confirm_password,
          first_name, middle_name, last_name, date_of_birth,
          phone_number, country, city, street,
-         postal, state, province, company_name, job_title_id) = request.get_json_or_form(
+         postal, state, province, company_name, job_title_id, profilePicture) = request.get_json_or_form(
             "email", "password", "confirm_password",
             "first_name", "middle_name", "last_name", "dob",
             "cell", "country", "city", "street", "postal_code",
-            "state", "province", "company_name", "job_title_id", req=req)
+            "state", "province", "company_name", "job_title_id", "profilePicture", req=req)
 
         if password != confirm_password:
             raise MemberPasswordMismatch()
@@ -147,8 +148,11 @@ class MemberRegisterResource(object):
         if member:
             raise MemberExists(email)
 
+        # Upload image to aws and create an entry in db
+        avatar_storage_id = FileStorageDA().store_file_to_storage(profilePicture)
+
         member_id = MemberDA.register(
-            email=email, username=email, password=password,
+            avatar_storage_id=avatar_storage_id, email=email, username=email, password=password,
             first_name=first_name, middle_name=middle_name, last_name=last_name, company_name=company_name, job_title_id=job_title_id,
             date_of_birth=date_of_birth, phone_number=phone_number,
             country=country, city=city, street=street, postal=postal,

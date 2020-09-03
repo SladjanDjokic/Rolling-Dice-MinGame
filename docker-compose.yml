@@ -157,6 +157,7 @@ services:
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/6-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/7-test-schedule.sql
       - ../web-api/datasource/postgresql/amera_tos.sql:/docker-entrypoint-initdb.d/8-amera_tos.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-09-04_member_avatar.sql:/docker-entrypoint-initdb.d/9-avatar-storage-id.sql
     environment:
       POSTGRES_DB: ameraiot
       POSTGRES_USER: amera

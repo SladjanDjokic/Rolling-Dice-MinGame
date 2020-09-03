@@ -343,7 +343,7 @@ class MemberDA(object):
         return None
 
     @classmethod
-    def register(cls, email, username, password, first_name, middle_name,
+    def register(cls, avatar_storage_id, email, username, password, first_name, middle_name,
                  last_name, company_name, job_title_id, date_of_birth, phone_number,
                  country, city, street, postal, state, province,
                  commit=True):
@@ -351,8 +351,8 @@ class MemberDA(object):
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query_member = ("""
         INSERT INTO member
-        (email, username, password, first_name, middle_name, last_name, date_of_birth, company_name, job_title_id)
-        VALUES (%s, %s, crypt(%s, gen_salt('bf')), %s, %s, %s, %s, %s, %s)
+        (email, username, password, first_name, middle_name, last_name, date_of_birth, company_name, job_title_id, avatar_storage_id)
+        VALUES (%s, %s, crypt(%s, gen_salt('bf')), %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """)
         query_member_contact = ("""
@@ -372,7 +372,7 @@ class MemberDA(object):
         # settings.get('MEMBER_KEY')
         # store member personal info
         params_member = (email, username, password, first_name,
-                         middle_name, last_name, date_of_birth, company_name, job_title_id)
+                         middle_name, last_name, date_of_birth, company_name, job_title_id, avatar_storage_id)
         cls.source.execute(query_member, params_member)
         id = cls.source.get_last_row_id()
 
