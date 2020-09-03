@@ -94,18 +94,31 @@ class SessionDA (object):
     def get_session(cls, session_id):
         query = ("""
         SELECT
-            session_id,
-            member_id,
-            email,
-            create_date,
-            update_date,
-            expiration_date,
-            username,
-            status,
-            first_name,
-            last_name
+            member_session.session_id as session_id,
+            member_session.member_id as member_id,
+            member_session.email as email,
+            member_session.create_date as create_date,
+            member_session.update_date as update_date,
+            member_session.expiration_date as expiration_date,
+            member_session.username as username,
+            member_session.status as status,
+            member_session.first_name as first_name,
+            member_session.last_name as last_name,
+            member.middle_name as middle_name,
+            member.company_name as company,
+            member.job_title as title,
+            member_contact.phone_number as cell_phone,
+            member_location.street as street,
+            member_location.city as city,
+            member_location.state as state,
+            member_location.province as province,
+            member_location.postal as postal,
+            member_location.country as country
         FROM member_session
-        WHERE session_id = %s AND expiration_date >= current_timestamp
+        LEFT JOIN member ON member_session.member_id = member.id
+        LEFT JOIN member_location ON member_session.member_id = member_location.member_id
+        LEFT JOIN member_contact ON member_session.member_id = member_contact.member_id
+        WHERE member_session.session_id = %s AND member_session.expiration_date >= current_timestamp
         """)
 
         params = (session_id,)
@@ -122,6 +135,16 @@ class SessionDA (object):
                 status,
                 first_name,
                 last_name,
+                middle_name,
+                company,
+                title,
+                cell_phone,
+                street,
+                city,
+                state,
+                province,
+                postal,
+                country
             ) = cls.source.cursor.fetchone()
 
             session = {
@@ -135,6 +158,16 @@ class SessionDA (object):
                 "status": status,
                 "first_name": first_name,
                 "last_name": last_name,
+                "middle_name": middle_name,
+                "company": company,
+                "title": title,
+                "cell_phone": cell_phone,
+                "street": street,
+                "city": city,
+                "state": state,
+                "province": province,
+                "postal": postal,
+                "country": country
             }
 
             return session

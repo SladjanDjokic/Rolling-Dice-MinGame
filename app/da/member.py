@@ -572,8 +572,7 @@ class MemberContactDA(object):
     def get_member_contacts(cls, member_id):
         contacts = list()
         get_contacts_query = ("""
-            SELECT
-                contact.id as id,
+            SELECT contact.id as id,
                 contact.contact_member_id as contact_member_id,
                 contact.first_name as first_name,
                 member.middle_name as middle_name,
@@ -593,15 +592,36 @@ class MemberContactDA(object):
                 contact.contact_role as role,
                 contact.create_date as create_date,
                 contact.update_date as update_date,
-                member_location.city as city,
-                member_location.state as state,
-                member_location.province as province,
-                member_location.country as country
+                json_agg(DISTINCT member_location.*) AS location_information,
+                json_agg(DISTINCT member_contact_2.*) AS contact_information
             FROM contact
-            LEFT JOIN member ON member.id = contact.contact_member_id
-            LEFT OUTER JOIN member_location ON member_location.member_id = contact.contact_member_id
-            LEFT OUTER JOIN member_contact ON member_contact.member_id = contact.contact_member_id
+                LEFT JOIN member ON member.id = contact.contact_member_id
+                LEFT OUTER JOIN member_location ON member_location.member_id = contact.contact_member_id
+                LEFT OUTER JOIN member_contact ON member_contact.member_id = contact.contact_member_id
+                LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = contact.contact_member_id
             WHERE contact.member_id = %s
+            GROUP BY 
+                contact.contact_member_id,
+                contact.id,
+                contact.contact_member_id,
+                contact.first_name,
+                member.middle_name,
+                contact.last_name,
+                contact.cell_phone,
+                contact.office_phone,
+                contact.home_phone,
+                contact.email,
+                contact.personal_email,
+                member.company_name,
+                member.job_title,
+                contact.company_name,
+                contact.company_phone,
+                contact.company_web_site,
+                contact.company_email,
+                contact.company_bio,
+                contact.contact_role,
+                contact.create_date,
+                contact.update_date
             ORDER BY contact.first_name ASC
             """)
         get_contacts_params = (member_id,)
@@ -628,10 +648,8 @@ class MemberContactDA(object):
                     role,
                     create_date,
                     update_date,
-                    city,
-                    state,
-                    province,
-                    country
+                    location_information,
+                    contact_information
             ) in cls.source.cursor:
                 contact = {
                     "id": id,
@@ -654,10 +672,12 @@ class MemberContactDA(object):
                     "role": role,
                     "create_date": create_date,
                     "update_date": update_date,
-                    "city": city,
-                    "state": state,
-                    "province": province,
-                    "country": country
+                    "location_information": location_information,
+                    "contact_information": contact_information
+                    # "city": city,
+                    # "state": state,
+                    # "province": province,
+                    # "country": country
                 }
                 contacts.append(contact)
         return contacts
@@ -709,39 +729,67 @@ class MemberContactDA(object):
 
     @classmethod
     def get_member_contact(cls, contact_id):
-        contact = cls.__get_member_contact('id', contact_id)
+        contact = cls.__get_member_contact('contact.id', contact_id)
         return contact
 
     @classmethod
     def get_member_contact_by_email(cls, email):
-        return cls.__get_member_contact('email', email)
+        return cls.__get_member_contact('contact.email', email)
 
     @classmethod
     def __get_member_contact(cls, key, value):
         get_contact_query = ("""
-            SELECT
-                id,
-                contact_member_id,
-                first_name,
-                last_name,
-                country,
-                cell_phone,
-                office_phone,
-                home_phone,
-                email,
-                personal_email,
-                company_name,
-                company_phone,
-                company_web_site,
-                company_email,
-                company_bio,
-                contact_role,
-                create_date,
-                update_date
+            SELECT contact.id as id,
+                contact.contact_member_id as contact_member_id,
+                contact.first_name as first_name,
+                member.middle_name as middle_name,
+                contact.last_name as last_name,
+                contact.cell_phone as cell_phone,
+                contact.office_phone as office_phone,
+                contact.home_phone as home_phone,
+                contact.email as email,
+                contact.personal_email as personal_email,
+                member.company_name as company,
+                member.job_title as title,
+                contact.company_name as company_name,
+                contact.company_phone as company_phone,
+                contact.company_web_site as company_web_site,
+                contact.company_email as company_email,
+                contact.company_bio as company_bio,
+                contact.contact_role as role,
+                contact.create_date as create_date,
+                contact.update_date as update_date,
+                json_agg(DISTINCT member_location.*) AS location_information,
+                json_agg(DISTINCT member_contact_2.*) AS contact_information
             FROM contact
+                LEFT JOIN member ON member.id = contact.contact_member_id
+                LEFT OUTER JOIN member_location ON member_location.member_id = contact.contact_member_id
+                LEFT OUTER JOIN member_contact ON member_contact.member_id = contact.contact_member_id
+                LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = contact.contact_member_id
             WHERE {} = %s
-            """.format(key)
-                             )
+            GROUP BY 
+                contact.contact_member_id,
+                contact.id,
+                contact.contact_member_id,
+                contact.first_name,
+                member.middle_name,
+                contact.last_name,
+                contact.cell_phone,
+                contact.office_phone,
+                contact.home_phone,
+                contact.email,
+                contact.personal_email,
+                member.company_name,
+                member.job_title,
+                contact.company_name,
+                contact.company_phone,
+                contact.company_web_site,
+                contact.company_email,
+                contact.company_bio,
+                contact.contact_role,
+                contact.create_date,
+                contact.update_date
+            """.format(key))
 
         get_contact_params = (value,)
         cls.source.execute(get_contact_query, get_contact_params)
@@ -750,42 +798,49 @@ class MemberContactDA(object):
                     id,
                     contact_member_id,
                     first_name,
+                    middle_name,
                     last_name,
-                    country,
                     cell_phone,
                     office_phone,
                     home_phone,
                     email,
                     personal_email,
+                    company,
+                    title,
                     company_name,
                     company_phone,
                     company_web_site,
                     company_email,
                     company_bio,
-                    contact_role,
+                    role,
                     create_date,
-                    update_date
+                    update_date,
+                    location_information,
+                    contact_information
             ) in cls.source.cursor:
                 contact = {
                     "id": id,
                     "contact_member_id": contact_member_id,
                     "first_name": first_name,
+                    "middle_name": middle_name,
                     "last_name": last_name,
                     "member_name": f'{first_name} {last_name}',
-                    "country": country,
                     "cell_phone": cell_phone,
                     "office_phone": office_phone,
                     "home_phone": home_phone,
                     "email": email,
-                    "personal_email": personal_email,
+                    "company": company,
+                    "title": title,
                     "company_name": company_name,
                     "company_phone": company_phone,
                     "company_web_site": company_web_site,
                     "company_email": company_email,
                     "company_bio": company_bio,
-                    "contact_role": contact_role,
+                    "role": role,
                     "create_date": create_date,
-                    "update_date": update_date
+                    "update_date": update_date,
+                    "location_information": location_information,
+                    "contact_information": contact_information
                 }
 
                 return contact
