@@ -103,3 +103,30 @@ INSERT INTO invite
         ('0a69c58f8d5e4279915abcadef533499', 'webster.sharpe@tetak.info', '2021-05-03', 'Webster', 'Sharpe', 1, NULL),
         ('04e8248b78884354935baafca60a43f6', 'gill.robles@polarium.name', '2020-08-03', 'Gill', 'Robles', 1, NULL),
         ('3a8a93ca08e24c8d956f85923556e210', 'strong.rogers@jimbies.com', '2020-08-03', 'Strong', 'Rogers', 1, NULL);
+
+
+INSERT INTO member_location
+        (member_id, location_type, street, city, state, postal, country, address_1, address_2)
+        VALUES 
+            (4, 'billing', '171 Wilson Street', 'Eggertsville', 'AS', '22110', 'United States', '171 Wilson Street', 'Apt #153'),
+            (3, 'work', '814 Pine Street', 'Crown', 'KS', '37986', 'United States', '814 Pine Street', 'Apt #121'),
+            (1, 'other', '713 Vandervoort Place', 'Spokane', 'MS', '35390', 'United States','713 Vandervoort Place', 'Apt #175'),
+            (2, 'billing', '305 Prospect Place', 'Wakarusa', 'LA', '64896', 'United States', '305 Prospect Place', 'Apt #160'),
+            (1, 'home', '913 Moore Place', 'Elizaville', 'SD', '28714', 'United States', '913 Moore Place', 'Apt #118'),
+            (4, 'home', '100 Hamilton Avenue', 'Dotsero', 'KY', '13730', 'United States', '100 Hamilton Avenue', 'Apt #181');
+
+INSERT INTO member_contact_2
+        (member_id, description, device, device_type, device_country, method_type, display_order, primary_contact)
+        VALUES 
+                (1, 'Cell phone', '9721713771', 'cell',840,'voice',2,TRUE),
+                (1, 'Office phone', '9723343333', 'landline',840,'voice',3,FALSE),
+                (1, 'Office email', 'test@email.com', 'email',840,'html',1,FALSE),
+                (2, 'Cell phone', '9721713771', 'cell',840,'voice',2,TRUE),
+                (2, 'Office phone', '9723343333', 'landline',840,'voice',3,FALSE),
+                (2, 'Office email', 'test@email.com', 'email',840,'html',1,FALSE),
+                (3, 'Cell phone', '9721713771', 'cell',840,'voice',2,TRUE),
+                (3, 'Office phone', '9723343333', 'landline',840,'voice',3,FALSE),
+                (3, 'Office email', 'test@email.com', 'email',840,'html',1,FALSE),
+                (4, 'Cell phone', '9721713771', 'cell',840,'voice',2,TRUE),
+                (4, 'Office phone', '9723343333', 'landline',840,'voice',3,FALSE),
+                (4, 'Office email', 'test@email.com', 'email',840,'html',1,FALSE);
