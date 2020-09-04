@@ -7,7 +7,7 @@ from falcon_multipart.middleware import MultipartMiddleware
 from app.config import parser, settings
 from app.middleware import CrossDomain  # , JSONTranslator
 from app.resources.member import MemberRegisterResource, MemberResource, MemberSearchResource, \
-    MemberGroupSearchResource, MemberContactResource, ContactMembersResource, MemberJobTitles
+    MemberGroupSearchResource, MemberContactResource, ContactMembersResource, MemberJobTitles, MemberTerms
 from app.resources.invite import MemberInviteResource, ValidInviteResource
 from app.resources.login import MemberLoginResource
 from app.resources.forgot_password import MemberForgotPasswordResource
@@ -98,6 +98,10 @@ def _setup_routes(app):
     app.add_route("/member/register", MemberRegisterResource())  # noqa: E501
     # get the job titles list
     app.add_route("/member/register/job-title", MemberJobTitles())
+    app.add_route("/member/register/terms", MemberTerms())
+    # 2FA of cell during registration
+    # app.add_route("/verify-cell", )
+
     # This route is commneted out to prevent any registrations someone may be sniffing out
     # This will be enabled later on
     # app.add_route("/member/register", MemberRegistrationResource())  # noqa: E501

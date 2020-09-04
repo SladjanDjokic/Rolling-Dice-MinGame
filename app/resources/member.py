@@ -366,3 +366,38 @@ class MemberJobTitles(object):
                 "description": "Could not get the job title list",
                 "success": False
             }, default_parser=json.parser)
+
+
+class MemberTerms(object):
+    auth = {
+        'exempt_methods': ['GET']
+    }
+
+    def on_get(self, req, resp):
+        # fetch all terms and conditions from db
+        # send them back
+        terms = MemberDA().get_terms()
+
+        if terms:
+            resp.body = json.dumps({
+                "data": terms,
+                "success": True
+            }, default_parser=json.parser)
+        else:
+            resp.body = json.dumps({
+                "description": "Could not get the terms and conditions",
+                "success": False
+            }, default_parser=json.parser)
+
+        # class MemberVerifyCell(object):
+        #     auth = {
+        #         'exempt_methods': ['GET', 'POST']
+        #     }
+
+        #     def on_get(self, req, resp):
+        #         # Init sms sending
+        #         # save cell and token to db
+
+        #     def on_post(self, req, resp):
+        #         # provide cell and token
+        #         # compare with stored

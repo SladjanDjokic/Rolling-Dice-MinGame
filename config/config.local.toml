@@ -43,6 +43,11 @@ region_name = "us-east-2"
 access_key_id = "${AWS_ACCESS_KEY_ID}"
 secret_access_key = "${AWS_SECRET_ACCESS_KEY}"
 
+[services.twilio]
+twilio_sid = "${TWILIO_ACCOUNT_SID}"
+twilio_auth_token = "${TWILIO_AUTH_TOKEN}"
+twilio_sender_number = "${TWILIO_SENDER_NUMBER}"
+
 [storage]
 [storage.s3]
 bucket = "file-testing"

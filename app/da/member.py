@@ -597,7 +597,33 @@ class MemberDA(object):
                     "job_title": entry_da[1]
                 }
                 entry.append(entry_element)
-            # logger.debug('Sobchak', entry)
+            return entry
+        return None
+
+    def get_terms(cls,):
+        query = ("""
+                SELECT
+                    amera_tos.id as amera_tos_id,
+                    amera_tos.contract_text as contract_text,
+                    country_code.alpha2 as country_code_alpha2,
+                    country_code.alpha3 as country_code_alpha3
+                FROM amera_tos
+                LEFT JOIN amera_tos_country ON amera_tos_country.amera_tos_id = amera_tos.id
+                LEFT JOIN country_code ON country_code.id = amera_tos_country.country_code_id
+                WHERE amera_tos.status = 'active'
+            """)
+        params = ()
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            entry = list()
+            for entry_da in cls.source.cursor.fetchall():
+                entry_element = {
+                    "amera_tos_id": entry_da[0],
+                    "contract_text": entry_da[1],
+                    "country_code_alpha2": entry_da[2],
+                    "country_code_alpha3": entry_da[3],
+                }
+                entry.append(entry_element)
             return entry
         return None
 
