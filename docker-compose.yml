@@ -162,6 +162,7 @@ services:
       - ../web-api/datasource/postgresql/amera_tos.sql:/docker-entrypoint-initdb.d/8-3-amera_tos.sql
       - ../web-api/datasource/postgresql/member_tos.sql:/docker-entrypoint-initdb.d/8-4-member-tos.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-09-04_member_avatar.sql:/docker-entrypoint-initdb.d/8-5-avatar-storage-id.sql
+      - ../web-api/datasource/postgresql/cell_token.sql:/docker-entrypoint-initdb.d/8-6-cell-token.sql
     environment:
       POSTGRES_DB: ameraiot
       POSTGRES_USER: amera

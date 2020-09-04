@@ -388,16 +388,3 @@ class MemberTerms(object):
                 "description": "Could not get the terms and conditions",
                 "success": False
             }, default_parser=json.parser)
-
-        # class MemberVerifyCell(object):
-        #     auth = {
-        #         'exempt_methods': ['GET', 'POST']
-        #     }
-
-        #     def on_get(self, req, resp):
-        #         # Init sms sending
-        #         # save cell and token to db
-
-        #     def on_post(self, req, resp):
-        #         # provide cell and token
-        #         # compare with stored
