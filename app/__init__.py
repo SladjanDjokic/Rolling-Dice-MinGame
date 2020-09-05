@@ -101,7 +101,7 @@ def _setup_routes(app):
     app.add_route("/member/register/job-title", MemberJobTitles())
     app.add_route("/member/register/terms", MemberTerms())
     # 2FA of cell during registration
-    app.add_route("/verify-cell", VerifyCell())
+    app.add_route("/member/register/verify-cell", VerifyCell())
 
     # This route is commneted out to prevent any registrations someone may be sniffing out
     # This will be enabled later on
