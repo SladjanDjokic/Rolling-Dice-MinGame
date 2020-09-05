@@ -593,12 +593,14 @@ class MemberContactDA(object):
                 contact.create_date as create_date,
                 contact.update_date as update_date,
                 json_agg(DISTINCT member_location.*) AS location_information,
-                json_agg(DISTINCT member_contact_2.*) AS contact_information
+                json_agg(DISTINCT member_contact_2.*) AS contact_information,
+                json_agg(DISTINCT country_code.*) AS country_code
             FROM contact
                 LEFT JOIN member ON member.id = contact.contact_member_id
                 LEFT OUTER JOIN member_location ON member_location.member_id = contact.contact_member_id
                 LEFT OUTER JOIN member_contact ON member_contact.member_id = contact.contact_member_id
                 LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = contact.contact_member_id
+                LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
             WHERE contact.member_id = %s
             GROUP BY 
                 contact.contact_member_id,
@@ -649,7 +651,8 @@ class MemberContactDA(object):
                     create_date,
                     update_date,
                     location_information,
-                    contact_information
+                    contact_information,
+                    country_code
             ) in cls.source.cursor:
                 contact = {
                     "id": id,
@@ -673,7 +676,8 @@ class MemberContactDA(object):
                     "create_date": create_date,
                     "update_date": update_date,
                     "location_information": location_information,
-                    "contact_information": contact_information
+                    "contact_information": contact_information,
+                    "country_code": country_code
                     # "city": city,
                     # "state": state,
                     # "province": province,
@@ -760,12 +764,14 @@ class MemberContactDA(object):
                 contact.create_date as create_date,
                 contact.update_date as update_date,
                 json_agg(DISTINCT member_location.*) AS location_information,
-                json_agg(DISTINCT member_contact_2.*) AS contact_information
+                json_agg(DISTINCT member_contact_2.*) AS contact_information,
+                json_agg(DISTINCT country_code.*) AS country_code
             FROM contact
                 LEFT JOIN member ON member.id = contact.contact_member_id
                 LEFT OUTER JOIN member_location ON member_location.member_id = contact.contact_member_id
                 LEFT OUTER JOIN member_contact ON member_contact.member_id = contact.contact_member_id
                 LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = contact.contact_member_id
+                LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
             WHERE {} = %s
             GROUP BY 
                 contact.contact_member_id,
@@ -816,7 +822,8 @@ class MemberContactDA(object):
                     create_date,
                     update_date,
                     location_information,
-                    contact_information
+                    contact_information,
+                    country_code
             ) in cls.source.cursor:
                 contact = {
                     "id": id,
@@ -840,7 +847,8 @@ class MemberContactDA(object):
                     "create_date": create_date,
                     "update_date": update_date,
                     "location_information": location_information,
-                    "contact_information": contact_information
+                    "contact_information": contact_information,
+                    "country_code": country_code
                 }
 
                 return contact
