@@ -381,13 +381,19 @@ class MemberDA(object):
         cls.source.execute(query_member, params_member)
         id = cls.source.get_last_row_id()
 
+        if email: 
+            # Member_contact_2
+            # FIXME: cell_confrimation_ts is passed temporary
+            params_email_member_contact_2 = (id, "Office email", email, "email", country, cell_confrimation_ts, "html", 2, False)
+            cls.source.execute(query_member_contact_2, params_email_member_contact_2)
+        
         if phone_number:
             # store member contact info
             params_member_contact = (id, phone_number, email)
             cls.source.execute(query_member_contact, params_member_contact)
             # Member_contact_2
-            params_member_contact_2 = (id, "Cell phone", phone_number, "cell", country, cell_confrimation_ts, "voice", 1, True)
-            cls.source.execute(query_member_contact_2, params_member_contact_2)
+            params_cell_member_contact_2 = (id, "Cell phone", phone_number, "cell", country, cell_confrimation_ts, "voice", 1, True)
+            cls.source.execute(query_member_contact_2, params_cell_member_contact_2)
         if street:
             # store member location info
             params_member_location = (
