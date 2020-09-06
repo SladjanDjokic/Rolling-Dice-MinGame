@@ -28,8 +28,8 @@ class VerifyCellDA(object):
         key = os.urandom(20)
         timeout = 30
         token_time = time.time()
-        potp_length = settings.get("services.twilio.potp_length")
-        totp = TOTP(key, 6, SHA1(), timeout, backend=default_backend())
+        totp_length = settings.get("services.twilio.totp_length")
+        totp = TOTP(key, totp_length, SHA1(), timeout, backend=default_backend())
         token = totp.generate(token_time).decode('utf8')
         return (token, token_time)
 

@@ -345,7 +345,7 @@ class MemberDA(object):
     @classmethod
     def register(cls, avatar_storage_id, email, username, password, first_name, middle_name,
                  last_name, company_name, job_title_id, date_of_birth, phone_number,
-                 country, city, street, postal, state, province, cell_confrimation_ts, commit=True):
+                 country, city, street, postal, state, province, cell_confrimation_ts, email_confrimation_ts, commit=True):
 
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query_member = ("""
@@ -384,7 +384,7 @@ class MemberDA(object):
         if email: 
             # Member_contact_2
             # FIXME: cell_confrimation_ts is passed temporary
-            params_email_member_contact_2 = (id, "Office email", email, "email", country, cell_confrimation_ts, "html", 2, False)
+            params_email_member_contact_2 = (id, "Office email", email, "email", country, email_confrimation_ts, "html", 2, False)
             cls.source.execute(query_member_contact_2, params_email_member_contact_2)
         
         if phone_number:

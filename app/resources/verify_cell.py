@@ -17,10 +17,10 @@ class VerifyCell(object):
         [cell] = request.get_json_or_form("cell", req=req)
         logger.debug('cell', cell)
         success = VerifyCellDA().create_verification_entry(cell)
-        potp_length = settings.get("services.twilio.potp_length")
-        logger.debug('potp_length',potp_length)
+        totp_length = settings.get("services.twilio.totp_length")
+        logger.debug('totp_length',totp_length)
         if success:
-            resp.body = json.dumps({"success": True, "totp_digits_count": potp_length})
+            resp.body = json.dumps({"success": True, "totp_digits_count": totp_length})
         else:
             resp.body = json.dumps(
                 {"success": False, "description": "Something went wrong"})

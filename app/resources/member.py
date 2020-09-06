@@ -117,11 +117,11 @@ class MemberRegisterResource(object):
         (email, password, confirm_password,
          first_name, middle_name, last_name, date_of_birth,
          phone_number, country, city, street,
-         postal, state, province, company_name, job_title_id, profilePicture, cell_confrimation_ts) = request.get_json_or_form(
+         postal, state, province, company_name, job_title_id, profilePicture, cell_confrimation_ts, email_confrimation_ts) = request.get_json_or_form(
             "email", "password", "confirm_password",
             "first_name", "middle_name", "last_name", "dob",
             "cell", "country", "city", "street", "postal_code",
-            "state", "province", "company_name", "job_title_id", "profilePicture", "cellConfirmationTS", req=req)
+            "state", "province", "company_name", "job_title_id", "profilePicture", "cellConfirmationTS", "emailConfirmationTS", req=req)
 
         if password != confirm_password:
             raise MemberPasswordMismatch()
@@ -156,7 +156,7 @@ class MemberRegisterResource(object):
             first_name=first_name, middle_name=middle_name, last_name=last_name, company_name=company_name, job_title_id=job_title_id,
             date_of_birth=date_of_birth, phone_number=phone_number,
             country=country, city=city, street=street, postal=postal,
-            state=state, province=province, cell_confrimation_ts=cell_confrimation_ts, commit=True)
+            state=state, province=province, cell_confrimation_ts=cell_confrimation_ts, email_confrimation_ts=email_confrimation_ts, commit=True)
 
         logger.debug("New registered member_id: {}".format(member_id))
 

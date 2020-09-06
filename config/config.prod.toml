@@ -41,7 +41,7 @@ password = "${SMTP_PASSWORD}"
 access_key_id = "${AWS_ACCESS_KEY_ID}"
 secret_access_key = "${AWS_SECRET_ACCESS_KEY}"
 [services.twilio]
-potp_length = 6
+totp_length = 6
 
 [storage]
 [storage.s3]
