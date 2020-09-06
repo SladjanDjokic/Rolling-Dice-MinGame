@@ -345,8 +345,7 @@ class MemberDA(object):
     @classmethod
     def register(cls, avatar_storage_id, email, username, password, first_name, middle_name,
                  last_name, company_name, job_title_id, date_of_birth, phone_number,
-                 country, city, street, postal, state, province,
-                 commit=True):
+                 country, city, street, postal, state, province, cell_confrimation_ts, commit=True):
 
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query_member = ("""
@@ -359,6 +358,12 @@ class MemberDA(object):
         INSERT INTO member_contact
         (member_id, phone_number, email)
         VALUES (%s, %s, %s)
+        RETURNING id
+        """)
+        query_member_contact_2 = ("""
+        INSERT INTO member_contact_2
+        (member_id, description, device, device_type, device_country, device_confirm_date, method_type, display_order, primary_contact)
+        VALUES (%s, %s, %s, %s, (SELECT id FROM country_code WHERE alpha2 = %s), TIMESTAMP %s, %s, %s, %s)
         RETURNING id
         """)
         query_member_location = ("""
@@ -380,7 +385,9 @@ class MemberDA(object):
             # store member contact info
             params_member_contact = (id, phone_number, email)
             cls.source.execute(query_member_contact, params_member_contact)
-
+            # Member_contact_2
+            params_member_contact_2 = (id, "Cell phone", phone_number, "cell", country, cell_confrimation_ts, "voice", 1, True)
+            cls.source.execute(query_member_contact_2, params_member_contact_2)
         if street:
             # store member location info
             params_member_location = (
@@ -600,6 +607,7 @@ class MemberDA(object):
             return entry
         return None
 
+    @classmethod
     def get_terms(cls,):
         query = ("""
                 SELECT

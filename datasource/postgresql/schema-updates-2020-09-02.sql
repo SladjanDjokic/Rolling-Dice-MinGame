@@ -24,7 +24,7 @@ CREATE TABLE member_contact_2 (
   description           VARCHAR(100)    NOT NULL,
   device                VARCHAR(100)    NOT NULL,
   device_type           device_types    NOT NULL DEFAULT 'email',
-  device_country        INTEGER         NOT NULL,
+  device_country        INTEGER         NOT NULL REFERENCES country_code (id),
   device_confirm_date   TIMESTAMP       WITH TIME ZONE,
   method_type           method_types    NOT NULL DEFAULT 'text',
   display_order         INTEGER         NOT NULL,
