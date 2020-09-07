@@ -7,7 +7,7 @@ from falcon_multipart.middleware import MultipartMiddleware
 from app.config import parser, settings
 from app.middleware import CrossDomain  # , JSONTranslator
 from app.resources.member import MemberRegisterResource, MemberResource, MemberSearchResource, \
-    MemberGroupSearchResource, MemberContactResource, ContactMembersResource
+    MemberGroupSearchResource, MemberContactResource, ContactMembersResource, MemberInfoResource
 from app.resources.invite import MemberInviteResource, ValidInviteResource
 from app.resources.login import MemberLoginResource
 from app.resources.forgot_password import MemberForgotPasswordResource
@@ -92,6 +92,7 @@ def _setup_routes(app):
     app.add_route("/member/change-password", MemberChangePasswordResource())
     app.add_route("/member/logout", MemberLogoutResource())
     app.add_route("/member/invite", MemberInviteResource())
+    app.add_route("/member/info", MemberInfoResource())
     app.add_route("/member/invite/{invite_key:uuid}", MemberInviteResource())
     app.add_route("/valid-invite/{invite_key:uuid}", ValidInviteResource())
     app.add_route("/member/register/{invite_key:uuid}", MemberRegisterResource())  # noqa: E501

@@ -890,3 +890,69 @@ class MemberContactDA(object):
             raise e
 
 
+class MemberInfoDA(object):
+    source = source
+
+    def get_member_info(cls, member_id):
+        get_member_info_query = ("""
+            SELECT 
+                member.first_name as first_name,
+                member.middle_name as middle_name,
+                member.last_name as last_name,
+                member.email as email,
+                member.company_name as company,
+                member.job_title as title,
+                member.create_date as create_date,
+                member.update_date as update_date,
+                json_agg(DISTINCT member_location.*) AS location_information,
+                json_agg(DISTINCT member_contact_2.*) AS contact_information,
+                json_agg(DISTINCT country_code.*) AS country_code
+            FROM member
+                LEFT OUTER JOIN member_location ON member_location.member_id = member.id
+                LEFT OUTER JOIN member_contact ON member_contact.member_id = member.id
+                LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = member.id
+                LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
+            WHERE member.id = %s
+            GROUP BY 
+                member.id,
+                member.first_name,
+                member.middle_name,
+                member.last_name,
+                member.email,
+                member.company_name,
+                member.job_title,
+                member.create_date,
+                member.update_date
+            """)
+        get_member_info_params = (member_id,)
+        cls.source.execute(get_member_info_query, get_member_info_params)
+        if cls.source.has_results():
+            for (
+                    first_name,
+                    middle_name,
+                    last_name,
+                    email,
+                    company,
+                    title,
+                    create_date,
+                    update_date,
+                    location_information,
+                    contact_information,
+                    country_code
+            ) in cls.source.cursor:
+                member = {
+                    "member_id": member_id,
+                    "first_name": first_name,
+                    "middle_name": middle_name,
+                    "last_name": last_name,
+                    "email": email,
+                    "company": company,
+                    "title": title,
+                    "create_date": create_date,
+                    "update_date": update_date,
+                    "location_information": location_information,
+                    "contact_information": contact_information,
+                    "country_code": country_code
+                }
+
+                return member

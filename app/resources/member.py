@@ -4,7 +4,7 @@ from uuid import UUID
 
 import app.util.json as json
 import app.util.request as request
-from app.da.member import MemberDA, MemberContactDA
+from app.da.member import MemberDA, MemberContactDA, MemberInfoDA
 from app.da.invite import InviteDA
 from app.da.group import GroupMembershipDA
 from app.util.session import get_session_cookie, validate_session
@@ -341,6 +341,26 @@ class MemberContactResource(object):
 
             resp.body = json.dumps({
                 "contacts": member_contacts,
+                "success": True
+            }, default_parser=json.parser)
+
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+
+
+class MemberInfoResource(object):
+    @staticmethod
+    def on_get(req, resp):
+
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+
+            member_info = MemberInfoDA().get_member_info(member_id)
+
+            resp.body = json.dumps({
+                "member": member_info,
                 "success": True
             }, default_parser=json.parser)
 
