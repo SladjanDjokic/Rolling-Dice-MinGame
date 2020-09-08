@@ -9,9 +9,6 @@ from app.exceptions.file_sharing import FileShareExists, FileNotFound, \
 
 logger = logging.getLogger(__name__)
 
-logger = logging.getLogger(__name__)
-
-
 class FileStorage(object):
     @staticmethod
     def on_post(req, resp):

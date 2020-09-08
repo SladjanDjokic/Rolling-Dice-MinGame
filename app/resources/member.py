@@ -5,6 +5,7 @@ from uuid import UUID
 import app.util.json as json
 import app.util.request as request
 from app.da.member import MemberDA, MemberContactDA, MemberInfoDA
+from app.da.file_sharing import FileStorageDA
 from app.da.invite import InviteDA
 from app.da.group import GroupMembershipDA
 from app.util.session import get_session_cookie, validate_session
@@ -114,55 +115,75 @@ class MemberRegisterResource(object):
         # We store the key in hex format in the database
 
         (email, password, confirm_password,
-         first_name, last_name, date_of_birth,
+         first_name, middle_name, last_name, date_of_birth,
          phone_number, country, city, street,
-         postal, state, province) = request.get_json_or_form(
+         postal, state, province, company_name, job_title_id, profilePicture, cell_confrimation_ts, email_confrimation_ts) = request.get_json_or_form(
             "email", "password", "confirm_password",
-            "first_name", "last_name", "dob",
+            "first_name", "middle_name", "last_name", "dob",
             "cell", "country", "city", "street", "postal_code",
-            "state", "province", req=req)
+            "state", "province", "company_name", "job_title_id", "profilePicture", "cellConfirmationTS", "emailConfirmationTS", req=req)
+
+        (sub_local0) = request.get_json_or_form("sub_local0", req=req)
 
         if password != confirm_password:
             raise MemberPasswordMismatch()
 
+        logger.debug(f"Job Title ID: {job_title_id} and {type(job_title_id)}")
+        job_title_id = job_title_id.strip() or None
+
         if (not email or not password or
-            not first_name or not last_name): #  or
-#            not date_of_birth or not phone_number or
-#            not country or not city or not street or not postal):
+                not first_name or not last_name):  # or
+            #            not date_of_birth or not phone_number or
+            #            not country or not city or not street or not postal):
 
             raise MemberDataMissing()
 
+        logger.debug(f"Sub Local0: {sub_local0}")
+        logger.debug(f"State: {state}")
+
+
+        if not state and sub_local0:
+            state = sub_local0
+
+        if isinstance(state, list) and len(state) > 0:
+            state = state[0]
+
         # logger.debug("invite_key: {}".format(invite_key))
 
-
         logger.debug("invite_key: {}".format(invite_key))
-        logger.debug(": {}".format(email))
-        logger.debug("First_nEmailame: {}".format(first_name))
+        logger.debug("email: {}".format(email))
+        logger.debug("First_name: {}".format(first_name))
+        logger.debug("Middle_name: {}".format(middle_name))
         logger.debug("Last_name: {}".format(last_name))
         logger.debug("Password: {}".format(password))
+        logger.debug("Company name: {}".format(company_name))
 
         member = MemberDA.get_member_by_email(email)
 
         if member:
             raise MemberExists(email)
 
-        member = MemberDA.get_member_by_email(email);
-        
-        if member:
-            raise MemberExists(email);
-        
+        # Upload image to aws and create an entry in db
+        avatar_storage_id = FileStorageDA().store_file_to_storage(profilePicture)
+
+        logger.debug(f"Job Title ID: {job_title_id} and {type(job_title_id)}")
+        logger.debug(f"State: {state} and {type(state)}")
+
+
         member_id = MemberDA.register(
-            email=email, username=email, password=password,
-            first_name=first_name, last_name=last_name,
+            avatar_storage_id=avatar_storage_id, email=email, username=email, password=password,
+            first_name=first_name, middle_name=middle_name, last_name=last_name, company_name=company_name, job_title_id=job_title_id,
             date_of_birth=date_of_birth, phone_number=phone_number,
             country=country, city=city, street=street, postal=postal,
-            state=state, province=province, commit=True)
+            state=state, province=province, cell_confrimation_ts=cell_confrimation_ts, email_confrimation_ts=email_confrimation_ts, commit=True)
 
         logger.debug("New registered member_id: {}".format(member_id))
 
+
+
         # Update the invite reference to the newly created member_id
         if invite_key:
-            invite_key = invite_key.hex           
+            invite_key = invite_key.hex
             InviteDA.update_invite_registered_member(
                 invite_key=invite_key, registered_member_id=member_id
             )
@@ -318,7 +339,8 @@ class MemberContactResource(object):
             "contact_role": role
         }
 
-        member_contact_id = MemberContactDA().create_member_contact(**new_member_contact_params)
+        member_contact_id = MemberContactDA().create_member_contact(**
+                                                                    new_member_contact_params)
         logger.debug("New created contact_id: {}".format(member_contact_id))
         member_contact = {}
         if member_contact_id:
@@ -366,3 +388,46 @@ class MemberInfoResource(object):
 
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
+
+
+class MemberJobTitles(object):
+    auth = {
+        'exempt_methods': ['GET']
+    }
+
+    def on_get(self, req, resp):
+        job_title_list = MemberDA().get_job_list()
+        # TODO: Replace with try/except and raise an exception
+        # if unable to get a list
+        if job_title_list:
+            resp.body = json.dumps({
+                "data": job_title_list,
+                "success": True
+            }, default_parser=json.parser)
+        else:
+            resp.body = json.dumps({
+                "description": "Could not get the job title list",
+                "success": False
+            }, default_parser=json.parser)
+
+
+class MemberTerms(object):
+    auth = {
+        'exempt_methods': ['GET']
+    }
+
+    def on_get(self, req, resp):
+        # fetch all terms and conditions from db
+        # send them back
+        terms = MemberDA().get_terms()
+
+        if terms:
+            resp.body = json.dumps({
+                "data": terms,
+                "success": True
+            }, default_parser=json.parser)
+        else:
+            resp.body = json.dumps({
+                "description": "Could not get the terms and conditions",
+                "success": False
+            }, default_parser=json.parser)

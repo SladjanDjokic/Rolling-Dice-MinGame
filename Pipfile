@@ -29,6 +29,7 @@ boto3 = "*"
 pytz = "*"
 cryptography = "*"
 requests = "*"
+twilio = "*"
 
 [requires]
 python_version = "3.6"

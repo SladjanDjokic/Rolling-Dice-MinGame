@@ -42,6 +42,8 @@ password = "${SMTP_PASSWORD}"
 region_name = "us-east-2"
 access_key_id = "${AWS_ACCESS_KEY_ID}"
 secret_access_key = "${AWS_SECRET_ACCESS_KEY}"
+[services.twilio]
+totp_length = 6
 
 [storage]
 [storage.s3]

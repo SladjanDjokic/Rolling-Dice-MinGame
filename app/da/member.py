@@ -70,13 +70,13 @@ class MemberDA(object):
                 members.append(member)
 
         return members
-        
+
     @classmethod
-    def extractAvailableMembers(cls, event_invite_to_list):        
-        res = []        
+    def extractAvailableMembers(cls, event_invite_to_list):
+        res = []
         if len(event_invite_to_list) == 0:
             return res
-        
+
         separator = ','
         strCanidateList = separator.join(map(str, event_invite_to_list))
         logger.debug("strCanidateList: {}".format(strCanidateList))
@@ -91,9 +91,9 @@ class MemberDA(object):
         cls.source.execute(query, params)
         if cls.source.has_results():
             for entry_da in cls.source.cursor.fetchall():
-                res.append(entry_da[0])        
+                res.append(entry_da[0])
         return res
-    
+
     @classmethod
     def get_password_reset_info_by_email(cls, email):
         return cls.__get_password_reset_info('email', email)
@@ -107,20 +107,25 @@ class MemberDA(object):
 
         query = """
             SELECT
-                id,
-                email,
-                create_date,
-                update_date,
-                username,
-                status,
-                first_name,
-                last_name
+                member.id as member_id,
+                member.email as email,
+                member.create_date as create_date,
+                member.update_date as update_date,
+                member.username as username,
+                member.status as status,
+                member.first_name as first_name,
+                member.middle_name as middle_name,
+                member.last_name as last_name, 
+                member.company_name as company_name, 
+                job_title.name as job_title
             FROM member
+            LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
             WHERE ( email LIKE %s OR username LIKE %s OR first_name LIKE %s OR last_name LIKE %s ) AND id <> %s
             """
 
         like_search_key = """%{}%""".format(search_key)
-        params = (like_search_key, like_search_key, like_search_key, like_search_key, member_id)
+        params = (like_search_key, like_search_key,
+                  like_search_key, like_search_key, member_id)
 
         if page_size and page_number:
             query += """LIMIT %s OFFSET %s"""
@@ -138,7 +143,10 @@ class MemberDA(object):
                     username,
                     status,
                     first_name,
+                    middle_name,
                     last_name,
+                    company_name,
+                    job_title
             ) in cls.source.cursor:
                 member = {
                     "member_id": member_id,
@@ -148,8 +156,10 @@ class MemberDA(object):
                     "username": username,
                     "status": status,
                     "first_name": first_name,
+                    "middle_name": middle_name,
                     "last_name": last_name,
-                    "member_name": f'{first_name} {last_name}'
+                    "member_name": f'{first_name}{middle_name}{last_name}',
+                    "job_title": job_title
                 }
 
                 members.append(member)
@@ -218,7 +228,7 @@ class MemberDA(object):
 
         like_search_key = """%{}%""".format(search_key)
         params = (
-        member_id, member_id, member_id, member_id, like_search_key, like_search_key, like_search_key, like_search_key)
+            member_id, member_id, member_id, member_id, like_search_key, like_search_key, like_search_key, like_search_key)
 
         if page_size and page_number:
             query += """LIMIT %s OFFSET %s"""
@@ -333,16 +343,15 @@ class MemberDA(object):
         return None
 
     @classmethod
-    def register(cls, email, username, password, first_name, 
-                 last_name, date_of_birth, phone_number,
-                 country, city, street, postal, state, province,
-                 commit=True):
+    def register(cls, avatar_storage_id, email, username, password, first_name, middle_name,
+                 last_name, company_name, job_title_id, date_of_birth, phone_number,
+                 country, city, street, postal, state, province, cell_confrimation_ts, email_confrimation_ts, commit=True):
 
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query_member = ("""
         INSERT INTO member
-        (email, username, password, first_name, last_name, date_of_birth)
-        VALUES (%s, %s, crypt(%s, gen_salt('bf')), %s, %s, %s)
+        (email, username, password, first_name, middle_name, last_name, date_of_birth, company_name, job_title_id, avatar_storage_id)
+        VALUES (%s, %s, crypt(%s, gen_salt('bf')), %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """)
         query_member_contact = ("""
@@ -351,28 +360,44 @@ class MemberDA(object):
         VALUES (%s, %s, %s)
         RETURNING id
         """)
+        query_member_contact_2 = ("""
+        INSERT INTO member_contact_2
+        (member_id, description, device, device_type, device_country, device_confirm_date, method_type, display_order, primary_contact)
+        VALUES (%s, %s, %s, %s, (SELECT id FROM country_code WHERE alpha2 = %s), TIMESTAMP %s, %s, %s, %s)
+        RETURNING id
+        """)
         query_member_location = ("""
         INSERT INTO member_location
-        (member_id, street, city, state, province, postal, country)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        (member_id, street, address_1, city, state, province, postal, country, location_type)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'home')
         RETURNING id
         """)
 
         # AES_ENCRYPT(%s, UNHEX(SHA2(%s)))
         # settings.get('MEMBER_KEY')
         # store member personal info
-        params_member = (email, username, password, first_name, last_name, date_of_birth)
+        params_member = (email, username, password, first_name,
+                         middle_name, last_name, date_of_birth, company_name, job_title_id, avatar_storage_id)
         cls.source.execute(query_member, params_member)
         id = cls.source.get_last_row_id()
+
+        if email: 
+            # Member_contact_2
+            # FIXME: cell_confrimation_ts is passed temporary
+            params_email_member_contact_2 = (id, "Office email", email, "email", country, email_confrimation_ts, "html", 2, False)
+            cls.source.execute(query_member_contact_2, params_email_member_contact_2)
         
         if phone_number:
             # store member contact info
             params_member_contact = (id, phone_number, email)
             cls.source.execute(query_member_contact, params_member_contact)
-
+            # Member_contact_2
+            params_cell_member_contact_2 = (id, "Cell phone", phone_number, "cell", country, cell_confrimation_ts, "voice", 1, True)
+            cls.source.execute(query_member_contact_2, params_cell_member_contact_2)
         if street:
             # store member location info
-            params_member_location = (id, street, city, state, province, postal, country)
+            params_member_location = (
+                id, street, street, city, state, province, postal, country)
             cls.source.execute(query_member_location, params_member_location)
 
         if commit:
@@ -386,6 +411,7 @@ class MemberDA(object):
             SELECT
                 member.email as email,
                 member.first_name as first_name,
+                member.middle_name as middle_name,
                 member.last_name as last_name,
                 member_location.country as country,
                 member_contact.phone_number as cell_phone
@@ -401,6 +427,7 @@ class MemberDA(object):
             for (
                     email,
                     first_name,
+                    middle_name,
                     last_name,
                     country,
                     cell_phone,
@@ -408,6 +435,7 @@ class MemberDA(object):
                 member = {
                     "email": email,
                     "first_name": first_name,
+                    "middle_name": middle_name,
                     "last_name": last_name,
                     "country": country,
                     "cell_phone": cell_phone,
@@ -416,7 +444,7 @@ class MemberDA(object):
                 return member
 
         return None
-    
+
     @classmethod
     def get_member_contact(cls, member_id):
         query = """
@@ -429,7 +457,7 @@ class MemberDA(object):
         params = (member_id,)
         cls.source.execute(query, params)
         if cls.source.has_results():
-            for ( phone_number) in cls.source.cursor:
+            for (phone_number) in cls.source.cursor:
                 member = {
                     "phone_number": phone_number,
                 }
@@ -449,7 +477,7 @@ class MemberDA(object):
         params = (member_id,)
         cls.source.execute(query, params)
         if cls.source.has_results():
-            for ( country) in cls.source.cursor:
+            for (country) in cls.source.cursor:
                 member = {
                     "country": country,
                 }
@@ -494,7 +522,7 @@ class MemberDA(object):
 
     @classmethod
     def create_forgot_password(cls, member_id, email, forgot_key,
-                            expiration, commit=True):
+                               expiration, commit=True):
 
         query = ("""
         INSERT INTO forgot_password
@@ -554,7 +582,7 @@ class MemberDA(object):
         WHERE id = %s
         """)
         params = (
-            password, member_id 
+            password, member_id
         )
         try:
             cls.source.execute(query, params)
@@ -563,6 +591,55 @@ class MemberDA(object):
                 cls.source.commit()
         except DataMissingError as err:
             raise DataMissingError from err
+
+    @classmethod
+    def get_job_list(cls,):
+        query = """
+        SELECT 
+            id as job_title_id,
+            name as job_title
+        FROM job_title
+        """
+        params = ()
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            entry = list()
+            for entry_da in cls.source.cursor.fetchall():
+                entry_element = {
+                    "job_title_id": entry_da[0],
+                    "job_title": entry_da[1]
+                }
+                entry.append(entry_element)
+            return entry
+        return None
+
+    @classmethod
+    def get_terms(cls,):
+        query = ("""
+                SELECT
+                    amera_tos.id as amera_tos_id,
+                    amera_tos.contract_text as contract_text,
+                    country_code.alpha2 as country_code_alpha2,
+                    country_code.alpha3 as country_code_alpha3
+                FROM amera_tos
+                LEFT JOIN amera_tos_country ON amera_tos_country.amera_tos_id = amera_tos.id
+                LEFT JOIN country_code ON country_code.id = amera_tos_country.country_code_id
+                WHERE amera_tos.status = 'active'
+            """)
+        params = ()
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            entry = list()
+            for entry_da in cls.source.cursor.fetchall():
+                entry_element = {
+                    "amera_tos_id": entry_da[0],
+                    "contract_text": entry_da[1],
+                    "country_code_alpha2": entry_da[2],
+                    "country_code_alpha3": entry_da[3],
+                }
+                entry.append(entry_element)
+            return entry
+        return None
 
 
 class MemberContactDA(object):
@@ -583,7 +660,7 @@ class MemberContactDA(object):
                 contact.email as email,
                 contact.personal_email as personal_email,
                 member.company_name as company,
-                member.job_title as title,
+                job_title.name as title,
                 contact.company_name as company_name,
                 contact.company_phone as company_phone,
                 contact.company_web_site as company_web_site,
@@ -601,6 +678,7 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN member_contact ON member_contact.member_id = contact.contact_member_id
                 LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = contact.contact_member_id
                 LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
+                LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
             WHERE contact.member_id = %s
             GROUP BY 
                 contact.contact_member_id,
@@ -615,7 +693,7 @@ class MemberContactDA(object):
                 contact.email,
                 contact.personal_email,
                 member.company_name,
-                member.job_title,
+                job_title.name,
                 contact.company_name,
                 contact.company_phone,
                 contact.company_web_site,
@@ -697,14 +775,15 @@ class MemberContactDA(object):
                     member.last_name as last_name,
                     member.email as email,
                     member.company_name as company,
-                    member.job_title as title,
+                    job_title.name as title,
                     contact.contact_member_id as contact_member_id
                 FROM member
                 LEFT JOIN contact ON (member.id = contact.contact_member_id AND contact.member_id = %s)
+                LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
                 WHERE member.id <> %s
                 ORDER BY member.first_name ASC
                 """)
-        get_members_params = (member_id,member_id,)
+        get_members_params = (member_id, member_id,)
         cls.source.execute(get_members_query, get_members_params)
         if cls.source.has_results():
             for (
@@ -754,7 +833,7 @@ class MemberContactDA(object):
                 contact.email as email,
                 contact.personal_email as personal_email,
                 member.company_name as company,
-                member.job_title as title,
+                job_title.name as title,
                 contact.company_name as company_name,
                 contact.company_phone as company_phone,
                 contact.company_web_site as company_web_site,
@@ -772,6 +851,7 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN member_contact ON member_contact.member_id = contact.contact_member_id
                 LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = contact.contact_member_id
                 LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
+                LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
             WHERE {} = %s
             GROUP BY 
                 contact.contact_member_id,
@@ -786,7 +866,7 @@ class MemberContactDA(object):
                 contact.email,
                 contact.personal_email,
                 member.company_name,
-                member.job_title,
+                job_title.name,
                 contact.company_name,
                 contact.company_phone,
                 contact.company_web_site,
@@ -880,7 +960,8 @@ class MemberContactDA(object):
         )
 
         try:
-            cls.source.execute(create_member_contact_query, create_member_contact_params)
+            cls.source.execute(create_member_contact_query,
+                               create_member_contact_params)
             contact_id = cls.source.get_last_row_id()
 
             if commit:
@@ -901,7 +982,7 @@ class MemberInfoDA(object):
                 member.last_name as last_name,
                 member.email as email,
                 member.company_name as company,
-                member.job_title as title,
+                job_title.name as title,
                 member.create_date as create_date,
                 member.update_date as update_date,
                 json_agg(DISTINCT member_location.*) AS location_information,
@@ -912,6 +993,7 @@ class MemberInfoDA(object):
                 LEFT OUTER JOIN member_contact ON member_contact.member_id = member.id
                 LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = member.id
                 LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
+                LEFT OUTER JOIN job_title ON member.job_title_id = job_title.name
             WHERE member.id = %s
             GROUP BY 
                 member.id,
@@ -920,7 +1002,7 @@ class MemberInfoDA(object):
                 member.last_name,
                 member.email,
                 member.company_name,
-                member.job_title,
+                job_title.name,
                 member.create_date,
                 member.update_date
             """)

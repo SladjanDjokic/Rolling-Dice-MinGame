@@ -106,7 +106,7 @@ class SessionDA (object):
             member_session.last_name as last_name,
             member.middle_name as middle_name,
             member.company_name as company,
-            member.job_title as title,
+            job_title.name as title,
             member_contact.phone_number as cell_phone,
             member_location.street as street,
             member_location.city as city,
@@ -118,6 +118,7 @@ class SessionDA (object):
         LEFT JOIN member ON member_session.member_id = member.id
         LEFT JOIN member_location ON member_session.member_id = member_location.member_id
         LEFT JOIN member_contact ON member_session.member_id = member_contact.member_id
+        LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
         WHERE member_session.session_id = %s AND member_session.expiration_date >= current_timestamp
         """)
 
