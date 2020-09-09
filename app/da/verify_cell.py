@@ -40,9 +40,20 @@ class VerifyCellDA(object):
         logger.debug(verification_entry)
 
         if verification_entry:
-            cls.delete_verification_entry(verification_entry["entry_id"])
-            return (verification_entry["token"] == user_token)
-        return None
+            
+            # Check if has expired
+            totp_lifetime_seconds = int(settings.get("services.twilio.totp_lifetime_seconds"))
+            token_age_seconds = int((datetime.now() - verification_entry["token_time"]).seconds)
+
+            if verification_entry["token"] != user_token:
+                return 'mismatch'
+            elif (verification_entry["token"] == user_token) and (token_age_seconds > totp_lifetime_seconds):
+                cls.delete_verification_entry(verification_entry["entry_id"])
+                return 'expired'
+            else:
+                cls.delete_verification_entry(verification_entry["entry_id"])
+                return 'match'              
+        return 'no_entry'
             
 
 
