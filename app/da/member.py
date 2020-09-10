@@ -363,7 +363,7 @@ class MemberDA(object):
         query_member_contact_2 = ("""
         INSERT INTO member_contact_2
         (member_id, description, device, device_type, device_country, device_confirm_date, method_type, display_order, primary_contact)
-        VALUES (%s, %s, %s, %s, (SELECT id FROM country_code WHERE alpha2 = %s), TIMESTAMP %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, (SELECT id FROM country_code WHERE alpha2 = %s), %s, %s, %s, %s)
         RETURNING id
         """)
         query_member_location = ("""
@@ -993,7 +993,7 @@ class MemberInfoDA(object):
                 LEFT OUTER JOIN member_contact ON member_contact.member_id = member.id
                 LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = member.id
                 LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
-                LEFT OUTER JOIN job_title ON member.job_title_id = job_title.name
+                LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
             WHERE member.id = %s
             GROUP BY 
                 member.id,
