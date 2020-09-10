@@ -541,7 +541,7 @@ class ShareFileDA(object):
                     "shared_key": file[1],
                     "sharer_member_id": file[2],
                     "sharer_first_name": file[4],
-                    "sharer_first_name": file[5],
+                    "sharer_last_name": file[5],
                     "file_name": file[3],
                     "consumer_first_name": member.get("first_name"),
                     "consumer_last_name": member.get("last_name"),

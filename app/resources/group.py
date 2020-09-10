@@ -36,10 +36,10 @@ class MemberGroupResource(object):
             group_leader_id = session["member_id"]
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
-        
+
         group_exist = GroupDA().get_group_by_name_and_leader_id(group_leader_id, name)
         members = json.loads(members)
-        
+
         if group_exist:
             raise GroupExists(name)
         else:
@@ -62,12 +62,21 @@ class MemberGroupResource(object):
         try:
             session_id = get_session_cookie(req)
             session = validate_session(session_id)
-            group_leader_id = session["member_id"]
+            # group_leader_id = session["member_id"]
+            member_id = session["member_id"]
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
-        group_list = GroupDA().get_group_list_by_group_leader_id(group_leader_id)
+
+        get_all = req.get_param('get_all')
+
+        group_list_where_leader = GroupDA().get_group_list_by_group_leader_id(member_id)
+        resp_list = group_list_where_leader
+        if get_all:
+            group_list_where_member = GroupMembershipDA().get_group_by_member_id(member_id)
+            resp_list = group_list_where_leader + group_list_where_member
+
         resp.body = json.dumps({
-            "data": group_list,
+            "data": resp_list,
             "message": "All Group",
             "success": True
         }, default_parser=json.parser)
@@ -142,12 +151,12 @@ class GroupDetailResource(object):
         group['members'] = members
         group['total_member'] = len(members)
         return group
-    
+
     def on_delete(self, req, resp, group_id=None):
         session_id = get_session_cookie(req)
         session = validate_session(session_id)
         member_id = session["member_id"]
-        
+
         group = GroupDA().get_group(group_id)
 
         if not group:

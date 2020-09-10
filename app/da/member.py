@@ -120,7 +120,7 @@ class MemberDA(object):
                 job_title.name as job_title
             FROM member
             LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
-            WHERE ( email LIKE %s OR username LIKE %s OR first_name LIKE %s OR last_name LIKE %s ) AND id <> %s
+            WHERE ( email LIKE %s OR username LIKE %s OR first_name LIKE %s OR last_name LIKE %s ) AND member.id <> %s
             """
 
         like_search_key = """%{}%""".format(search_key)
