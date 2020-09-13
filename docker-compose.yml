@@ -162,10 +162,12 @@ services:
       - ../web-api/datasource/postgresql/cell_token.sql:/docker-entrypoint-initdb.d/c-cell-token.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-09-04_member_avatar.sql:/docker-entrypoint-initdb.d/d-1-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-09-07.sql:/docker-entrypoint-initdb.d/d-2-schema-updates.sql
+      - ../web-api/datasource/postgresql/promo_codes.sql:/docker-entrypoint-initdb.d/d-3-promo-codes.sql
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/e-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/e-2-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/e-3-test-schedule.sql
       - ../web-api/datasource/postgresql/test-amera-tos.dev.sql:/docker-entrypoint-initdb.d/e-4-test-amera-tos.dev.sql.sql
+      - ../web-api/datasource/postgresql/test-promo-codes.dev.sql:/docker-entrypoint-initdb.d/e-5-test-promo-codes.dev.sql
     environment:
       POSTGRES_DB: ameraiot
       POSTGRES_USER: amera

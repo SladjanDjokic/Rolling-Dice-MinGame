@@ -10,6 +10,7 @@ from app.resources.member import MemberRegisterResource, MemberResource, MemberS
     MemberGroupSearchResource, MemberContactResource, ContactMembersResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms
 from app.resources.verify_cell import VerifyCell
+from app.resources.promo_codes import PromoCodes
 from app.resources.invite import MemberInviteResource, ValidInviteResource
 from app.resources.login import MemberLoginResource
 from app.resources.forgot_password import MemberForgotPasswordResource
@@ -105,6 +106,7 @@ def _setup_routes(app):
     app.add_route("/member/register/terms", MemberTerms())
     # 2FA of cell during registration
     app.add_route("/member/register/verify-cell", VerifyCell())
+    app.add_route("/member/register/promo-code", PromoCodes())
 
     # This route is commneted out to prevent any registrations someone may be sniffing out
     # This will be enabled later on
