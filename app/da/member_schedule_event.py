@@ -11,7 +11,7 @@ class MemberScheduleEventDA(object):
     source = source
 
     @classmethod
-    def get_eventById(cls, id):
+    def get_event_by_id(cls, id):
         return cls.__get_data('id', id)
 
     @classmethod
@@ -27,7 +27,7 @@ class MemberScheduleEventDA(object):
         return True
 
     @classmethod
-    def get_events_full(cls, member_id, search_time_start = None, search_time_end = None):
+    def get_events_full(cls, member_id, search_time_start=None, search_time_end=None):
         return cls.__get_data_full('event_host_member_id', member_id, search_time_start, search_time_end)
 
     @classmethod
@@ -53,7 +53,9 @@ class MemberScheduleEventDA(object):
                 event_recurrence,
                 event_image,
                 create_date,
-                update_date
+                update_date,
+                event_invite_to_list,
+                event_duration_all_day
             ) in cls.source.cursor:
                 event = {
                     "id": id,
@@ -68,6 +70,8 @@ class MemberScheduleEventDA(object):
                     "event_image": event_image,
                     "create_date": create_date.strftime("%m/%d/%Y %H:%M:%S"),
                     "update_date": update_date.strftime("%m/%d/%Y %H:%M:%S"),
+                    "event_invite_to_list": event_invite_to_list,
+                    "event_duration_all_day": event_duration_all_day
                 }
                 events.append(event)
 
@@ -75,7 +79,7 @@ class MemberScheduleEventDA(object):
 
 
     @classmethod
-    def __get_data_full(cls, key, value, search_time_start = None, search_time_end = None):
+    def __get_data_full(cls, key, value, search_time_start=None, search_time_end=None):
 
         query_date = ""
         if search_time_start  and search_time_end:
@@ -98,7 +102,8 @@ class MemberScheduleEventDA(object):
                                 event_recurrence, event_image,
                                 event_invite_to_list,
                                 create_date,
-                                update_date 
+                                update_date ,
+                                event_duration_all_day
                             FROM schedule_event WHERE {} {} = %s 
                         ) a 
                         left join member_file
@@ -129,6 +134,7 @@ class MemberScheduleEventDA(object):
                 event_invite_to_list,
                 create_date,
                 update_date,
+                event_duration_all_day,
                 member_file_id,
                 storage_engine_id
             ) in cls.source.cursor:
@@ -148,6 +154,7 @@ class MemberScheduleEventDA(object):
                     "update_date": update_date.strftime("%m/%d/%Y %H:%M:%S"),
                     "member_file_id": member_file_id,
                     "storage_engine_id": storage_engine_id,
+                    "event_duration_all_day": event_duration_all_day
                 }
                 events.append(event)
 
@@ -155,20 +162,21 @@ class MemberScheduleEventDA(object):
 
     @classmethod
     def add(cls, event_name, event_host_member_id, event_type, event_datetime_start, event_datetime_end,
-                event_recurrence, event_invite_to_list = None ,
-                event_location_address = None, event_location_postal = None, event_image = None,
+                event_recurrence, event_invite_to_list=None, event_location_address=None,
+                event_location_postal=None, event_image=None, event_duration_all_day=False,
                 commit=True):
         try:
             query = ("""
-                INSERT INTO schedule_event (event_name, event_host_member_id,
-                event_type, event_datetime_start, event_datetime_end,
-                event_location_address, event_location_postal, event_recurrence, event_invite_to_list, event_image) VALUES (%s, %s, %s,
-                %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                INSERT INTO schedule_event (event_name, event_host_member_id, event_type,
+                    event_datetime_start, event_datetime_end, event_location_address, event_location_postal,
+                    event_recurrence, event_invite_to_list, event_image, event_duration_all_day) VALUES (%s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
                 """)
             
             # store info
-            params_value = (event_name, event_host_member_id, event_type, event_datetime_start, event_datetime_end,
-             event_location_address, event_location_postal, event_recurrence, event_invite_to_list, event_image)
+            params_value = (event_name, event_host_member_id, event_type, event_datetime_start,
+                            event_datetime_end, event_location_address, event_location_postal,
+                            event_recurrence, event_invite_to_list, event_image, event_duration_all_day)
 
             res = cls.source.execute(query, params_value)
 
