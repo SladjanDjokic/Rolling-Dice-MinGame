@@ -15,4 +15,18 @@ class PromoCodes(object):
     def on_get(self, req, resp):
         promo_input = req.get_params("promoCode")
 
+        found_code = PromoCodesDA().check_promo_code(promo_input)
+
+        if found_code:
+            resp.body = json.dumps({
+                "success": True,
+                "description": found_code["description"],
+                "promo_code_id": found_code["promo_code_id"]
+            })
+        else:
+            resp.body = json.dumps({
+                "success": False
+            })
+
         #  Check if this promo code exists & is not expired
+
