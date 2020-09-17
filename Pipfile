@@ -32,7 +32,7 @@ requests = "*"
 twilio = "*"
 
 [requires]
-python_version = "3.6"
+python_version = "3.7.9"
 
 [scripts]
 "dev" = "python run.py --env-name=LOCAL"

@@ -6,11 +6,12 @@ from app.exceptions.data import DuplicateKeyError, DataMissingError, Relationshi
 import logging
 logger = logging.getLogger(__name__)
 
+
 class PromoCodesDA(object):
     source = source
 
     @classmethod
-    def check_promo_code (cls, promo_code):
+    def check_promo_code(cls, promo_code):
         query = ("""SELECT
             id as promo_code_id, description
             FROM promo_codes
@@ -27,5 +28,15 @@ class PromoCodesDA(object):
             return code_entry
         return None
 
-
-
+    @classmethod
+    def create_activation_entry(cls, member_id, promo_code_id):
+        query = ("""INSERT INTO promo_code_activations (member_id, promo_code_id) 
+            VALUES (%s, %s)
+            RETURNING id;
+        """)
+        params = (member_id, promo_code_id)
+        cls.source.execute(query, params)
+        cls.source.commit()
+        if cls.source.has_results():
+            return True
+        return None

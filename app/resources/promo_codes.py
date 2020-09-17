@@ -9,11 +9,12 @@ logger = logging.getLogger(__name__)
 
 class PromoCodes(object):
     auth = {
-        'exempt_methods': ["GET"]
+        'exempt_methods': ["POST"]
     }
 
-    def on_get(self, req, resp):
-        promo_input = req.get_params("promoCode")
+    def on_post(self, req, resp):
+        (promo_input,) = request.get_json_or_form("promoCode", req=req)
+        logger.debug('Will check this promo', promo_input)
 
         found_code = PromoCodesDA().check_promo_code(promo_input)
 
@@ -29,4 +30,3 @@ class PromoCodes(object):
             })
 
         #  Check if this promo code exists & is not expired
-

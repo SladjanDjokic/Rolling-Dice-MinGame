@@ -8,6 +8,7 @@ from app.da.member import MemberDA, MemberContactDA, MemberInfoDA
 from app.da.file_sharing import FileStorageDA
 from app.da.invite import InviteDA
 from app.da.group import GroupMembershipDA
+from app.da.promo_codes import PromoCodesDA
 from app.util.session import get_session_cookie, validate_session
 from app.exceptions.member import MemberNotFound, MemberDataMissing, MemberExists, MemberContactExists, MemberPasswordMismatch
 from app.exceptions.invite import InviteNotFound, InviteExpired
@@ -117,11 +118,11 @@ class MemberRegisterResource(object):
         (email, password, confirm_password,
          first_name, middle_name, last_name, date_of_birth,
          phone_number, country, city, street,
-         postal, state, province, company_name, job_title_id, profilePicture, cell_confrimation_ts, email_confrimation_ts) = request.get_json_or_form(
+         postal, state, province, company_name, job_title_id, profilePicture, cell_confrimation_ts, email_confrimation_ts, promo_code_id) = request.get_json_or_form(
             "email", "password", "confirm_password",
             "first_name", "middle_name", "last_name", "dob",
             "cell", "country", "city", "street", "postal_code",
-            "state", "province", "company_name", "job_title_id", "profilePicture", "cellConfirmationTS", "emailConfirmationTS", req=req)
+            "state", "province", "company_name", "job_title_id", "profilePicture", "cellConfirmationTS", "emailConfirmationTS", "activatedPromoCode", req=req)
 
         (sub_local0) = request.get_json_or_form("sub_local0", req=req)
 
@@ -140,7 +141,6 @@ class MemberRegisterResource(object):
 
         logger.debug(f"Sub Local0: {sub_local0}")
         logger.debug(f"State: {state}")
-
 
         if not state and sub_local0:
             state = sub_local0
@@ -169,7 +169,6 @@ class MemberRegisterResource(object):
         logger.debug(f"Job Title ID: {job_title_id} and {type(job_title_id)}")
         logger.debug(f"State: {state} and {type(state)}")
 
-
         member_id = MemberDA.register(
             avatar_storage_id=avatar_storage_id, email=email, username=email, password=password,
             first_name=first_name, middle_name=middle_name, last_name=last_name, company_name=company_name, job_title_id=job_title_id,
@@ -178,8 +177,6 @@ class MemberRegisterResource(object):
             state=state, province=province, cell_confrimation_ts=cell_confrimation_ts, email_confrimation_ts=email_confrimation_ts, commit=True)
 
         logger.debug("New registered member_id: {}".format(member_id))
-
-
 
         # Update the invite reference to the newly created member_id
         if invite_key:
@@ -197,6 +194,10 @@ class MemberRegisterResource(object):
                     email=email,
                     invite_email=invite.get("email")
                 )
+
+        # Update the promo code reference for the newly created member_id
+        if promo_code_id:
+            PromoCodesDA().create_activation_entry(member_id, promo_code_id)
 
         resp.body = json.dumps({
             "member_id": member_id,
