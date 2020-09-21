@@ -32,6 +32,7 @@ from app.resources.member_schedule_holiday import MemberScheduleHolidayResource
 from app.resources.member_schedule_event_invite import MemberScheduleEventInviteResource, \
     MemberScheduleEventInviteAddSingleResource, MemberScheduleEventInviteSetStatusResource
 from app.resources.country import CountryCodeResource
+from app.resources.role import RolesResource
 # from app.resources.memberfile import MemberFile
 # from app.resources.keygen import KeyGenResource, KeyGenFileUpload
 
@@ -146,3 +147,4 @@ def _setup_routes(app):
                   MemberScheduleEventInviteSetStatusResource())
 
     app.add_route("/member/country", CountryCodeResource())
+    app.add_route("/member/role", RolesResource())

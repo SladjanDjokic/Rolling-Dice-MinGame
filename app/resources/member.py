@@ -306,6 +306,25 @@ class MemberContactResource(object):
         'exempt_methods': ['POST']
     }
 
+    def on_put(self, req, resp):
+        (id, role_id, role) = request.get_json_or_form("id", "role_id", "role", req=req)
+        
+        if id and role_id and role :
+            try:
+                MemberContactDA.update_member_contact_role(
+                    contact_id=id, contact_role_id=role_id, contact_role=role
+                    )
+                resp.body = json.dumps({
+                    "description": 'Contact updated successfully',
+                    "success": True
+                }, default_parser=json.parser)
+            except Exception as e:
+                resp.body = json.dumps({
+                    "description": 'Failed to update contact role!',
+                    "success": False
+                }, default_parser=json.parser)        
+        return    
+
     def on_post(self, req, resp):
 
         try:

@@ -970,6 +970,24 @@ class MemberContactDA(object):
         except Exception as e:
             raise e
 
+    @classmethod
+    def update_member_contact_role(cls, contact_id, contact_role_id, contact_role, commit=True):
+        query = ("""
+        UPDATE contact SET
+            role_id = %s,
+            contact_role = %s
+        WHERE id = %s
+        """)
+        params = (
+            contact_role_id, contact_role, contact_id
+        )
+        try:
+            cls.source.execute(query, params)
+
+            if commit:
+                cls.source.commit()
+        except DataMissingError as err:
+            raise DataMissingError from err
 
 class MemberInfoDA(object):
     source = source
