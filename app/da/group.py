@@ -93,18 +93,32 @@ class GroupDA(object):
     def get_group_list_by_group_leader_id(cls, group_leader_id):
         group_list = list()
         query = ("""
-            SELECT
-                member_group.id as group_id,
-                member_group.group_leader_id as group_leader_id,
-                member_group.group_name as group_name,
-                member_group.create_date as create_date,
-                member_group.update_date as update_date,
-                member.first_name as group_leader_first_name,
-                member.last_name as group_leader_last_name
-            FROM member_group
-            LEFT JOIN member ON member_group.group_leader_id = member.id
-            WHERE member_group.group_leader_id = %s AND member_group.status = 'active'
-            ORDER BY member_group.group_name ASC
+SELECT
+    member_group.id AS group_id,
+    member_group.group_leader_id AS group_leader_id,
+    member_group.group_name AS group_name,
+    member_group.create_date AS create_date,
+    member_group.update_date AS update_date,
+    member.first_name AS group_leader_first_name,
+    member.last_name AS group_leader_last_name,
+    count(DISTINCT member_group_membership.member_id) AS total_member,
+    count(DISTINCT shared_file.id) AS total_files
+FROM member_group
+LEFT JOIN member ON member_group.group_leader_id = member.id
+LEFT OUTER JOIN member_group_membership ON (member_group_membership.group_id = member_group.id)
+LEFT OUTER JOIN shared_file ON (shared_file.group_id = member_group.id)
+WHERE 
+    member_group.group_leader_id = %s AND 
+    member_group.status = 'active'
+GROUP BY 
+    member_group.id,
+    member_group.group_leader_id,
+    member_group.group_name,
+    member_group.create_date,
+    member_group.update_date,
+    member.first_name,
+    member.last_name
+ORDER BY member_group.group_name ASC
         """)
         params = (group_leader_id,)
         cls.source.execute(query, params)
@@ -116,7 +130,8 @@ class GroupDA(object):
                     "group_leader_id": row[1],
                     "group_name": row[2],
                     "group_leader_name": f'{row[5]} {row[6]}',
-                    "total_member": len(GroupMembershipDA().get_members_by_group_id(row[0])),
+                    "total_member": row[7],
+                    "total_files": row[8],
                     "create_date": row[3],
                     "update_date": row[4],
                 }
@@ -229,28 +244,60 @@ class GroupMembershipDA(object):
     def get_group_by_member_id(cls, member_id):
         try:
             query = ("""
-                SELECT
-                    member_group.id,
-                    member_group.group_name,
-                    member_group.create_date,
-                    member_group.update_date,
-                    member.id,
-                    member.first_name,
-                    member.last_name,
-                    member.email,
-                    member_group_membership.create_date,
-                    member_group_membership.update_date
-                FROM  member_group_membership
-                LEFT JOIN member_group ON member_group.id = member_group_membership.group_id
-                LEFT JOIN member ON member_group.group_leader_id = member.id
-                WHERE member_group_membership.member_id = %s
-                ORDER BY member_group.create_date DESC
+SELECT member_group.id AS group_id,
+       member_group.group_name,
+       member_group.create_date,
+       member_group.update_date,
+       member.id AS member_id,
+       member.first_name,
+       member.last_name,
+       member.email,
+       member_group_membership.create_date,
+       member_group_membership.update_date,
+       count(DISTINCT group_membership_member.member_id) AS member_count,
+       count(DISTINCT shared_file.id) AS file_count,
+       json_agg(DISTINCT ( group_member_detail.id,
+                group_member_detail.first_name,
+                group_member_detail.last_name,
+                group_member_detail.email,
+                group_membership_member.create_date)
+        ) AS members
+FROM member_group_membership
+INNER JOIN member_group ON (member_group.id = member_group_membership.group_id)
+LEFT OUTER JOIN member_group_membership AS group_membership_member ON (group_membership_member.group_id = member_group.id)
+LEFT OUTER JOIN member AS group_member_detail ON (group_membership_member.member_id = group_member_detail.id)
+LEFT OUTER JOIN shared_file ON (shared_file.group_id = member_group.id)
+INNER JOIN member ON member_group.group_leader_id = member.id
+WHERE member_group_membership.member_id = 3
+GROUP BY member_group.id,
+         member_group.group_name,
+         member_group.create_date,
+         member_group.update_date,
+         member.id,
+         member.first_name,
+         member.last_name,
+         member.email,
+         member_group_membership.create_date,
+         member_group_membership.update_date
+ORDER BY member_group.create_date DESC
             """)
             params = (member_id,)
             group_list = list()
             cls.source.execute(query, params)
             if cls.source.has_results():
                 for elem in cls.source.cursor.fetchall():
+                    # { 
+                    #     "f1": 3, 
+                    #     "f2": "taylor" , 
+                    #     "f3": "user", 
+                    #     "f4": "donald@email.com",
+                    #     "f5":"2020-09-23T16:27:16.11328+00:00"
+                    # }
+                    # id
+                    # first_name
+                    # last_name
+                    # email
+                    # create_date
                     group = {
                         "group_id": elem[0],
                         "group_name": elem[1],
@@ -262,21 +309,19 @@ class GroupMembershipDA(object):
                         "group_leader_last_name": elem[6],
                         "group_leader_email": elem[7],
                         "create_date": elem[8],
-                        "update_date": elem[9]
+                        "update_date": elem[9],
+                        "total_member": elem[10],
+                        "total_files": elem[11],
+                        "members": elem[12]
                     }
-                    group_id = group['group_id']
-                    members = cls.get_members_by_group_id(group_id)
-                    group_leader_member = {
-                        "member_id": elem[4],
-                        "first_name": elem[5],
-                        "last_name": elem[6],
-                        "email": elem[7],
-                        "joined_date": elem[2]
-                    }
-                    members.append(group_leader_member)
-                    members = sorted(members, key=lambda x: (x['joined_date']), reverse=True)
-                    group['members'] = members
-                    group['total_member'] = len(members)
+                    group["members"] = [{
+                        "id": m["f1"],
+                        "first_name": m["f2"],
+                        "last_name": m["f3"],
+                        "email": m["f4"],
+                        "create_date": m["f5"]
+                    } for m in group["members"]]
+
                     group_list.append(group)
             return group_list
         except Exception as e:

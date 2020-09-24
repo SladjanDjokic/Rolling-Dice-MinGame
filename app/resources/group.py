@@ -23,6 +23,7 @@ from app.exceptions.session import ForbiddenSession
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 
 logger = logging.getLogger(__name__)
+import pdb
 
 
 class MemberGroupResource(object):
@@ -132,6 +133,31 @@ class MemberGroupResource(object):
             except InviteInvalidInviterError:
                 continue
 
+    def on_delete(self, req, resp):
+        (group_ids) = request.get_json_or_form("groupIds", req=req)
+        group_ids = group_ids[0].split(',')
+        
+        session_id = get_session_cookie(req)
+        session = validate_session(session_id)
+        member_id = session["member_id"]
+        
+        delete_status = {}
+        for group_id in group_ids:
+            group = GroupDA().get_group(group_id)
+            if group:
+                if group["group_leader_id"] == member_id:
+                    GroupDA().change_group_status(group_id, 'deleted')
+                    delete_status[group_id] = True
+                else:
+                    delete_status[group_id] = False
+            else:
+                delete_status[group_id] = False
+            
+        resp.body = json.dumps({
+            "data": delete_status,
+            "description": "Group's deleted successfully!",
+            "success": True
+        }, default_parser=json.parser)
 
 class GroupDetailResource(object):
     def on_get(self, req, resp, group_id=None):
@@ -151,25 +177,6 @@ class GroupDetailResource(object):
         group['members'] = members
         group['total_member'] = len(members)
         return group
-
-    def on_delete(self, req, resp, group_id=None):
-        session_id = get_session_cookie(req)
-        session = validate_session(session_id)
-        member_id = session["member_id"]
-
-        group = GroupDA().get_group(group_id)
-
-        if not group:
-            raise GroupNotFound
-        if group["group_leader_id"] != member_id:
-            raise ForbiddenSession
-        GroupDA().change_group_status(group_id, 'deleted')
-        resp.body = json.dumps({
-            "data": group,
-            "description": "Group deleted successfully!",
-            "success": True
-        }, default_parser=json.parser)
-
 
 class GroupMembershipResource(object):
     @staticmethod

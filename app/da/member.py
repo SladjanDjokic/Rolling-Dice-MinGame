@@ -988,6 +988,21 @@ class MemberContactDA(object):
                 cls.source.commit()
         except DataMissingError as err:
             raise DataMissingError from err
+            
+    @classmethod
+    def delete_contact(cls, contact_id, commit=True):
+        query = """
+            DELETE FROM contact 
+            WHERE id = %s 
+        """
+        params = (contact_id,)
+        try:
+            cls.source.execute(query, params)
+
+            if commit:
+                cls.source.commit()
+        except Exception as err:
+            raise err
 
 class MemberInfoDA(object):
     source = source

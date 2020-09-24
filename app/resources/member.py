@@ -282,6 +282,24 @@ class ContactMembersResource(object):
             "success": True
         }, default_parser=json.parser)
 
+    def on_delete(self, req, resp):
+        (contact_ids) = request.get_json_or_form("contactIds", req=req)
+        contact_ids = contact_ids[0].split(',')
+        
+        delete_status = {}
+        for contact_id in contact_ids:
+            try:
+                MemberContactDA().delete_contact(contact_id)
+                delete_status[contact_id] = True
+            except:
+                delete_status[contact_id] = False
+            
+        resp.body = json.dumps({
+            "data": delete_status,
+            "description": "Contact's deleted successfully!",
+            "success": True
+        }, default_parser=json.parser)
+
     @staticmethod
     def on_get(req, resp):
 

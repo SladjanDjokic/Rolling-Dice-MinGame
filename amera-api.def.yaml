@@ -1,0 +1,373 @@
+name: AMERA API
+routes:
+  ##############################
+  # Member Login
+  ##############################
+  - path: /member/login
+    class: MemberLoginResource
+    methods:
+      POST: >
+        {
+          "username": "test@email.com",
+          "password":"password"
+        }
+      response: >
+        {
+          "session_id": ""
+        }
+  ##############################
+  # Member Forgot-Password
+  ##############################
+  - path: /member/forgot
+    class: MemberForgotPasswordResource
+    methods:
+      POST: >
+        {
+          "email": "test@email.com"
+        }
+      GET:
+  ##############################
+  # Member Reset-Password
+  ##############################
+  - path: /member/reset-password/{forgot_key:uuid}
+    class: MemberResetPasswordResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Change-Password
+  ##############################
+  - path: /member/change-password
+    class: MemberChangePasswordResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Logout
+  ##############################
+  - path: /member/logout
+    class: MemberLogoutResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Info - Uses the session id to retrieve member information
+  #               Similar to /valid-session
+  ##############################
+  - path: /member/info
+    class: MemberInfoResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Invite - Invite/retrieve invite of a user to the system
+  ##############################
+  - path: /member/invite/{invite_key:uuid}
+    class: MemberInviteResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Valid-Invite - Validates an invite key, this is also done by `Member Invite`
+  ##############################
+  - path: /valid-invite/{invite_key:uuid}
+    class: ValidInviteResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Register
+  ##############################
+  - path: /member/register/{invite_key:uuid}
+    class: MemberRegisterResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Job-Titles
+  ##############################
+  - path: /member/register/job-title
+    class: MemberJobTitles
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Terms
+  ##############################
+  - path: /member/register/terms
+    class: MemberTerms
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Verify Cell Phone
+  ##############################
+  - path: /member/register/verify-cell
+    class: VerifyCell
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Registration
+  ##############################
+  - path: /member/register
+    class: MemberRegistrationResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Search
+  ##############################
+  - path: /member/search
+    class: MemberSearchResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Group-Search
+  ##############################
+  - path: /member/group/search
+    class: MemberGroupSearchResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member
+  ##############################
+  - path: /member/{username}
+    class: MemberResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Contact
+  ##############################
+  - path: /member/contact
+    class: MemberContactResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Contact-Members
+  ##############################
+  - path: /member-contacts
+    class: ContactMembersResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Session
+  ##############################
+  - path: /session/{session_id}
+    class: SessionResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Validate-Session
+  ##############################
+  - path: /valid-session
+    class: ValidateSessionResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member File
+  ##############################
+  - path: /cloud/files
+    class: MemberFile
+    methods:
+      POST:
+      GET:
+  ##############################
+  # File-Storage
+  ##############################
+  - path: /cloud/files
+    class: FileStorage
+    methods:
+      POST:
+      GET:
+  ##############################
+  # File-Storage-Detail
+  ##############################
+  - path: /cloud/files/details/{file_id}
+    class: FileStorageDetail
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Download-Storage-File
+  ##############################
+  - path: /cloud/files/download/{file_id}
+    class: DownloadStorageFile
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Share-File
+  ##############################
+  - path: /cloud/files/share
+    class: ShareFile
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Share-File-Detail
+  ##############################
+  - path: /cloud/files/share/details/{shared_key}
+    class: ShareFileDetail
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Download-Shared-File
+  ##############################
+  - path: /cloud/files/share/download/{shared_key}
+    class: DownloadSharedFile
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Static
+  ##############################
+  - path: /static/{file_name}
+    class: StaticResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Group
+  ##############################
+  - path: /group
+    class: MemberGroupResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Group-Detail
+  ##############################
+  - path: /group/{group_id}
+    class: GroupDetailResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Group
+  ##############################
+  - path: /groups
+    class: MemberGroupResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Group-Membership
+  ##############################
+  - path: /groups/membership
+    class: GroupMembershipResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Group-Member Invite
+  ##############################
+  - path: /member/group/invite
+    class: GroupMemberInviteResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Group-Members
+  ##############################
+  - path: /member/group-members
+    class: GroupMembersResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # System-Activity-Invite
+  ##############################
+  - path: /system/activity/invite
+    class: SystemActivityInviteResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # System-Activity-Session
+  ##############################
+  - path: /system/activity/session
+    class: SystemActivitySessionResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Language
+  ##############################
+  - path: /languages
+    class: LanguageResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Scheduler-Setting
+  ##############################
+  - path: /member/scheduler/setting
+    class: MemberSchedulerSettingResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Schedule-Event
+  ##############################
+  - path: /member/schedule/event
+    class: MemberScheduleEventResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Schedule-Holiday
+  ##############################
+  - path: /member/schedule/holiday
+    class: MemberScheduleHolidayResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Schedule-Event-Invite-Add-Single
+  ##############################
+  - path: /member/schedule/event-invite/add-single
+    class: MemberScheduleEventInviteAddSingleResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Schedule-Event-Invite
+  ##############################
+  - path: /member/schedule/event-invite
+    class: MemberScheduleEventInviteResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Member Schedule-Event-Invite-Set-Status
+  ##############################
+  - path: /member/schedule/event-invite/set-status
+    class: MemberScheduleEventInviteSetStatusResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Country-Code
+  ##############################
+  - path: /member/country
+    class: CountryCodeResource
+    methods:
+      POST:
+      GET:
+  ##############################
+  # Roles
+  ##############################
+  - path: /member/role
+    class: RolesResource
+    methods:
+      POST:
+      GET:
