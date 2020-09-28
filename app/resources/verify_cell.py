@@ -18,9 +18,9 @@ class VerifyCell(object):
         logger.debug('cell', cell)
         success = VerifyCellDA().create_verification_entry(cell)
         totp_length = settings.get("services.twilio.totp_length")
-        logger.debug('totp_length',totp_length)
+        totp_lifetime_seconds = settings.get("services.twilio.totp_lifetime_seconds")
         if success:
-            resp.body = json.dumps({"success": True, "totp_digits_count": totp_length})
+            resp.body = json.dumps({"success": True, "totp_digits_count": totp_length, "totp_lifetime_seconds": totp_lifetime_seconds})
         else:
             resp.body = json.dumps(
                 {"success": False, "description": "Something went wrong"})
@@ -29,11 +29,13 @@ class VerifyCell(object):
         # provide cell and token, compare with stored
         (cell, token) = request.get_json_or_form(
             "cell", "token", req=req)
-        logger.debug('cell', cell, type(cell)),
-        is_matches = VerifyCellDA().verify_cell_phone(cell, token)
+        # logger.debug('cell', cell, type(cell)),
+        result = VerifyCellDA().verify_cell_phone(cell, token)
 
-        if is_matches:
-            resp.body = json.dumps({"success": True})
-        else:
-            resp.body = json.dumps(
-                {"success": False, "description": "Something went wrong"})
+        resp.body = json.dumps({"result": result})
+
+        # if is_matches:
+        #     resp.body = json.dumps({"success": True})
+        # else:
+        #     resp.body = json.dumps(
+        #         {"success": False, "description": "Something went wrong"})
