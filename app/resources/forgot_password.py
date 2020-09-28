@@ -64,7 +64,7 @@ class MemberForgotPasswordResource(object):
                 "web.member_forgot_password_url"
             ).format(forgot_key)
 
-        forgot_url = urljoin(request.get_url_base(req), forgot_url)
+        forgot_url = urljoin("https://amerashare.com", forgot_url)
         result['forgot_url'] = forgot_url
         try:
             self._send_email(
