@@ -23,6 +23,7 @@ from app.exceptions.session import ForbiddenSession
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 
 logger = logging.getLogger(__name__)
+import pdb
 
 
 class MemberGroupResource(object):
@@ -36,10 +37,10 @@ class MemberGroupResource(object):
             group_leader_id = session["member_id"]
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
-        
+
         group_exist = GroupDA().get_group_by_name_and_leader_id(group_leader_id, name)
         members = json.loads(members)
-        
+
         if group_exist:
             raise GroupExists(name)
         else:
@@ -62,12 +63,21 @@ class MemberGroupResource(object):
         try:
             session_id = get_session_cookie(req)
             session = validate_session(session_id)
-            group_leader_id = session["member_id"]
+            # group_leader_id = session["member_id"]
+            member_id = session["member_id"]
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
-        group_list = GroupDA().get_group_list_by_group_leader_id(group_leader_id)
+
+        get_all = req.get_param('get_all')
+
+        group_list_where_leader = GroupDA().get_group_list_by_group_leader_id(member_id)
+        resp_list = group_list_where_leader
+        if get_all:
+            group_list_where_member = GroupMembershipDA().get_group_by_member_id(member_id)
+            resp_list = group_list_where_leader + group_list_where_member
+
         resp.body = json.dumps({
-            "data": group_list,
+            "data": resp_list,
             "message": "All Group",
             "success": True
         }, default_parser=json.parser)
@@ -123,6 +133,31 @@ class MemberGroupResource(object):
             except InviteInvalidInviterError:
                 continue
 
+    def on_delete(self, req, resp):
+        (group_ids) = request.get_json_or_form("groupIds", req=req)
+        group_ids = group_ids[0].split(',')
+        
+        session_id = get_session_cookie(req)
+        session = validate_session(session_id)
+        member_id = session["member_id"]
+        
+        delete_status = {}
+        for group_id in group_ids:
+            group = GroupDA().get_group(group_id)
+            if group:
+                if group["group_leader_id"] == member_id:
+                    GroupDA().change_group_status(group_id, 'deleted')
+                    delete_status[group_id] = True
+                else:
+                    delete_status[group_id] = False
+            else:
+                delete_status[group_id] = False
+            
+        resp.body = json.dumps({
+            "data": delete_status,
+            "description": "Group's deleted successfully!",
+            "success": True
+        }, default_parser=json.parser)
 
 class GroupDetailResource(object):
     def on_get(self, req, resp, group_id=None):
@@ -142,25 +177,6 @@ class GroupDetailResource(object):
         group['members'] = members
         group['total_member'] = len(members)
         return group
-    
-    def on_delete(self, req, resp, group_id=None):
-        session_id = get_session_cookie(req)
-        session = validate_session(session_id)
-        member_id = session["member_id"]
-        
-        group = GroupDA().get_group(group_id)
-
-        if not group:
-            raise GroupNotFound
-        if group["group_leader_id"] != member_id:
-            raise ForbiddenSession
-        GroupDA().change_group_status(group_id, 'deleted')
-        resp.body = json.dumps({
-            "data": group,
-            "description": "Group deleted successfully!",
-            "success": True
-        }, default_parser=json.parser)
-
 
 class GroupMembershipResource(object):
     @staticmethod
@@ -250,6 +266,8 @@ class GroupMemberInviteResource(object):
             ).format(invite_key)
 
             register_url = urljoin(request.get_url_base(req), register_url)
+            register_url = "/registration/{}".format(invite_key)
+            register_url = urljoin("https://amerashare.com", register_url)
 
             self._send_email(
                 email=email,

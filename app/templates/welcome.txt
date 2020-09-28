@@ -2,7 +2,7 @@ Welcome to {{product_name}}
 
 Hello {{first_name}}, 
 
-You have been invited to become a member of {{product_name}}, in order to create your account to login please copy paste the following URL into your browser:
+You have been invited to become a member of {{product_name}}, in order to create your account to login please click or copy the following URL into your browser:
 
 {{register_url}}
 

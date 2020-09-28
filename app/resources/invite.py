@@ -57,8 +57,8 @@ class MemberInviteResource(object):
             register_url = settings.get(
                 "web.member_invite_register_url"
             ).format(invite_key)
-
-            register_url = urljoin(request.get_url_base(req), register_url)
+            register_url = "/member/{}".format(invite_key)
+            register_url = urljoin("https://amerashare.com", register_url)
 
             self._send_email(
                 email=email,

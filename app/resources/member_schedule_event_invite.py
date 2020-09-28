@@ -1,5 +1,4 @@
 import logging
-import json
 from datetime import timezone, datetime
 
 import app.util.json as json
@@ -17,53 +16,65 @@ logger = logging.getLogger(__name__)
 
 
 class MemberScheduleEventInviteResource(object):
+    @staticmethod
+    def on_get(req, resp):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
 
-    def on_post(self, req, resp):
+            event_invite_to = req.get_param("event_invite_to")
+            search_time_start = req.get_param("search_time_start")
+            search_time_end = req.get_param("search_time_end")
 
-        [event_invite_to] = request.get_json_or_form("event_invite_to", req=req)
-        [search_time_start] = request.get_json_or_form("search_time_start", req=req)
-        [search_time_end] = request.get_json_or_form("search_time_end", req=req)
-                      
-        event_invites = MemberScheduleEventInviteDA.get_event_invites_full(event_invite_to, search_time_start, search_time_end)
+            event_invites = MemberScheduleEventInviteDA.get_event_invites_full(event_invite_to, search_time_start,
+                                                                               search_time_end)
 
-        resp.body = json.dumps({
-            "data": event_invites,
-            "success": True
-        })
+            resp.body = json.dumps({
+                "data": event_invites,
+                "success": True
+            }, default_parser=json.parser)
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
 
+    @staticmethod
+    def on_post(req, resp):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
 
-class MemberScheduleEventInviteAddMultipleResource(object):
-    def on_post(self, req, resp):
+            (event_id, event_invite_to_list) = request.get_json_or_form(
+                "event_id", "event_invite_to_list", req=req)
 
-        (event_id, event_invite_to_list_str) = request.get_json_or_form(
-            "event_id", "event_invite_to_list", req=req)      
+            add_result = list()
+            if event_invite_to_list is not None:
+                event_invite_to_list = json.loads(event_invite_to_list)
+                available_member_list = MemberDA().extractAvailableMembers(event_invite_to_list)
 
-        addResult = list()
-        if event_invite_to_list != None:
-            event_invite_to_list = json.loads(event_invite_to_list_str)
-            available_member_list = MemberDA().extractAvailableMembers(event_invite_to_list)
-                        
-            set_params = {
-                "event_id": event_id,
-                "event_invite_to_list": available_member_list   
-            }            
-            #logger.debug("set_params: {}".format(set_params))
+                set_params = {
+                    "event_id": event_id,
+                    "event_invite_to_list": available_member_list
+                }
+                #logger.debug("set_params: {}".format(set_params))
 
-            addResult = MemberScheduleEventInviteDA().addMultiple(**set_params)
-                
-            if not addResult:
-                raise ScheduleEventInviteAddingFailed()
+                add_result = MemberScheduleEventInviteDA().addMultiple(**set_params)
 
-        resp.body = json.dumps({
-            "data": addResult,
-            "description": "Event invites have been sent successfully!",
-            "success": True
-        })
+                if not add_result:
+                    raise ScheduleEventInviteAddingFailed()
+
+            resp.body = json.dumps({
+                "data": add_result,
+                "description": "Event invites have been sent successfully!",
+                "success": True
+            }, default_parser=json.parser)
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
     
 
 class MemberScheduleEventInviteAddSingleResource(object):
-    def on_post(self, req, resp):
-
+    @staticmethod
+    def on_post(req, resp):
         (event_id, event_invite_to) = request.get_json_or_form(
             "event_id", "event_invite_to", req=req)
 
@@ -71,8 +82,8 @@ class MemberScheduleEventInviteAddSingleResource(object):
         if not member:
             raise MemberNotFound(member)
 
-        bEventExisting = MemberScheduleEventDA().check_eventExistanceById(event_id)
-        if not bEventExisting:
+        b_event_existing = MemberScheduleEventDA().check_eventExistanceById(event_id)
+        if not b_event_existing:
             raise ScheduleEventNotFound(event_id)
 
         set_params = {
@@ -80,21 +91,21 @@ class MemberScheduleEventInviteAddSingleResource(object):
             "event_invite_to": event_invite_to   
         }
 
-        addResult = MemberScheduleEventInviteDA().addSingle(**set_params)
+        add_result = MemberScheduleEventInviteDA().addSingle(**set_params)
 
-        if not addResult:
+        if not add_result:
             raise ScheduleEventInviteAddingFailed()
 
         resp.body = json.dumps({
-            "data": addResult,
+            "data": add_result,
             "description": "Event invite has been sent successfully!",
             "success": True
         })
     
 
 class MemberScheduleEventInviteSetStatusResource(object):
-
-    def on_post(self, req, resp):
+    @staticmethod
+    def on_post(req, resp):
 
         [event_invite_id] = request.get_json_or_form("event_invite_id", req=req)
         [event_invite_status] = request.get_json_or_form("event_invite_status", req=req)
@@ -114,4 +125,4 @@ class MemberScheduleEventInviteSetStatusResource(object):
             "data": event_invite_full,
             "description": "Event invite status has been updated successfully!",
             "success": True
-        })
+        }, default_parser=json.parser)

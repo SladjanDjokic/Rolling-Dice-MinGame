@@ -44,8 +44,8 @@ class MemberSchedulerSettingDA(object):
                     "time_interval": time_interval,
                     "start_day": start_day,
                     "drag_method": drag_method,
-                    "create_date": create_date.strftime("%m/%d/%Y %H:%M:%S"),
-                    "update_date": update_date.strftime("%m/%d/%Y %H:%M:%S"),
+                    "create_date": create_date,
+                    "update_date": update_date,
                 }
 
                 return setting

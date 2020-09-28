@@ -27,13 +27,13 @@ from app.resources.file_sharing import FileStorage, FileStorageDetail, \
 from app.resources.system import SystemActivitySessionResource, SystemActivityInviteResource
 from app.resources.language import LanguageResource
 from app.resources.static import StaticResource
-from app.resources.member_scheduler_setting import MemberSchedulerSettingResource, MemberSchedulerSettingUpdateResource
-from app.resources.member_schedule_event import MemberScheduleEventAddResource, MemberScheduleEventResource
-from app.resources.member_schedule_holiday import MemberScheduleHolidayAddResource, MemberScheduleHolidayResource
+from app.resources.member_scheduler_setting import MemberSchedulerSettingResource
+from app.resources.member_schedule_event import MemberScheduleEventResource
+from app.resources.member_schedule_holiday import MemberScheduleHolidayResource
 from app.resources.member_schedule_event_invite import MemberScheduleEventInviteResource, \
-    MemberScheduleEventInviteAddMultipleResource, MemberScheduleEventInviteAddSingleResource, \
-    MemberScheduleEventInviteSetStatusResource
+    MemberScheduleEventInviteAddSingleResource, MemberScheduleEventInviteSetStatusResource
 from app.resources.country import CountryCodeResource
+from app.resources.role import RolesResource
 # from app.resources.memberfile import MemberFile
 # from app.resources.keygen import KeyGenResource, KeyGenFileUpload
 
@@ -139,26 +139,14 @@ def _setup_routes(app):
 
     app.add_route("/languages", LanguageResource())
 
-    app.add_route("/member/scheduler/setting/set",
-                  MemberSchedulerSettingUpdateResource())
-    app.add_route("/member/scheduler/setting/get",
-                  MemberSchedulerSettingResource())
-
-    app.add_route("/member/schedule/event/add",
-                  MemberScheduleEventAddResource())
-    app.add_route("/member/schedule/event/get", MemberScheduleEventResource())
-
-    app.add_route("/member/schedule/holiday/add",
-                  MemberScheduleHolidayAddResource())
-    app.add_route("/member/schedule/holiday/get",
-                  MemberScheduleHolidayResource())
+    app.add_route("/member/scheduler/setting", MemberSchedulerSettingResource())
+    app.add_route("/member/schedule/event", MemberScheduleEventResource())
+    app.add_route("/member/schedule/holiday", MemberScheduleHolidayResource())
 
     # app.add_route("/member/schedule/event-invite/add-single", MemberScheduleEventInviteAddSingleResource())
-    app.add_route("/member/schedule/event-invite/add",
-                  MemberScheduleEventInviteAddMultipleResource())
-    app.add_route("/member/schedule/event-invite/get",
-                  MemberScheduleEventInviteResource())
+    app.add_route("/member/schedule/event-invite", MemberScheduleEventInviteResource())
     app.add_route("/member/schedule/event-invite/set-status",
                   MemberScheduleEventInviteSetStatusResource())
 
     app.add_route("/member/country", CountryCodeResource())
+    app.add_route("/member/role", RolesResource())

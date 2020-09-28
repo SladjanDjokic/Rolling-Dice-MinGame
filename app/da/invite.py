@@ -119,8 +119,7 @@ class InviteDA(object):
     def get_invites(cls, search_key, page_size=None, page_number=None):
 
         query = ("""
-        SELECT
-            invite.id,
+        SELECT invite.id,
             invite.invite_key,
             invite.email,
             invite.expiration,
@@ -134,10 +133,12 @@ class InviteDA(object):
             member.last_name,
             member.email,
             member_group.id,
-            member_group.group_name
+            member_group.group_name,
+            registered_member.create_date as registered_date
         FROM invite
-        LEFT JOIN member on invite.inviter_member_id = member.id
-        LEFT JOIN member_group on invite.group_id = member_group.id
+            LEFT JOIN member on invite.inviter_member_id = member.id
+            LEFT JOIN member_group on invite.group_id = member_group.id
+            LEFT OUTER JOIN member AS registered_member on invite.registered_member_id = registered_member.id
         WHERE 
             invite.email LIKE %s
             OR invite.first_name LIKE %s
@@ -203,7 +204,9 @@ class InviteDA(object):
                     inviter_last_name,
                     inviter_email,
                     group_id,
-                    group_name
+                    group_name,
+                    registered_date
+
             ) in cls.source.cursor:
                 invite = {
                     "id": id,
@@ -221,7 +224,8 @@ class InviteDA(object):
                     "inviter_last_name": inviter_last_name,
                     "inviter_email": inviter_email,
                     "group_id": group_id,
-                    "group_name": group_name
+                    "group_name": group_name,
+                    "registered_date": registered_date
                 }
                 invites.append(invite)
 

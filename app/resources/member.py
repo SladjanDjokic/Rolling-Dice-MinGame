@@ -130,7 +130,9 @@ class MemberRegisterResource(object):
             raise MemberPasswordMismatch()
 
         logger.debug(f"Job Title ID: {job_title_id} and {type(job_title_id)}")
-        job_title_id = job_title_id.strip() or None
+        if job_title_id:
+            job_title_id = job_title_id.strip() or None
+        # job_title_id = job_title_id.strip() or None
 
         if (not email or not password or
                 not first_name or not last_name):  # or
@@ -164,10 +166,22 @@ class MemberRegisterResource(object):
             raise MemberExists(email)
 
         # Upload image to aws and create an entry in db
-        avatar_storage_id = FileStorageDA().store_file_to_storage(profilePicture)
+        avatar_storage_id = None
+        #print(f"TYPE PICTURE {type(profilePicture)}")
+        #print(f"PICTURE {profilePicture}")
+        #print(f"PICTURE MATCH {type(profilePicture) == 'falcon_multipart.parser.Parser'}")
+
+        if profilePicture is not None:
+            avatar_storage_id = FileStorageDA().store_file_to_storage(profilePicture)
 
         logger.debug(f"Job Title ID: {job_title_id} and {type(job_title_id)}")
         logger.debug(f"State: {state} and {type(state)}")
+
+        if not job_title_id:
+            job_title_id = None
+
+        if not country:
+            country = 'US' 
 
         member_id = MemberDA.register(
             avatar_storage_id=avatar_storage_id, email=email, username=email, password=password,
@@ -270,6 +284,24 @@ class ContactMembersResource(object):
             "success": True
         }, default_parser=json.parser)
 
+    def on_delete(self, req, resp):
+        (contact_ids) = request.get_json_or_form("contactIds", req=req)
+        contact_ids = contact_ids[0].split(',')
+        
+        delete_status = {}
+        for contact_id in contact_ids:
+            try:
+                MemberContactDA().delete_contact(contact_id)
+                delete_status[contact_id] = True
+            except:
+                delete_status[contact_id] = False
+            
+        resp.body = json.dumps({
+            "data": delete_status,
+            "description": "Contact's deleted successfully!",
+            "success": True
+        }, default_parser=json.parser)
+
     @staticmethod
     def on_get(req, resp):
 
@@ -293,6 +325,25 @@ class MemberContactResource(object):
     auth = {
         'exempt_methods': ['POST']
     }
+
+    def on_put(self, req, resp):
+        (id, role_id, role) = request.get_json_or_form("id", "role_id", "role", req=req)
+        
+        if id and role_id and role :
+            try:
+                MemberContactDA.update_member_contact_role(
+                    contact_id=id, contact_role_id=role_id, contact_role=role
+                    )
+                resp.body = json.dumps({
+                    "description": 'Contact updated successfully',
+                    "success": True
+                }, default_parser=json.parser)
+            except Exception as e:
+                resp.body = json.dumps({
+                    "description": 'Failed to update contact role!',
+                    "success": False
+                }, default_parser=json.parser)        
+        return    
 
     def on_post(self, req, resp):
 

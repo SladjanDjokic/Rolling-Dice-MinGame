@@ -11,6 +11,8 @@ services:
       - amera-web-db
     networks:
       - amera-net
+    ports:
+      - 5000:5000
     expose:
       - 5000
     volumes:
@@ -23,19 +25,40 @@ services:
     container_name: amera-web-db
     image: postgres:latest
     restart: always
-    volumes:
-      - ../web-api/datasource/postgresql/members.sql:/docker-entrypoint-initdb.d/1-members.sql
-      - ../web-api/datasource/postgresql/group.sql:/docker-entrypoint-initdb.d/2-group.sql
-      - ../web-api/datasource/postgresql/schema-updates-2020-07-21.sql:/docker-entrypoint-initdb.d/3-1-schema-updates.sql
-      - ../web-api/datasource/postgresql/schema-updates-2020-08-13.sql:/docker-entrypoint-initdb.d/3-2-schema-updates.sql
-      - ../web-api/datasource/postgresql/schema-updates-2020-08-14.sql:/docker-entrypoint-initdb.d/3-3-schema-updates.sql
-      - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/4-test-member.sql
     environment:
       POSTGRES_DB: ameraiot
       POSTGRES_USER: amera
       POSTGRES_PASSWORD: amera
     networks:
       - amera-net
+    ports:
+      - 5432:5432
+    volumes:
+      - ../web-api/datasource/postgresql/members.sql:/docker-entrypoint-initdb.d/1-members.sql
+      - ../web-api/datasource/postgresql/group.sql:/docker-entrypoint-initdb.d/2-group.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-07-21.sql:/docker-entrypoint-initdb.d/3-1-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-08-13.sql:/docker-entrypoint-initdb.d/3-2-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-08-14.sql:/docker-entrypoint-initdb.d/3-3-schema-updates.sql
+      - ../web-api/datasource/postgresql/scheduler.sql:/docker-entrypoint-initdb.d/4-scheduler.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-08-15-schedulersetting.sql:/docker-entrypoint-initdb.d/5-1-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-08-26.sql:/docker-entrypoint-initdb.d/5-2-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-08-29.sql:/docker-entrypoint-initdb.d/5-3-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-09-01.sql:/docker-entrypoint-initdb.d/5-4-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-09-02.sql:/docker-entrypoint-initdb.d/5-5-schema-updates.sql
+      - ../web-api/datasource/postgresql/member_contact.sql:/docker-entrypoint-initdb.d/7-member_contact.sql
+      - ../web-api/datasource/postgresql/country_code.sql:/docker-entrypoint-initdb.d/8-country_code.sql
+      - ../web-api/datasource/postgresql/job-title.sql:/docker-entrypoint-initdb.d/9-job-title.sql
+      - ../web-api/datasource/postgresql/amera_tos.sql:/docker-entrypoint-initdb.d/a-amera_tos.sql
+      - ../web-api/datasource/postgresql/member_tos.sql:/docker-entrypoint-initdb.d/b-member-tos.sql
+      - ../web-api/datasource/postgresql/cell_token.sql:/docker-entrypoint-initdb.d/c-cell-token.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-09-04_member_avatar.sql:/docker-entrypoint-initdb.d/d-1-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-09-07.sql:/docker-entrypoint-initdb.d/d-2-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-09-09.sql:/docker-entrypoint-initdb.d/d-3-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-09-17.sql:/docker-entrypoint-initdb.d/d-4-schema-updates.sql
+      - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/e-1-test-country.sql
+      - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/e-2-test-member.sql
+      - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/e-3-test-schedule.sql
+      - ../web-api/datasource/postgresql/test-amera-tos.dev.sql:/docker-entrypoint-initdb.d/e-4-test-amera-tos.dev.sql.sql
 volumes:
   web-api-python-packages: 
     name: amera-web-api-python-packages
