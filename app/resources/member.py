@@ -115,16 +115,12 @@ class MemberRegisterResource(object):
     def on_post(self, req, resp, invite_key=None):
         # We store the key in hex format in the database
 
-        (email, password, confirm_password,
-         first_name, middle_name, last_name, date_of_birth,
-         phone_number, country, city, street,
-         postal, state, province, company_name, job_title_id, profilePicture, cell_confrimation_ts, email_confrimation_ts, promo_code_id) = request.get_json_or_form(
-            "email", "password", "confirm_password",
-            "first_name", "middle_name", "last_name", "dob",
-            "cell", "country", "city", "street", "postal_code",
-            "state", "province", "company_name", "job_title_id", "profilePicture", "cellConfirmationTS", "emailConfirmationTS", "activatedPromoCode", req=req)
-
-        (sub_local0) = request.get_json_or_form("sub_local0", req=req)
+        (pin, email, password, confirm_password, first_name, last_name, date_of_birth,
+         phone_number, country, postal, company_name, job_title_id, profilePicture,
+         cell_confrimation_ts, email_confrimation_ts, promo_code_id, department_id) = request.get_json_or_form(
+            "pin", "email", "password", "confirm_password", "first_name", "last_name", "dob",
+            "cell", "country", "postal_code", "company_name", "job_title_id", "profilePicture",
+            "cellConfirmationTS", "emailConfirmationTS", "activatedPromoCode", "department_id", req=req)
 
         if password != confirm_password:
             raise MemberPasswordMismatch()
@@ -132,7 +128,9 @@ class MemberRegisterResource(object):
         logger.debug(f"Job Title ID: {job_title_id} and {type(job_title_id)}")
         if job_title_id:
             job_title_id = job_title_id.strip() or None
-        # job_title_id = job_title_id.strip() or None
+
+        if department_id:
+            department_id = department_id.strip() or None
 
         if (not email or not password or
                 not first_name or not last_name):  # or
@@ -141,21 +139,12 @@ class MemberRegisterResource(object):
 
             raise MemberDataMissing()
 
-        logger.debug(f"Sub Local0: {sub_local0}")
-        logger.debug(f"State: {state}")
-
-        if not state and sub_local0:
-            state = sub_local0
-
-        if isinstance(state, list) and len(state) > 0:
-            state = state[0]
-
         # logger.debug("invite_key: {}".format(invite_key))
 
         logger.debug("invite_key: {}".format(invite_key))
         logger.debug("email: {}".format(email))
         logger.debug("First_name: {}".format(first_name))
-        logger.debug("Middle_name: {}".format(middle_name))
+        # logger.debug("Middle_name: {}".format(middle_name))
         logger.debug("Last_name: {}".format(last_name))
         logger.debug("Password: {}".format(password))
         logger.debug("Company name: {}".format(company_name))
@@ -175,20 +164,21 @@ class MemberRegisterResource(object):
             avatar_storage_id = FileStorageDA().store_file_to_storage(profilePicture)
 
         logger.debug(f"Job Title ID: {job_title_id} and {type(job_title_id)}")
-        logger.debug(f"State: {state} and {type(state)}")
 
         if not job_title_id:
             job_title_id = None
 
+        if not department_id:
+            department_id = None
+
         if not country:
-            country = 'US' 
+            country = 'US'
 
         member_id = MemberDA.register(
-            avatar_storage_id=avatar_storage_id, email=email, username=email, password=password,
-            first_name=first_name, middle_name=middle_name, last_name=last_name, company_name=company_name, job_title_id=job_title_id,
+            pin=pin, avatar_storage_id=avatar_storage_id, email=email, username=email, password=password,
+            first_name=first_name, last_name=last_name, company_name=company_name, job_title_id=job_title_id,
             date_of_birth=date_of_birth, phone_number=phone_number,
-            country=country, city=city, street=street, postal=postal,
-            state=state, province=province, cell_confrimation_ts=cell_confrimation_ts, email_confrimation_ts=email_confrimation_ts, commit=True)
+            country=country, postal=postal, cell_confrimation_ts=cell_confrimation_ts, email_confrimation_ts=email_confrimation_ts, department_id=department_id, commit=True)
 
         logger.debug("New registered member_id: {}".format(member_id))
 
@@ -210,7 +200,7 @@ class MemberRegisterResource(object):
                 )
 
         # Update the promo code reference for the newly created member_id
-        if promo_code_id:
+        if promo_code_id != "null":
             PromoCodesDA().create_activation_entry(member_id, promo_code_id)
 
         resp.body = json.dumps({
@@ -287,7 +277,7 @@ class ContactMembersResource(object):
     def on_delete(self, req, resp):
         (contact_ids) = request.get_json_or_form("contactIds", req=req)
         contact_ids = contact_ids[0].split(',')
-        
+
         delete_status = {}
         for contact_id in contact_ids:
             try:
@@ -295,7 +285,7 @@ class ContactMembersResource(object):
                 delete_status[contact_id] = True
             except:
                 delete_status[contact_id] = False
-            
+
         resp.body = json.dumps({
             "data": delete_status,
             "description": "Contact's deleted successfully!",
@@ -327,13 +317,14 @@ class MemberContactResource(object):
     }
 
     def on_put(self, req, resp):
-        (id, role_id, role) = request.get_json_or_form("id", "role_id", "role", req=req)
-        
-        if id and role_id and role :
+        (id, role_id, role) = request.get_json_or_form(
+            "id", "role_id", "role", req=req)
+
+        if id and role_id and role:
             try:
                 MemberContactDA.update_member_contact_role(
                     contact_id=id, contact_role_id=role_id, contact_role=role
-                    )
+                )
                 resp.body = json.dumps({
                     "description": 'Contact updated successfully',
                     "success": True
@@ -342,8 +333,8 @@ class MemberContactResource(object):
                 resp.body = json.dumps({
                     "description": 'Failed to update contact role!',
                     "success": False
-                }, default_parser=json.parser)        
-        return    
+                }, default_parser=json.parser)
+        return
 
     def on_post(self, req, resp):
 
@@ -449,16 +440,17 @@ class MemberJobTitles(object):
 
     def on_get(self, req, resp):
         job_title_list = MemberDA().get_job_list()
+        department_list = MemberDA().get_department_list()
         # TODO: Replace with try/except and raise an exception
         # if unable to get a list
-        if job_title_list:
+        if job_title_list and department_list:
             resp.body = json.dumps({
-                "data": job_title_list,
+                "data": {"job_list": job_title_list, "deps_list": department_list},
                 "success": True
             }, default_parser=json.parser)
         else:
             resp.body = json.dumps({
-                "description": "Could not get the job title list",
+                "description": "Could not get the job title or department list",
                 "success": False
             }, default_parser=json.parser)
 

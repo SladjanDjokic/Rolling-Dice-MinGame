@@ -343,15 +343,15 @@ class MemberDA(object):
         return None
 
     @classmethod
-    def register(cls, avatar_storage_id, email, username, password, first_name, middle_name,
-                 last_name, company_name, job_title_id, date_of_birth, phone_number,
-                 country, city, street, postal, state, province, cell_confrimation_ts, email_confrimation_ts, commit=True):
+    def register(cls, pin, avatar_storage_id, email, username, password, first_name, last_name, company_name, job_title_id, date_of_birth, phone_number,
+                 country, postal, cell_confrimation_ts, email_confrimation_ts, department_id, commit=True):
 
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query_member = ("""
         INSERT INTO member
-        (email, username, password, first_name, middle_name, last_name, date_of_birth, company_name, job_title_id, avatar_storage_id)
-        VALUES (%s, %s, crypt(%s, gen_salt('bf')), %s, %s, %s, %s, %s, %s, %s)
+        (pin, email, username, password, first_name, last_name,
+         date_of_birth, company_name, job_title_id, avatar_storage_id, department_id)
+        VALUES (%s, %s, %s, crypt(%s, gen_salt('bf')), %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """)
         query_member_contact = ("""
@@ -362,42 +362,46 @@ class MemberDA(object):
         """)
         query_member_contact_2 = ("""
         INSERT INTO member_contact_2
-        (member_id, description, device, device_type, device_country, device_confirm_date, method_type, display_order, primary_contact)
+        (member_id, description, device, device_type, device_country,
+         device_confirm_date, method_type, display_order, primary_contact)
         VALUES (%s, %s, %s, %s, (SELECT id FROM country_code WHERE alpha2 = %s), %s, %s, %s, %s)
         RETURNING id
         """)
         query_member_location = ("""
         INSERT INTO member_location
-        (member_id, street, address_1, city, state, province, postal, country, location_type)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'home')
+        (member_id, postal, country, location_type)
+        VALUES (%s, %s, %s, 'home')
         RETURNING id
         """)
 
         # AES_ENCRYPT(%s, UNHEX(SHA2(%s)))
         # settings.get('MEMBER_KEY')
         # store member personal info
-        params_member = (email, username, password, first_name,
-                         middle_name, last_name, date_of_birth, company_name, job_title_id, avatar_storage_id)
+        params_member = (pin, email, username, password, first_name,
+                         last_name, date_of_birth, company_name, job_title_id, avatar_storage_id, department_id)
         cls.source.execute(query_member, params_member)
         id = cls.source.get_last_row_id()
 
-        if email: 
+        if email:
             # Member_contact_2
-            # FIXME: cell_confrimation_ts is passed temporary
-            params_email_member_contact_2 = (id, "Office email", email, "email", country, email_confrimation_ts, "html", 2, False)
-            cls.source.execute(query_member_contact_2, params_email_member_contact_2)
-        
+            params_email_member_contact_2 = (
+                id, "Office email", email, "email", country, email_confrimation_ts, "html", 2, False)
+            cls.source.execute(query_member_contact_2,
+                               params_email_member_contact_2)
+
         if phone_number:
             # store member contact info
             params_member_contact = (id, phone_number, email)
             cls.source.execute(query_member_contact, params_member_contact)
             # Member_contact_2
-            params_cell_member_contact_2 = (id, "Cell phone", phone_number, "cell", country, cell_confrimation_ts, "voice", 1, True)
-            cls.source.execute(query_member_contact_2, params_cell_member_contact_2)
-        if street:
+            params_cell_member_contact_2 = (
+                id, "Cell phone", phone_number, "cell", country, cell_confrimation_ts, "voice", 1, True)
+            cls.source.execute(query_member_contact_2,
+                               params_cell_member_contact_2)
+        if postal:
             # store member location info
             params_member_location = (
-                id, street, street, city, state, province, postal, country)
+                id, postal, country)
             cls.source.execute(query_member_location, params_member_location)
 
         if commit:
@@ -595,7 +599,7 @@ class MemberDA(object):
     @classmethod
     def get_job_list(cls,):
         query = """
-        SELECT 
+        SELECT
             id as job_title_id,
             name as job_title
         FROM job_title
@@ -608,6 +612,27 @@ class MemberDA(object):
                 entry_element = {
                     "job_title_id": entry_da[0],
                     "job_title": entry_da[1]
+                }
+                entry.append(entry_element)
+            return entry
+        return None
+
+    @classmethod
+    def get_department_list(cls,):
+        query = """
+        SELECT
+            id as department_id,
+            name as department_name
+        FROM department
+        """
+        params = ()
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            entry = list()
+            for entry_da in cls.source.cursor.fetchall():
+                entry_element = {
+                    "department_id": entry_da[0],
+                    "department_name": entry_da[1]
                 }
                 entry.append(entry_element)
             return entry
@@ -988,7 +1013,7 @@ class MemberContactDA(object):
                 cls.source.commit()
         except DataMissingError as err:
             raise DataMissingError from err
-            
+
     @classmethod
     def delete_contact(cls, contact_id, commit=True):
         query = """
@@ -1003,6 +1028,7 @@ class MemberContactDA(object):
                 cls.source.commit()
         except Exception as err:
             raise err
+
 
 class MemberInfoDA(object):
     source = source
