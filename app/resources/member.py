@@ -115,10 +115,10 @@ class MemberRegisterResource(object):
     def on_post(self, req, resp, invite_key=None):
         # We store the key in hex format in the database
 
-        (pin, email, password, confirm_password, first_name, last_name, date_of_birth,
+        (city, state, pin, email, password, confirm_password, first_name, last_name, date_of_birth,
          phone_number, country, postal, company_name, job_title_id, profilePicture,
          cell_confrimation_ts, email_confrimation_ts, promo_code_id, department_id) = request.get_json_or_form(
-            "pin", "email", "password", "confirm_password", "first_name", "last_name", "dob",
+            "city", "state", "pin", "email", "password", "confirm_password", "first_name", "last_name", "dob",
             "cell", "country", "postal_code", "company_name", "job_title_id", "profilePicture",
             "cellConfirmationTS", "emailConfirmationTS", "activatedPromoCode", "department_id", req=req)
 
@@ -175,7 +175,7 @@ class MemberRegisterResource(object):
             country = 'US'
 
         member_id = MemberDA.register(
-            pin=pin, avatar_storage_id=avatar_storage_id, email=email, username=email, password=password,
+            city=city, state=state, pin=pin, avatar_storage_id=avatar_storage_id, email=email, username=email, password=password,
             first_name=first_name, last_name=last_name, company_name=company_name, job_title_id=job_title_id,
             date_of_birth=date_of_birth, phone_number=phone_number,
             country=country, postal=postal, cell_confrimation_ts=cell_confrimation_ts, email_confrimation_ts=email_confrimation_ts, department_id=department_id, commit=True)
