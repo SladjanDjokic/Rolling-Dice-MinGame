@@ -5,7 +5,8 @@ Fusce id sagittis arcu. Orci varius natoque penatibus et magnis dis parturient m
   ( 'inactive', 'Inactive contract text', CURRENT_DATE, CURRENT_DATE ),
   ( 'deleted', 'Deleted contract text', CURRENT_DATE, CURRENT_DATE ),
   ( 'active', 'Parle france', CURRENT_DATE, CURRENT_DATE ),
-  ( 'active', 'I speak Russian', CURRENT_DATE, CURRENT_DATE );
+  ( 'active', 'I speak Russian', CURRENT_DATE, CURRENT_DATE ),
+  ( 'active', 'I speak JP', CURRENT_DATE, CURRENT_DATE );
 
 
 -- 
@@ -19,4 +20,6 @@ INSERT INTO amera_tos_country ( amera_tos_id, country_code_id ) VALUES
   -- Active for France
   ( 4, 250 ),
   -- Active for Russian
+  ( 5, 643 ),
+  -- Active for JP
   ( 5, 643 );
