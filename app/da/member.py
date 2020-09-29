@@ -356,8 +356,8 @@ class MemberDA(object):
         """)
         query_member_contact = ("""
         INSERT INTO member_contact
-        (member_id, city, state, phone_number, email)
-        VALUES (%s, %s, %s, %s, %s)
+        (member_id, phone_number, email)
+        VALUES (%s,  %s, %s)
         RETURNING id
         """)
         query_member_contact_2 = ("""
@@ -369,8 +369,8 @@ class MemberDA(object):
         """)
         query_member_location = ("""
         INSERT INTO member_location
-        (member_id, postal, country, location_type)
-        VALUES (%s, %s, %s, 'home')
+        (member_id, city, state, postal, country, location_type)
+        VALUES (%s, %s, %s, %s, %s, 'home')
         RETURNING id
         """)
 
@@ -391,7 +391,7 @@ class MemberDA(object):
 
         if phone_number:
             # store member contact info
-            params_member_contact = (id, city, state, phone_number, email)
+            params_member_contact = (id, phone_number, email)
             cls.source.execute(query_member_contact, params_member_contact)
             # Member_contact_2
             params_cell_member_contact_2 = (
@@ -401,7 +401,7 @@ class MemberDA(object):
         if postal:
             # store member location info
             params_member_location = (
-                id, postal, country)
+                id, city, state, postal, country)
             cls.source.execute(query_member_location, params_member_location)
 
         if commit:
