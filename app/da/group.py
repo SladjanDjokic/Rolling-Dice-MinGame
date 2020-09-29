@@ -268,7 +268,7 @@ LEFT OUTER JOIN member_group_membership AS group_membership_member ON (group_mem
 LEFT OUTER JOIN member AS group_member_detail ON (group_membership_member.member_id = group_member_detail.id)
 LEFT OUTER JOIN shared_file ON (shared_file.group_id = member_group.id)
 INNER JOIN member ON member_group.group_leader_id = member.id
-WHERE member_group_membership.member_id = 3
+WHERE member_group_membership.member_id = %s
 GROUP BY member_group.id,
          member_group.group_name,
          member_group.create_date,
