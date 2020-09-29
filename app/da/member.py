@@ -115,8 +115,8 @@ class MemberDA(object):
                 member.status as status,
                 member.first_name as first_name,
                 member.middle_name as middle_name,
-                member.last_name as last_name, 
-                member.company_name as company_name, 
+                member.last_name as last_name,
+                member.company_name as company_name,
                 job_title.name as job_title
             FROM member
             LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
@@ -360,6 +360,9 @@ class MemberDA(object):
         VALUES (%s,  %s, %s)
         RETURNING id
         """)
+        query_phone_code = ("""
+        SELECT phone FROM country_code WHERE alpha2 = %s
+        """)
         query_member_contact_2 = ("""
         INSERT INTO member_contact_2
         (member_id, description, device, device_type, device_country,
@@ -390,16 +393,25 @@ class MemberDA(object):
                                params_email_member_contact_2)
 
         if phone_number:
+            # Get phone code. Lame but fast
+            cls.source.execute(query_phone_code, (country,))
+            phone_code = str(cls.source.cursor.fetchone()[0])
+            logger.debug('Wacko', phone_code)
+
             # store member contact info
-            params_member_contact = (id, phone_number, email)
+            # Subtract phone code from number
+            params_member_contact = (
+                id, phone_number.lstrip(phone_code), email)
             cls.source.execute(query_member_contact, params_member_contact)
             # Member_contact_2
             params_cell_member_contact_2 = (
-                id, "Cell phone", phone_number, "cell", country, cell_confrimation_ts, "voice", 1, True)
+                id, "Cell phone", phone_number.lstrip(phone_code), "cell", country, cell_confrimation_ts, "voice", 1, True)
             cls.source.execute(query_member_contact_2,
                                params_cell_member_contact_2)
         if postal:
             # store member location info
+            city = None if city == 'null' else city
+            state = None if state == 'null' else state
             params_member_location = (
                 id, city, state, postal, country)
             cls.source.execute(query_member_location, params_member_location)
@@ -705,7 +717,7 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
                 LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
             WHERE contact.member_id = %s
-            GROUP BY 
+            GROUP BY
                 contact.contact_member_id,
                 contact.id,
                 contact.contact_member_id,
@@ -793,7 +805,7 @@ class MemberContactDA(object):
     def get_members(cls, member_id):
         members = list()
         get_members_query = ("""
-                SELECT 
+                SELECT
                     member.id as id,
                     member.first_name as first_name,
                     member.middle_name as middle_name,
@@ -878,7 +890,7 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
                 LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
             WHERE {} = %s
-            GROUP BY 
+            GROUP BY
                 contact.contact_member_id,
                 contact.id,
                 contact.contact_member_id,
@@ -1017,8 +1029,8 @@ class MemberContactDA(object):
     @classmethod
     def delete_contact(cls, contact_id, commit=True):
         query = """
-            DELETE FROM contact 
-            WHERE id = %s 
+            DELETE FROM contact
+            WHERE id = %s
         """
         params = (contact_id,)
         try:
@@ -1035,7 +1047,7 @@ class MemberInfoDA(object):
 
     def get_member_info(cls, member_id):
         get_member_info_query = ("""
-            SELECT 
+            SELECT
                 member.first_name as first_name,
                 member.middle_name as middle_name,
                 member.last_name as last_name,
@@ -1054,7 +1066,7 @@ class MemberInfoDA(object):
                 LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
                 LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
             WHERE member.id = %s
-            GROUP BY 
+            GROUP BY
                 member.id,
                 member.first_name,
                 member.middle_name,
