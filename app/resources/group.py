@@ -236,9 +236,11 @@ class GroupMemberInviteResource(object):
         session = validate_session(session_id)
         inviter_member_id = session["member_id"]
 
-        (email, first_name, last_name, group_id, country, phone_number) = request.get_json_or_form(
-            "groupMemberEmail", "firstName", "lastName", "groupId", "country", "phoneNumber", req=req
-        )
+        (email, first_name, last_name, group_id, 
+            country, phone_number, role) = request.get_json_or_form(
+                    "groupMemberEmail", "firstName", "lastName", "groupId",
+                    "country", "phoneNumber", "role", req=req
+                )
 
         expiration = datetime.now() + relativedelta(months=+1)
 
@@ -256,7 +258,8 @@ class GroupMemberInviteResource(object):
             "group_id": group_id,
             "country": country,
             "phone_number": phone_number,
-            "expiration": expiration
+            "expiration": expiration,
+            "role": role
         }
         try:
             invite_id = GroupMemberInviteDA().create_invite(**invite_params)

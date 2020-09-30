@@ -7,12 +7,14 @@ import app.util.request as request
 from app.da.member import MemberDA, MemberContactDA, MemberInfoDA
 from app.da.file_sharing import FileStorageDA
 from app.da.invite import InviteDA
-from app.da.group import GroupMembershipDA
+from app.da.group import GroupMembershipDA, GroupDA
 from app.da.promo_codes import PromoCodesDA
 from app.util.session import get_session_cookie, validate_session
 from app.exceptions.member import MemberNotFound, MemberDataMissing, MemberExists, MemberContactExists, MemberPasswordMismatch
 from app.exceptions.invite import InviteNotFound, InviteExpired
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
+import app.util.email as sendmail
+
 
 logger = logging.getLogger(__name__)
 
@@ -117,10 +119,10 @@ class MemberRegisterResource(object):
 
         (city, state, pin, email, password, confirm_password, first_name, last_name, date_of_birth,
          phone_number, country, postal, company_name, job_title_id, profilePicture,
-         cell_confrimation_ts, email_confrimation_ts, promo_code_id, department_id) = request.get_json_or_form(
+         cell_confrimation_ts, email_confrimation_ts, group_id, promo_code_id, department_id) = request.get_json_or_form(
             "city", "state", "pin", "email", "password", "confirm_password", "first_name", "last_name", "dob",
             "cell", "country", "postal_code", "company_name", "job_title_id", "profilePicture",
-            "cellConfirmationTS", "emailConfirmationTS", "activatedPromoCode", "department_id", req=req)
+            "cellConfirmationTS", "emailConfirmationTS", "groupId", "activatedPromoCode", "department_id", req=req)
 
         if password != confirm_password:
             raise MemberPasswordMismatch()
@@ -148,6 +150,7 @@ class MemberRegisterResource(object):
         logger.debug("Last_name: {}".format(last_name))
         logger.debug("Password: {}".format(password))
         logger.debug("Company name: {}".format(company_name))
+        logger.debug("group id: {}".format(group_id))
 
         member = MemberDA.get_member_by_email(email)
 
@@ -174,17 +177,56 @@ class MemberRegisterResource(object):
         if not country:
             country = 'US'
 
+        inviter_member_id = None
+        role_id = None
+        if invite_key:
+            invite_key = invite_key.hex
+            invite = InviteDA.get_invite(invite_key=invite_key)
+            inviter_member_id = invite.get('inviter_member_id')
+            role_id = invite.get('role_id')
+
+        logger.debug(f"inviter_member_id: {inviter_member_id}")
+        logger.debug(f"role_id: {role_id}")
+
         member_id = MemberDA.register(
             city=city, state=state, pin=pin, avatar_storage_id=avatar_storage_id, email=email, username=email, password=password,
             first_name=first_name, last_name=last_name, company_name=company_name, job_title_id=job_title_id,
             date_of_birth=date_of_birth, phone_number=phone_number,
-            country=country, postal=postal, cell_confrimation_ts=cell_confrimation_ts, email_confrimation_ts=email_confrimation_ts, department_id=department_id, commit=True)
+            country=country, postal=postal, cell_confrimation_ts=cell_confrimation_ts, email_confrimation_ts=email_confrimation_ts,
+            department_id=department_id, commit=True)
 
+
+        if member_id:
+            # invitee contact info for inviter
+            MemberContactDA.create_member_contact(member_id=inviter_member_id, 
+                contact_member_id=member_id, first_name=first_name, last_name=last_name,country=country,
+                cell_phone=phone_number, office_phone='',  home_phone='', email=email, 
+                personal_email='', company_name=company_name, company_phone='', company_web_site='',
+                company_email='', company_bio='', contact_role='', role_id=role_id)
+
+
+            # inviter contact info for invitee
+            inviter = MemberDA.get_contact_member(inviter_member_id)
+            if inviter:
+                (inviter_first_name, inviter_last_name, inviter_country,
+                inviter_phone_number, inviter_email, inviter_company_name,
+                inviter_role_id) = [inviter[k] for k in ('first_name', 'last_name','country', 'cell_phone', 'email', 'company_name', 'role_id')]
+
+
+                # contact for invitee
+                MemberContactDA.create_member_contact(member_id=member_id, 
+                    contact_member_id=inviter_member_id, first_name=inviter_first_name, last_name=inviter_last_name,
+                    country=inviter_country, cell_phone=inviter_phone_number, office_phone='',  home_phone='', 
+                    email=inviter_email, personal_email='', company_name=inviter_company_name, company_phone='', 
+                    company_web_site='', company_email='', company_bio='', contact_role='', 
+                    role_id=inviter_role_id)
+
+        logger.debug(f"member id: {member_id} and {type(member_id)}")
+        logger.debug(f"group ID: {group_id} and {type(group_id)}")
         logger.debug("New registered member_id: {}".format(member_id))
-
+    
         # Update the invite reference to the newly created member_id
         if invite_key:
-            invite_key = invite_key.hex
             InviteDA.update_invite_registered_member(
                 invite_key=invite_key, registered_member_id=member_id
             )
@@ -202,14 +244,23 @@ class MemberRegisterResource(object):
         # Update the promo code reference for the newly created member_id
         if promo_code_id != "null":
             PromoCodesDA().create_activation_entry(member_id, promo_code_id)
-
-        resp.body = json.dumps({
-            "member_id": member_id,
-            "success": True
-        })
+      
+        if group_id is not None:
+            GroupMembershipDA().create_group_membership(group_id, member_id)
+            group = MemberRegisterResource.get_group_detail(group_id)
+            resp.body = json.dumps({
+                "member_id": member_id,
+                "data": group,
+                "description": "Registered Successfully!",
+                "success": True
+            }, default_parser=json.parser)
+        else:
+            resp.body = json.dumps({
+                "member_id": member_id,
+                "success": True
+            })
 
     def _send_email(self, first_name, email, invite_email):
-
         sendmail.send_mail(
             to_email=email,
             subject="Welcome to AMERA Share",
@@ -218,6 +269,13 @@ class MemberRegisterResource(object):
                 "email": email,
                 "invite_email": invite_email
             })
+    @staticmethod
+    def get_group_detail(group_id):
+        group = GroupDA().get_group(group_id)
+        members = GroupMembershipDA().get_members_by_group_id(group_id)
+        group['members'] = members
+        group['total_member'] = len(members)
+        return group
 
 
 class MemberRoleResource(object):
@@ -259,7 +317,8 @@ class ContactMembersResource(object):
                 "company_web_site": '',
                 "company_email": '',
                 "company_bio": '',
-                "contact_role": ''
+                "contact_role": '',
+                "role_id": None
             }
 
             contact_id = MemberContactDA().create_member_contact(**contact_member_params)

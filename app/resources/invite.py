@@ -95,7 +95,7 @@ class MemberInviteResource(object):
         logger.debug("Invite Key: {}".format(invite_key))
         logger.debug(invite_key)
 
-        invite = InviteDA.get_invite(invite_key)
+        invite = InviteDA.get_invite_for_register(invite_key)
 
         logger.debug("Invite: {}".format(invite))
 

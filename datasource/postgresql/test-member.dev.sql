@@ -73,13 +73,6 @@ INSERT INTO member
         ('meyers.witt@inventure.io', 'Meyers', 'Witt', 'meyers.witt@inventure.io', '1964-03-16', 'Inventure', crypt('password', gen_salt('bf'))),
         ('robyn.whitfield@norali.org', 'Robyn', 'Whitfield', 'robyn.whitfield@norali.org', '2012-10-23', 'Norali', crypt('password', gen_salt('bf')));
 
-
-
-
-
-
-
-
 INSERT INTO file_storage_engine
         (storage_engine_id, storage_engine, status)
         VALUES

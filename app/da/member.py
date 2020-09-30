@@ -343,8 +343,10 @@ class MemberDA(object):
         return None
 
     @classmethod
-    def register(cls, city, state, pin, avatar_storage_id, email, username, password, first_name, last_name, company_name, job_title_id, date_of_birth, phone_number,
-                 country, postal, cell_confrimation_ts, email_confrimation_ts, department_id, commit=True):
+    def register(cls, city, state, pin, avatar_storage_id, email, username, password, first_name,
+                 last_name, company_name, job_title_id, date_of_birth, phone_number,
+                 country, postal, cell_confrimation_ts, email_confrimation_ts, department_id,
+                 commit=True):
 
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query_member = ("""
@@ -404,6 +406,7 @@ class MemberDA(object):
                 id, phone_number.lstrip(phone_code), email)
             cls.source.execute(query_member_contact, params_member_contact)
             # Member_contact_2
+
             params_cell_member_contact_2 = (
                 id, "Cell phone", phone_number.lstrip(phone_code), "cell", country, cell_confrimation_ts, "voice", 1, True)
             cls.source.execute(query_member_contact_2,
@@ -415,7 +418,7 @@ class MemberDA(object):
             params_member_location = (
                 id, city, state, postal, country)
             cls.source.execute(query_member_location, params_member_location)
-
+        
         if commit:
             cls.source.commit()
 
@@ -430,10 +433,13 @@ class MemberDA(object):
                 member.middle_name as middle_name,
                 member.last_name as last_name,
                 member_location.country as country,
-                member_contact.phone_number as cell_phone
+                member_contact.phone_number as cell_phone,
+                contact.company_name as company_name,
+                contact.role_id as role_id
             FROM member
             LEFT JOIN member_contact ON member.id = member_contact.member_id
             LEFT JOIN member_location ON member.id = member_location.member_id
+            LEFT JOIN contact ON member.id = contact.member_id
             WHERE member.id = %s
             """)
 
@@ -447,6 +453,8 @@ class MemberDA(object):
                     last_name,
                     country,
                     cell_phone,
+                    company_name,
+                    role_id
             ) in cls.source.cursor:
                 member = {
                     "email": email,
@@ -455,6 +463,8 @@ class MemberDA(object):
                     "last_name": last_name,
                     "country": country,
                     "cell_phone": cell_phone,
+                    "company_name": company_name,
+                    "role_id": role_id
                 }
 
                 return member
@@ -704,6 +714,7 @@ class MemberContactDA(object):
                 contact.company_email as company_email,
                 contact.company_bio as company_bio,
                 contact.contact_role as role,
+                contact.role_id as role_id,
                 contact.create_date as create_date,
                 contact.update_date as update_date,
                 json_agg(DISTINCT member_location.*) AS location_information,
@@ -763,6 +774,7 @@ class MemberContactDA(object):
                     company_email,
                     company_bio,
                     role,
+                    role_id,
                     create_date,
                     update_date,
                     location_information,
@@ -780,6 +792,7 @@ class MemberContactDA(object):
                     "office_phone": office_phone,
                     "home_phone": home_phone,
                     "email": email,
+                    "personal_email": personal_email,
                     "company": company,
                     "title": title,
                     "company_name": company_name,
@@ -788,6 +801,7 @@ class MemberContactDA(object):
                     "company_email": company_email,
                     "company_bio": company_bio,
                     "role": role,
+                    "role_id": role_id,
                     "create_date": create_date,
                     "update_date": update_date,
                     "location_information": location_information,
@@ -977,23 +991,23 @@ class MemberContactDA(object):
                               last_name, country, cell_phone, office_phone,
                               home_phone, email, personal_email, company_name,
                               company_phone, company_web_site, company_email,
-                              company_bio, contact_role, commit=True):
+                              company_bio, contact_role, role_id, commit=True):
         create_member_contact_query = ("""
                     INSERT INTO contact
                         (member_id, contact_member_id, first_name, last_name,
                         country, cell_phone, office_phone, home_phone,
                         email, personal_email, company_name, company_phone,
                         company_web_site, company_email, company_bio,
-                        contact_role)
+                        contact_role, role_id)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                            %s, %s, %s, %s, %s)
+                            %s, %s, %s, %s, %s, %s)
                     RETURNING id
                     """)
 
         create_member_contact_params = (
             member_id, contact_member_id, first_name, last_name, country, cell_phone, office_phone,
             home_phone, email, personal_email, company_name, company_phone,
-            company_web_site, company_email, company_bio, contact_role
+            company_web_site, company_email, company_bio, contact_role, role_id
         )
 
         try:

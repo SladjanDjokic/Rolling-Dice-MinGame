@@ -48,7 +48,7 @@ class InviteDA(object):
     def get_invite(cls, invite_key):
         query = ("""
         SELECT
-            id, invite_key, email, expiration,
+            id, invite_key, email, role_id, group_id, expiration,
             first_name, last_name, inviter_member_id,
             country, phone_number, registered_member_id
         FROM invite
@@ -60,7 +60,7 @@ class InviteDA(object):
         if cls.source.has_results():
             (
                 id, invite_key, email,
-                expiration, first_name,
+                role_id, group_id, expiration, first_name,
                 last_name, inviter_member_id,
                 country, phone_number, registered_member_id
             ) = cls.source.cursor.fetchone()
@@ -68,10 +68,45 @@ class InviteDA(object):
                 "id": id,
                 "invite_key": invite_key,
                 "email": email,
+                "role_id":role_id,
+                "group_id":group_id,
                 "expiration": expiration,
                 "first_name": first_name,
                 "last_name": last_name,
                 "inviter_member_id": inviter_member_id,
+                "country": country,
+                "phone_number": phone_number,
+                "registered_member_id": registered_member_id
+            }
+            return invite
+
+        return None
+
+    @classmethod
+    def get_invite_for_register(cls, invite_key):
+        query = ("""
+        SELECT
+            id, invite_key, email, group_id, expiration,
+            first_name, last_name, country, phone_number, registered_member_id
+        FROM invite
+        WHERE invite_key = %s
+        """)
+
+        params = (invite_key,)
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            (
+                id, invite_key, email, group_id, expiration, 
+                first_name, last_name, country, phone_number, registered_member_id
+            ) = cls.source.cursor.fetchone()
+            invite = {
+                "id": id,
+                "invite_key": invite_key,
+                "email": email,
+                "group_id":group_id,
+                "expiration": expiration,
+                "first_name": first_name,
+                "last_name": last_name,
                 "country": country,
                 "phone_number": phone_number,
                 "registered_member_id": registered_member_id
