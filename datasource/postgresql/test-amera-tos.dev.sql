@@ -22,4 +22,4 @@ INSERT INTO amera_tos_country ( amera_tos_id, country_code_id ) VALUES
   -- Active for Russian
   ( 5, 643 ),
   -- Active for JP
-  ( 5, 643 );
+  ( 5, 392 );
