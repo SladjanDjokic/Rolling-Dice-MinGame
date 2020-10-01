@@ -653,6 +653,51 @@ class ShareFileDA(object):
                 shared_files.append(elem)
         return shared_files
 
+    @classmethod 
+    def get_group_list(cls, member_id):
+        query = ("""
+SELECT member_group.id AS group_id,
+    member_group.group_leader_id AS group_leader_id,
+    member_group.group_name AS group_name,
+    member_group.create_date AS create_date,
+    member_group.update_date AS update_date,
+    count(DISTINCT shared_file.id) AS total_files
+FROM member_group
+    INNER JOIN shared_file ON (shared_file.group_id = member_group.id)
+    INNER JOIN file_storage_engine ON (shared_file.file_id = file_storage_engine.id)
+    LEFT OUTER JOIN member_group_membership ON (
+        member_group_membership.group_id = member_group.id
+    )
+WHERE (
+        member_group.group_leader_id = 1
+        OR member_group_membership.member_id = 1
+    )
+    AND member_group.status = 'active'
+    AND file_storage_engine.status = 'available'
+GROUP BY member_group.id,
+    member_group.group_leader_id,
+    member_group.group_name,
+    member_group.create_date,
+    member_group.update_date
+ORDER BY member_group.group_name ASC
+        """)
+        params = (member_id,)
+        group_list = list()
+        try:
+            cls.source.execute(query, params)
+            if cls.source.has_results():
+                for elem in cls.source.cursor.fetchall():
+                    group = {
+                        "group_id": elem[0],
+                        "group_name": elem[2],
+                        "group_create_date": elem[3],
+                        "group_update_date": elem[4]
+                    }
+                    group_list.append(group)
+            return group_list
+        except Exception as e:
+            return None
+
     @classmethod
     def get_shared_file_detail(cls, member, shared_key):
         query = ("""

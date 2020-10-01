@@ -6,6 +6,7 @@ from app.da.file_sharing import FileStorageDA, ShareFileDA
 from app.util.session import get_session_cookie, validate_session
 from app.exceptions.file_sharing import FileShareExists, FileNotFound, \
     FileUploadCreateException, FileStorageUploadError
+from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 
 logger = logging.getLogger(__name__)
 
@@ -305,3 +306,21 @@ class DownloadSharedFile(object):
                     "status": "warning",
                     "success": False
                 })
+
+class FileGroupResource(object):
+    @staticmethod
+    def on_get(req, resp):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+
+        group_list = ShareFileDA().get_group_list(member_id)
+        resp.body = json.dumps({
+            "data": group_list,
+            "message": "All Group",
+            "status": "success",
+            "success": True
+        }, default_parser=json.parser)

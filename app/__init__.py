@@ -23,7 +23,8 @@ from app.resources.file_sharing import FileStorage, FileStorageDetail, ShareFile
 from app.resources.group import MemberGroupResource, GroupMembershipResource, GroupDetailResource, \
     GroupMemberInviteResource, GroupMembersResource
 from app.resources.file_sharing import FileStorage, FileStorageDetail, \
-    ShareFile, ShareFileDetail, DownloadStorageFile, DownloadSharedFile
+    ShareFile, ShareFileDetail, DownloadStorageFile, DownloadSharedFile, \
+    FileGroupResource
 from app.resources.system import SystemActivitySessionResource, SystemActivityInviteResource
 from app.resources.language import LanguageResource
 from app.resources.static import StaticResource
@@ -120,6 +121,7 @@ def _setup_routes(app):
     app.add_route("/valid-session", ValidateSessionResource())
     # app.add_route("/cloud/files", MemberFile())
     app.add_route("/cloud/files", FileStorage())
+    app.add_route("/cloud/files/groups", FileGroupResource())
     app.add_route("/cloud/files/details/{file_id}", FileStorageDetail())
     app.add_route("/cloud/files/download/{file_id}", DownloadStorageFile())
     app.add_route("/cloud/files/share", ShareFile())
