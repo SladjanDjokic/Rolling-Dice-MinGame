@@ -5,6 +5,7 @@ import datetime
 from app.util.db import source
 from app.exceptions.data import DuplicateKeyError
 from app.exceptions.session import SessionExistsError
+from app.util.filestorage import amerize_url
 
 logger = logging.getLogger(__name__)
 
@@ -113,12 +114,16 @@ class SessionDA (object):
             member_location.state as state,
             member_location.province as province,
             member_location.postal as postal,
-            member_location.country as country
+            member_location.country as country,
+            file_storage_engine.storage_engine_id as s3_avatar_url
+
         FROM member_session
         LEFT JOIN member ON member_session.member_id = member.id
         LEFT JOIN member_location ON member_session.member_id = member_location.member_id
         LEFT JOIN member_contact ON member_session.member_id = member_contact.member_id
         LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
+        LEFT OUTER JOIN member_profile ON member_session.member_id = member_profile.member_id
+        LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
         WHERE member_session.session_id = %s AND member_session.expiration_date >= current_timestamp
         """)
 
@@ -145,7 +150,8 @@ class SessionDA (object):
                 state,
                 province,
                 postal,
-                country
+                country,
+                s3_avatar_url
             ) = cls.source.cursor.fetchone()
 
             session = {
@@ -168,7 +174,8 @@ class SessionDA (object):
                 "state": state,
                 "province": province,
                 "postal": postal,
-                "country": country
+                "country": country,
+                "amera_avatar_url": amerize_url(s3_avatar_url)
             }
 
             return session
@@ -271,11 +278,11 @@ class SessionDA (object):
 
         like_search_key = """%{}%""".format(search_key)
         params = tuple(4 * [like_search_key])
-        cls.source.execute(countQuery, params);
+        cls.source.execute(countQuery, params)
 
         count = 0
         if cls.source.has_results():
-            ( count, ) = cls.source.cursor.fetchone()
+            (count, ) = cls.source.cursor.fetchone()
 
         if page_size and page_number:
             query += """LIMIT %s OFFSET %s"""
@@ -313,4 +320,4 @@ class SessionDA (object):
 
                 sessions.append(session)
 
-        return { "activities": sessions, "count": count }
+        return {"activities": sessions, "count": count}

@@ -18,6 +18,7 @@ from app.resources.reset_password import MemberResetPasswordResource
 from app.resources.change_password import MemberChangePasswordResource
 from app.resources.logout import MemberLogoutResource
 from app.resources.session import SessionResource, ValidateSessionResource
+from app.resources.file_download import FileDownloadResource
 from app.resources.file_sharing import FileStorage, FileStorageDetail, ShareFile, ShareFileDetail, \
     DownloadStorageFile, DownloadSharedFile
 from app.resources.group import MemberGroupResource, GroupMembershipResource, GroupDetailResource, \
@@ -116,6 +117,7 @@ def _setup_routes(app):
     app.add_route("/member/group/search", MemberGroupSearchResource())
     app.add_route("/member/{username}", MemberResource())
     app.add_route("/member/contact", MemberContactResource())
+    app.add_route("/member/file/{file_path}", FileDownloadResource())
     app.add_route("/member-contacts", ContactMembersResource())
     app.add_route('/session/{session_id}', SessionResource)
     app.add_route("/valid-session", ValidateSessionResource())
@@ -141,12 +143,14 @@ def _setup_routes(app):
 
     app.add_route("/languages", LanguageResource())
 
-    app.add_route("/member/scheduler/setting", MemberSchedulerSettingResource())
+    app.add_route("/member/scheduler/setting",
+                  MemberSchedulerSettingResource())
     app.add_route("/member/schedule/event", MemberScheduleEventResource())
     app.add_route("/member/schedule/holiday", MemberScheduleHolidayResource())
 
     # app.add_route("/member/schedule/event-invite/add-single", MemberScheduleEventInviteAddSingleResource())
-    app.add_route("/member/schedule/event-invite", MemberScheduleEventInviteResource())
+    app.add_route("/member/schedule/event-invite",
+                  MemberScheduleEventInviteResource())
     app.add_route("/member/schedule/event-invite/set-status",
                   MemberScheduleEventInviteSetStatusResource())
 

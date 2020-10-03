@@ -47,7 +47,8 @@ class FileStorageDA(object):
         bucket = settings.get("storage.s3.bucket")
         s3_location = settings.get("storage.s3.file_location_host")
 
-        uploaded = cls.upload_to_aws(local_path, bucket, storage_key)
+        uploaded = cls.upload_to_aws(
+            local_path, bucket, s3fy_filekey(storage_key))
 
         if not uploaded:
             raise FileStorageUploadError
@@ -68,13 +69,27 @@ class FileStorageDA(object):
 
         try:
             s3.upload_file(local_file, bucket, s3_file)
-            print("Upload Successful")
-            return True
+            exists = cls.check_if_key_exists(s3_file)
+            if exists:
+                logger.debug("Upload Successful, Yoda")
+                return True
+            else:
+                return False
         except FileNotFoundError:
             print("The file was not found")
             return False
         except NoCredentialsError:
             print("Credentials not available")
+            return False
+
+    @classmethod
+    def check_if_key_exists(cls, key):
+        bucket = settings.get("storage.s3.bucket")
+        s3 = cls.aws_s3_client()
+        try:
+            s3.head_object(Bucket=bucket, Key=key)
+            return True
+        except ClientError:
             return False
 
     @classmethod
@@ -417,6 +432,18 @@ class FileStorageDA(object):
                 "services.aws.secret_access_key")
         )
 
+    @classmethod
+    def stream_s3_file(cls, s3_file_path):
+        s3 = cls.aws_s3_client()
+        bucket = settings.get("storage.s3.bucket")
+
+        try:
+            s3_response = s3.get_object(
+                Bucket=bucket, Key=s3fy_filekey(s3_file_path))
+            return s3_response
+        except Exception as e:
+            raise e
+
 
 class ShareFileDA(object):
 
@@ -653,7 +680,7 @@ class ShareFileDA(object):
                 shared_files.append(elem)
         return shared_files
 
-    @classmethod 
+    @classmethod
     def get_group_list(cls, member_id):
         query = ("""
 SELECT member_group.id AS group_id,

@@ -3,6 +3,7 @@ import datetime
 
 from app.util.db import source
 from app.util.config import settings
+from app.util.filestorage import amerize_url
 
 from app.exceptions.data import DuplicateKeyError, DataMissingError, RelationshipReferenceError
 from app.exceptions.member import ForgotDuplicateDataError
@@ -352,15 +353,14 @@ class MemberDA(object):
         query_member = ("""
         INSERT INTO member
         (pin, email, username, password, first_name, last_name,
-         date_of_birth, company_name, job_title_id, avatar_storage_id, department_id)
+         date_of_birth, company_name, job_title_id, security_picture_storage_id, department_id)
         VALUES (%s, %s, %s, crypt(%s, gen_salt('bf')), %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """)
         query_member_contact = ("""
         INSERT INTO member_contact
         (member_id, phone_number, email)
-        VALUES (%s,  %s, %s)
-        RETURNING id
+        VALUES (%s, %s, %s)
         """)
         query_phone_code = ("""
         SELECT phone FROM country_code WHERE alpha2 = %s
@@ -370,13 +370,16 @@ class MemberDA(object):
         (member_id, description, device, device_type, device_country,
          device_confirm_date, method_type, display_order, primary_contact)
         VALUES (%s, %s, %s, %s, (SELECT id FROM country_code WHERE alpha2 = %s), %s, %s, %s, %s)
-        RETURNING id
         """)
         query_member_location = ("""
         INSERT INTO member_location
         (member_id, city, state, postal, country, location_type)
         VALUES (%s, %s, %s, %s, %s, 'home')
-        RETURNING id
+        """)
+
+        query_member_profile = (""" 
+        INSERT INTO member_profile (member_id, profile_picture_storage_id)
+        VALUES (%s, %s)
         """)
 
         # AES_ENCRYPT(%s, UNHEX(SHA2(%s)))
@@ -398,8 +401,6 @@ class MemberDA(object):
             # Get phone code. Lame but fast
             cls.source.execute(query_phone_code, (country,))
             phone_code = str(cls.source.cursor.fetchone()[0])
-            logger.debug('Wacko', phone_code)
-
             # store member contact info
             # Subtract phone code from number
             params_member_contact = (
@@ -418,7 +419,11 @@ class MemberDA(object):
             params_member_location = (
                 id, city, state, postal, country)
             cls.source.execute(query_member_location, params_member_location)
-        
+
+        # When registering a new member, the uploaded photo is set as both profile and security picture. Profile picture can be changed later on.
+        params_member_profile = (id, avatar_storage_id)
+        cls.source.execute(query_member_profile, params_member_profile)
+
         if commit:
             cls.source.commit()
 
@@ -719,7 +724,8 @@ class MemberContactDA(object):
                 contact.update_date as update_date,
                 json_agg(DISTINCT member_location.*) AS location_information,
                 json_agg(DISTINCT member_contact_2.*) AS contact_information,
-                json_agg(DISTINCT country_code.*) AS country_code
+                json_agg(DISTINCT country_code.*) AS country_code,
+                file_storage_engine.storage_engine_id as s3_avatar_url
             FROM contact
                 LEFT JOIN member ON member.id = contact.contact_member_id
                 LEFT OUTER JOIN member_location ON member_location.member_id = contact.contact_member_id
@@ -727,6 +733,8 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = contact.contact_member_id
                 LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
                 LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
+                LEFT OUTER JOIN member_profile ON contact.contact_member_id = member_profile.member_id 
+                LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
             WHERE contact.member_id = %s
             GROUP BY
                 contact.contact_member_id,
@@ -749,7 +757,8 @@ class MemberContactDA(object):
                 contact.company_bio,
                 contact.contact_role,
                 contact.create_date,
-                contact.update_date
+                contact.update_date,
+                file_storage_engine.storage_engine_id
             ORDER BY contact.first_name ASC
             """)
         get_contacts_params = (member_id,)
@@ -779,7 +788,8 @@ class MemberContactDA(object):
                     update_date,
                     location_information,
                     contact_information,
-                    country_code
+                    country_code,
+                    s3_avatar_url
             ) in cls.source.cursor:
                 contact = {
                     "id": id,
@@ -806,7 +816,8 @@ class MemberContactDA(object):
                     "update_date": update_date,
                     "location_information": location_information,
                     "contact_information": contact_information,
-                    "country_code": country_code
+                    "country_code": country_code,
+                    "amera_avatar_url": amerize_url(s3_avatar_url)
                     # "city": city,
                     # "state": state,
                     # "province": province,
@@ -827,10 +838,13 @@ class MemberContactDA(object):
                     member.email as email,
                     member.company_name as company,
                     job_title.name as title,
-                    contact.contact_member_id as contact_member_id
+                    contact.contact_member_id as contact_member_id,
+                    file_storage_engine.storage_engine_id as s3_avatar_url
                 FROM member
                 LEFT JOIN contact ON (member.id = contact.contact_member_id AND contact.member_id = %s)
                 LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
+                LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id
+                LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
                 WHERE member.id <> %s
                 ORDER BY member.first_name ASC
                 """)
@@ -845,7 +859,8 @@ class MemberContactDA(object):
                     email,
                     company,
                     title,
-                    contact_member_id
+                    contact_member_id,
+                    s3_avatar_url
             ) in cls.source.cursor:
                 if not contact_member_id:
                     member = {
@@ -856,7 +871,8 @@ class MemberContactDA(object):
                         "email": email,
                         "company": company,
                         "title": title,
-                        "contact_member_id": contact_member_id
+                        "contact_member_id": contact_member_id,
+                        "amera_avatar_url": amerize_url(s3_avatar_url)
                     }
                     members.append(member)
         return members
@@ -895,7 +911,8 @@ class MemberContactDA(object):
                 contact.update_date as update_date,
                 json_agg(DISTINCT member_location.*) AS location_information,
                 json_agg(DISTINCT member_contact_2.*) AS contact_information,
-                json_agg(DISTINCT country_code.*) AS country_code
+                json_agg(DISTINCT country_code.*) AS country_code,
+                file_storage_engine.storage_engine_id as s3_avatar_url
             FROM contact
                 LEFT JOIN member ON member.id = contact.contact_member_id
                 LEFT OUTER JOIN member_location ON member_location.member_id = contact.contact_member_id
@@ -903,6 +920,8 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = contact.contact_member_id
                 LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
                 LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
+                LEFT OUTER JOIN member_profile ON contact.contact_member_id = member_profile.member_id 
+                LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
             WHERE {} = %s
             GROUP BY
                 contact.contact_member_id,
@@ -925,7 +944,8 @@ class MemberContactDA(object):
                 contact.company_bio,
                 contact.contact_role,
                 contact.create_date,
-                contact.update_date
+                contact.update_date,
+                file_storage_engine.storage_engine_id
             """.format(key))
 
         get_contact_params = (value,)
@@ -954,7 +974,8 @@ class MemberContactDA(object):
                     update_date,
                     location_information,
                     contact_information,
-                    country_code
+                    country_code,
+                    s3_avatar_url
             ) in cls.source.cursor:
                 contact = {
                     "id": id,
@@ -979,7 +1000,8 @@ class MemberContactDA(object):
                     "update_date": update_date,
                     "location_information": location_information,
                     "contact_information": contact_information,
-                    "country_code": country_code
+                    "country_code": country_code,
+                    "amera_avatar_url": amerize_url(s3_avatar_url)
                 }
 
                 return contact
@@ -1072,13 +1094,16 @@ class MemberInfoDA(object):
                 member.update_date as update_date,
                 json_agg(DISTINCT member_location.*) AS location_information,
                 json_agg(DISTINCT member_contact_2.*) AS contact_information,
-                json_agg(DISTINCT country_code.*) AS country_code
+                json_agg(DISTINCT country_code.*) AS country_code,
+                file_storage_engine.storage_engine_id as s3_avatar_url
             FROM member
                 LEFT OUTER JOIN member_location ON member_location.member_id = member.id
                 LEFT OUTER JOIN member_contact ON member_contact.member_id = member.id
                 LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = member.id
                 LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
                 LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
+                LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id 
+                LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
             WHERE member.id = %s
             GROUP BY
                 member.id,
@@ -1089,7 +1114,8 @@ class MemberInfoDA(object):
                 member.company_name,
                 job_title.name,
                 member.create_date,
-                member.update_date
+                member.update_date,
+                file_storage_engine.storage_engine_id
             """)
         get_member_info_params = (member_id,)
         cls.source.execute(get_member_info_query, get_member_info_params)
@@ -1105,7 +1131,8 @@ class MemberInfoDA(object):
                     update_date,
                     location_information,
                     contact_information,
-                    country_code
+                    country_code,
+                    s3_avatar_url
             ) in cls.source.cursor:
                 member = {
                     "member_id": member_id,
@@ -1119,7 +1146,8 @@ class MemberInfoDA(object):
                     "update_date": update_date,
                     "location_information": location_information,
                     "contact_information": contact_information,
-                    "country_code": country_code
+                    "country_code": country_code,
+                    "amera_avatar_url": amerize_url(s3_avatar_url)
                 }
 
                 return member
