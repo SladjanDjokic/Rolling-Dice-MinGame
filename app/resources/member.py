@@ -15,7 +15,6 @@ from app.exceptions.invite import InviteNotFound, InviteExpired
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 import app.util.email as sendmail
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -340,14 +339,16 @@ class ContactMembersResource(object):
 
     @staticmethod
     def on_get(req, resp):
-
         try:
             session_id = get_session_cookie(req)
             session = validate_session(session_id)
             member_id = session["member_id"]
 
-            members = MemberContactDA.get_members(member_id)
+            # sort_by_params = 'first_name, last_name, -company' or '+first_name, +last_name, -company'
+            sort_params = req.get_param('sort')
 
+            members = MemberContactDA.get_members(member_id, sort_params)
+            
             resp.body = json.dumps({
                 "members": members,
                 "success": True
@@ -355,7 +356,6 @@ class ContactMembersResource(object):
 
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
-
 
 class MemberContactResource(object):
     auth = {
@@ -448,7 +448,10 @@ class MemberContactResource(object):
             session = validate_session(session_id)
             member_id = session["member_id"]
 
-            member_contacts = MemberContactDA.get_member_contacts(member_id)
+            # sort_by_params = 'first_name, last_name, -company' or '+first_name, +last_name, -company'
+            sort_params = req.get_param('sort')
+
+            member_contacts = MemberContactDA.get_member_contacts(member_id, sort_params)
 
             resp.body = json.dumps({
                 "contacts": member_contacts,

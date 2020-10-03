@@ -69,8 +69,10 @@ class MemberGroupResource(object):
             raise UnauthorizedSession() from err
 
         get_all = req.get_param('get_all')
+        # sort_params = '-member_group.group_name' names in descending order
+        sort_params = req.get_param('sort')
 
-        group_list_where_leader = GroupDA().get_group_list_by_group_leader_id(member_id)
+        group_list_where_leader = GroupDA().get_group_list_by_group_leader_id(member_id, sort_params)
         resp_list = group_list_where_leader
         if get_all:
             group_list_where_member = GroupMembershipDA().get_group_by_member_id(member_id)

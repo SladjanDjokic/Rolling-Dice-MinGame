@@ -90,35 +90,48 @@ class GroupDA(object):
         return None
 
     @classmethod
-    def get_group_list_by_group_leader_id(cls, group_leader_id):
+    def get_group_list_by_group_leader_id(cls, group_leader_id, sort_params):
+        sort_columns_string = 'group_name ASC'
+        if sort_params:
+            entity_dict = {
+                    'group_id': 'member_group.id',
+                    'group_leader_id': 'member_group.group_leader_id',
+                    'group_name': 'member_group.group_name',
+                    'create_date': 'member_group.create_date',
+                    'update_date': 'member_group.update_date',
+                    'group_leader_first_name': 'member.first_name',
+                    'group_leader_last_name': 'member.last_name',
+                }
+            sort_columns_string = cls.formatSortingParams(sort_params, entity_dict)
+        
         group_list = list()
-        query = ("""
-SELECT
-    member_group.id AS group_id,
-    member_group.group_leader_id AS group_leader_id,
-    member_group.group_name AS group_name,
-    member_group.create_date AS create_date,
-    member_group.update_date AS update_date,
-    member.first_name AS group_leader_first_name,
-    member.last_name AS group_leader_last_name,
-    count(DISTINCT member_group_membership.member_id) AS total_member,
-    count(DISTINCT shared_file.id) AS total_files
-FROM member_group
-LEFT JOIN member ON member_group.group_leader_id = member.id
-LEFT OUTER JOIN member_group_membership ON (member_group_membership.group_id = member_group.id)
-LEFT OUTER JOIN shared_file ON (shared_file.group_id = member_group.id)
-WHERE 
-    member_group.group_leader_id = %s AND 
-    member_group.status = 'active'
-GROUP BY 
-    member_group.id,
-    member_group.group_leader_id,
-    member_group.group_name,
-    member_group.create_date,
-    member_group.update_date,
-    member.first_name,
-    member.last_name
-ORDER BY member_group.group_name ASC
+        query = (f"""
+            SELECT
+                member_group.id AS group_id,
+                member_group.group_leader_id AS group_leader_id,
+                member_group.group_name AS group_name,
+                member_group.create_date AS create_date,
+                member_group.update_date AS update_date,
+                member.first_name AS group_leader_first_name,
+                member.last_name AS group_leader_last_name,
+                count(DISTINCT member_group_membership.member_id) AS total_member,
+                count(DISTINCT shared_file.id) AS total_files
+            FROM member_group
+            LEFT JOIN member ON member_group.group_leader_id = member.id
+            LEFT OUTER JOIN member_group_membership ON (member_group_membership.group_id = member_group.id)
+            LEFT OUTER JOIN shared_file ON (shared_file.group_id = member_group.id)
+            WHERE 
+                member_group.group_leader_id = %s AND 
+                member_group.status = 'active'
+            GROUP BY 
+                member_group.id,
+                member_group.group_leader_id,
+                member_group.group_name,
+                member_group.create_date,
+                member_group.update_date,
+                member.first_name,
+                member.last_name
+            ORDER BY {sort_columns_string}
         """)
         params = (group_leader_id,)
         cls.source.execute(query, params)
@@ -137,6 +150,26 @@ ORDER BY member_group.group_name ASC
                 }
                 group_list.append(group)
         return group_list
+
+    @classmethod
+    def formatSortingParams(cls, sort_by, entity_dict):
+        columns_list = sort_by.split(',')
+        new_columns_list = list()
+
+        for column in columns_list:
+            if column[0] == '-':
+                column = column[1:]
+                column = entity_dict.get(column)
+                if column:
+                    column = column + ' DESC'
+                    new_columns_list.append(column)
+            else:
+                column = entity_dict.get(column)
+                if column:
+                    column= column + ' ASC'
+                    new_columns_list.append(column)
+
+        return (',').join(column for column in new_columns_list)
 
     @classmethod
     def create_group(cls, member_id, group_name, commit=True):

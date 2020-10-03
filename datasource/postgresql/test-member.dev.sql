@@ -3,6 +3,9 @@ INSERT INTO member
         VALUES 
         ('test@email.com', 'test', 'user', 'test@email.com', '2017-03-25', 'Coriander', crypt('password', gen_salt('bf'))),
         ('adrian@email.com', 'adrian', 'thomas', 'adrian@email.com', '2018-10-07', 'Cincyr', crypt('password', gen_salt('bf'))),
+        ('adrian2@email.com', 'adrian', 'thomas2', 'adrian2@email.com', '2018-10-07', 'Cincyr2', crypt('password', gen_salt('bf'))),
+        ('adrian3@email.com', 'adrian', 'thomas3', 'adrian3@email.com', '2018-10-07', 'Cincyr3', crypt('password', gen_salt('bf'))),
+        ('adrian4@email.com', 'adrian', 'thomas4', 'adrian4@email.com', '2018-10-07', 'Cincyr4', crypt('password', gen_salt('bf'))),
         ('donald@email.com', 'taylor', 'user', 'donald@email.com', '2016-11-24', 'Genekom', crypt('password', gen_salt('bf'))),
         ('long@email.com', 'long-user-first-name-test-case', 'scenario', 'long@email.com', '2017-10-12', 'Marvane', crypt('password', gen_salt('bf'))),
         ('isabella.richmond@sustenza.net', 'Isabella', 'Richmond', 'isabella.richmond@sustenza.net', '2000-02-14', 'Sustenza', crypt('password', gen_salt('bf'))),

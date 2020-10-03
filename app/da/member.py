@@ -698,9 +698,37 @@ class MemberContactDA(object):
     source = source
 
     @classmethod
-    def get_member_contacts(cls, member_id):
+    def get_member_contacts(cls, member_id, sort_params):
+        sort_columns_string = 'first_name ASC'
+        if sort_params:
+            contact_dict = {
+                    'id': 'contact.id',
+                    'contact_member_id': 'contact.contact_member_id',
+                    'first_name': 'contact.first_name',
+                    'middle_name': 'member.middle_name',
+                    'last_name': 'contact.last_name',
+                    'cell_phone': 'contact.cell_phone',
+                    'office_phone': 'contact.office_phone',
+                    'home_phone': 'contact.home_phone',
+                    'email': 'contact.email',
+                    'personal_email': 'contact.personal_email',
+                    'company': 'member.company_name',
+                    'title': 'job_title.name',
+                    'company_name': 'contact.company_name',
+                    'company_phone': 'contact.company_phone',
+                    'company_web_site': 'contact.company_web_site',
+                    'company_email': 'contact.company_email',
+                    'company_bio': 'contact.company_bio',
+                    'role': 'contact.contact_role',
+                    'role_id': 'contact.role_id',
+                    'create_date': 'contact.create_date',
+                    'update_date': 'contact.update_date'
+                }
+            sort_columns_string = cls.formatSortingParams(sort_params, contact_dict)
+
+        logger.debug('sorting params for contact members {} and sort_by_columns {}'.format(sort_params, sort_columns_string))
         contacts = list()
-        get_contacts_query = ("""
+        get_contacts_query = (f"""
             SELECT contact.id as id,
                 contact.contact_member_id as contact_member_id,
                 contact.first_name as first_name,
@@ -759,7 +787,7 @@ class MemberContactDA(object):
                 contact.create_date,
                 contact.update_date,
                 file_storage_engine.storage_engine_id
-            ORDER BY contact.first_name ASC
+            ORDER BY {sort_columns_string}
             """)
         get_contacts_params = (member_id,)
         cls.source.execute(get_contacts_query, get_contacts_params)
@@ -827,9 +855,23 @@ class MemberContactDA(object):
         return contacts
 
     @classmethod
-    def get_members(cls, member_id):
+    def get_members(cls, member_id, sort_params):
+        sort_columns_string = 'first_name ASC'
+        if sort_params:
+            member_dict = {
+                    'id': 'member.id',
+                    'first_name': 'member.first_name',
+                    'middle_name': 'member.middle_name',
+                    'last_name': 'member.last_name',
+                    'email': 'member.email',
+                    'company': 'member.company_name',
+                    'title': 'job_title.name',
+                    'contact_member_id': 'contact.contact_member_id'
+                }
+            sort_columns_string = cls.formatSortingParams(sort_params, member_dict)
+        logger.debug('sorting params for members {} and sort_by_columns {}'.format(sort_params, sort_columns_string))
         members = list()
-        get_members_query = ("""
+        get_members_query = (f"""
                 SELECT
                     member.id as id,
                     member.first_name as first_name,
@@ -846,7 +888,7 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
                 WHERE member.id <> %s
-                ORDER BY member.first_name ASC
+                ORDER BY {sort_columns_string}
                 """)
         get_members_params = (member_id, member_id,)
         cls.source.execute(get_members_query, get_members_params)
@@ -876,6 +918,34 @@ class MemberContactDA(object):
                     }
                     members.append(member)
         return members
+    
+    @classmethod
+    def formatSortingParams(cls, sort_by, entity_dict):
+        columns_list = sort_by.split(',')
+        new_columns_list = list()
+
+        for column in columns_list:
+            if column[0] == '-':
+                column = column[1:]
+                entity_dict.get(column)
+                if column:
+                    column = column + ' DESC'
+                    new_columns_list.append(column)
+            else:
+                entity_dict.get(column)
+                if column:
+                    column= column + ' ASC'
+                    new_columns_list.append(column)
+
+        return (',').join(column for column in new_columns_list)
+
+    @classmethod
+    def map_member_table(cls, column_name):
+        return 
+
+    @classmethod
+    def map_contact_table(cls, column_name):
+        return 
 
     @classmethod
     def get_member_contact(cls, contact_id):
