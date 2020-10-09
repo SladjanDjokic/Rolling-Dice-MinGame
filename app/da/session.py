@@ -245,8 +245,22 @@ class SessionDA (object):
         return None
 
     @classmethod
-    def get_sessions(cls, search_key, page_size=None, page_number=None):
-        query = """
+    def get_sessions(cls, search_key, page_size=None, page_number=None, sort_params=''):
+        sort_columns_string = 'first_name ASC, last_name ASC'
+        if sort_params:
+            session_dict = {
+                'session_id': 'session_id',
+                'email': 'email',
+                'username': 'username',
+                'first_name': 'first_name',
+                'last_name': 'last_name',
+                'status': 'status',
+                'create_date': 'create_date',
+                'update_date': 'update_date',
+                'expiration_date': 'expiration_date'
+            }
+            sort_columns_string = formatSortingParams(sort_params, session_dict) or sort_columns_string
+        query = (f"""
             SELECT
                 session_id,
                 email,
@@ -263,7 +277,8 @@ class SessionDA (object):
                 OR first_name LIKE %s
                 OR last_name LIKE %s
                 OR email LIKE %s
-            """
+            ORDER BY {sort_columns_string}
+            """)
 
         countQuery = """
             SELECT
@@ -321,3 +336,22 @@ class SessionDA (object):
                 sessions.append(session)
 
         return {"activities": sessions, "count": count}
+
+def formatSortingParams(sort_by, entity_dict):
+    columns_list = sort_by.split(',')
+    new_columns_list = list()
+
+    for column in columns_list:
+        if column[0] == '-':
+            column = column[1:]
+            column = entity_dict.get(column)
+            if column:
+                column = column + ' DESC'
+                new_columns_list.append(column)
+        else:
+            column = entity_dict.get(column)
+            if column:
+                column= column + ' ASC'
+                new_columns_list.append(column)
+
+    return (',').join(column for column in new_columns_list)

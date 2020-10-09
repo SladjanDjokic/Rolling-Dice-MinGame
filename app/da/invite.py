@@ -151,10 +151,32 @@ class InviteDA(object):
         return res
 
     @classmethod
-    def get_invites(cls, search_key, page_size=None, page_number=None):
+    def get_invites(cls, search_key, page_size=None, page_number=None, sort_params=''):
+        sort_columns_string = 'invite.first_name ASC, invite.last_name ASC'
+        if sort_params:
+            invite_dict = {
+                'id': 'invite.id',
+                'invite_key': 'invite.invite_key',
+                'email': 'invite.email',
+                'expiration': 'invite.expiration',
+                'first_name': 'invite.first_name',
+                'last_name': 'invite.last_name',
+                'inviter_member_id': 'invite.inviter_member_id',
+                'registered_member_id': 'invite.registered_member_id',
+                'create_date': 'invite.create_date',
+                'update_date': 'invite.update_date',
+                'inviter_first_name':'member.first_name',
+                'inviter_last_name': 'member.last_name',
+                'inviter_email': 'member.email',
+                'group_id': 'member_group.id',
+                'group_name': 'member_group.group_name',
+                'registered_date': 'registered_member.create_date'
+            }
+            sort_columns_string = formatSortingParams(sort_params, invite_dict) or sort_columns_string
 
-        query = ("""
-        SELECT invite.id,
+        query = (f"""
+        SELECT 
+            invite.id,
             invite.invite_key,
             invite.email,
             invite.expiration,
@@ -184,6 +206,7 @@ class InviteDA(object):
             OR member.email LIKE %s
 
             OR member_group.group_name LIKE %s
+        ORDER BY {sort_columns_string}
         """)
 
         countQuery = ("""
@@ -265,3 +288,22 @@ class InviteDA(object):
                 invites.append(invite)
 
         return {"activities": invites, "count": count}
+
+def formatSortingParams(sort_by, entity_dict):
+    columns_list = sort_by.split(',')
+    new_columns_list = list()
+
+    for column in columns_list:
+        if column[0] == '-':
+            column = column[1:]
+            column = entity_dict.get(column)
+            if column:
+                column = column + ' DESC'
+                new_columns_list.append(column)
+        else:
+            column = entity_dict.get(column)
+            if column:
+                column= column + ' ASC'
+                new_columns_list.append(column)
+
+    return (',').join(column for column in new_columns_list)

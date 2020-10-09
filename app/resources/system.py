@@ -26,8 +26,10 @@ class SystemActivitySessionResource(object):
 
         if search_key is None:
             search_key = ''
+        
+        sort_params = req.get_param('sort')
 
-        result = SessionDA.get_sessions(search_key, page_size, page_number)
+        result = SessionDA.get_sessions(search_key, page_size, page_number, sort_params)
 
         resp.body = json.dumps({
             'activities': result['activities'],
@@ -45,8 +47,10 @@ class SystemActivityInviteResource(object):
 
         if search_key is None:
             search_key = ''
+        
+        sort_params = req.get_param('sort')
 
-        result = InviteDA.get_invites(search_key, page_size, page_number)
+        result = InviteDA.get_invites(search_key, page_size, page_number, sort_params)
 
         resp.body = json.dumps({
             'activities': result['activities'],

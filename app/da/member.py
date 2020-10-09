@@ -724,7 +724,7 @@ class MemberContactDA(object):
                     'create_date': 'contact.create_date',
                     'update_date': 'contact.update_date'
                 }
-            sort_columns_string = cls.formatSortingParams(sort_params, contact_dict)
+            sort_columns_string = cls.formatSortingParams(sort_params, contact_dict) or sort_columns_string
 
         logger.debug('sorting params for contact members {} and sort_by_columns {}'.format(sort_params, sort_columns_string))
         contacts = list()
@@ -868,7 +868,7 @@ class MemberContactDA(object):
                     'title': 'job_title.name',
                     'contact_member_id': 'contact.contact_member_id'
                 }
-            sort_columns_string = cls.formatSortingParams(sort_params, member_dict)
+            sort_columns_string = cls.formatSortingParams(sort_params, member_dict) or sort_columns_string
         logger.debug('sorting params for members {} and sort_by_columns {}'.format(sort_params, sort_columns_string))
         members = list()
         get_members_query = (f"""
@@ -927,12 +927,12 @@ class MemberContactDA(object):
         for column in columns_list:
             if column[0] == '-':
                 column = column[1:]
-                entity_dict.get(column)
+                column = entity_dict.get(column)
                 if column:
                     column = column + ' DESC'
                     new_columns_list.append(column)
             else:
-                entity_dict.get(column)
+                column = entity_dict.get(column)
                 if column:
                     column= column + ' ASC'
                     new_columns_list.append(column)

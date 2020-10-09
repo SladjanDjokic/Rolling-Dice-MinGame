@@ -1,7 +1,7 @@
 import logging
 
-import uuid
-from dateutil.relativedelta import relativedelta
+# import uuid
+# from dateutil.relativedelta import relativedelta
 from app.util.db import source
 from app.exceptions.data import DuplicateKeyError, DataMissingError, \
     RelationshipReferenceError
@@ -93,7 +93,7 @@ class GroupDA(object):
     def get_groups_by_group_leader_id(cls, group_leader_id, sort_params):
         sort_columns_string = 'group_name ASC'
         if sort_params:
-            entity_dict = {
+            group_dict = {
                     'group_id': 'member_group.id',
                     'group_leader_id': 'member_group.group_leader_id',
                     'group_name': 'member_group.group_name',
@@ -101,9 +101,12 @@ class GroupDA(object):
                     'update_date': 'member_group.update_date',
                     'group_leader_first_name': 'member.first_name',
                     'group_leader_last_name': 'member.last_name',
+                    'total_member': 'total_member',
+                    'total_files': 'total_files'
                 }
-            sort_columns_string = cls.formatSortingParams(sort_params, entity_dict)
-        
+            sort_columns_string = cls.formatSortingParams(
+                sort_params, group_dict) or sort_columns_string
+
         group_list = list()
         query = (f"""
             SELECT
@@ -120,10 +123,10 @@ class GroupDA(object):
             LEFT JOIN member ON member_group.group_leader_id = member.id
             LEFT OUTER JOIN member_group_membership ON (member_group_membership.group_id = member_group.id)
             LEFT OUTER JOIN shared_file ON (shared_file.group_id = member_group.id)
-            WHERE 
-                member_group.group_leader_id = %s AND 
+            WHERE
+                member_group.group_leader_id = %s AND
                 member_group.status = 'active'
-            GROUP BY 
+            GROUP BY
                 member_group.id,
                 member_group.group_leader_id,
                 member_group.group_name,
@@ -170,7 +173,7 @@ class GroupDA(object):
                 'group_leader_email': 'member.email',
             }
             sort_columns_string = cls.formatSortingParams(
-                sort_params, entity_dict)
+                sort_params, entity_dict) or sort_columns_string
 
         group_list = list()
         query = (f"""
@@ -268,7 +271,7 @@ ORDER BY {sort_columns_string}
                     "create_date": m["f5"]
                 } for m in group["members"]]
                 group_list.append(group)
-        
+
         return group_list
 
     @classmethod
@@ -286,7 +289,7 @@ ORDER BY {sort_columns_string}
             else:
                 column = entity_dict.get(column)
                 if column:
-                    column= column + ' ASC'
+                    column = column + ' ASC'
                     new_columns_list.append(column)
 
         return (',').join(column for column in new_columns_list)
@@ -330,7 +333,7 @@ ORDER BY {sort_columns_string}
         query = """
             UPDATE member_group SET
                 status = %s
-            WHERE id = %s 
+            WHERE id = %s
         """
         params = (status, group_id,)
         try:
@@ -370,7 +373,8 @@ class GroupMembershipDA(object):
             if commit:
                 cls.source.commit()
             return id
-        except Exception as e:
+        except Exception:
+            logger.exception('Unable to add to group membership')
             return None
 
     @classmethod
@@ -390,59 +394,79 @@ class GroupMembershipDA(object):
 
             if commit:
                 cls.source.commit()
-        except Exception as e:
+        except Exception:
+            logger.exception('UNable to bulk create group membership')
             return None
 
     @classmethod
-    def get_group_membership_by_member_id(cls, member_id):
+    def get_group_membership_by_member_id(cls, member_id, sort_params):
+        sort_columns_string = 'member_group.create_date DESC'
+        if sort_params:
+            group_dict = {
+                'group_id': 'member_group.id',
+                'group_name': 'member_group.group_name',
+                'group_create_date': 'member_group.create_date',
+                'group_update_date': 'member_group.update_date',
+                'group_leader_id': 'member.id',
+                'group_leader_first_name': 'member.first_name',
+                'group_leader_last_name': 'member.last_name',
+                'group_leader_email': 'member.email',
+                'create_date': 'member_group_membership.create_date',
+                'update_date': 'member_group_membership.update_date',
+                'total_member': 'member_count',
+                'total_files': 'file_count'
+            }
+        sort_columns_string = formatSortingParams(
+            sort_params, group_dict) or sort_columns_string
         try:
-            query = ("""
-SELECT member_group.id AS group_id,
-       member_group.group_name,
-       member_group.create_date,
-       member_group.update_date,
-       member.id AS member_id,
-       member.first_name,
-       member.last_name,
-       member.email,
-       member_group_membership.create_date,
-       member_group_membership.update_date,
-       count(DISTINCT group_membership_member.member_id) AS member_count,
-       count(DISTINCT shared_file.id) AS file_count,
-       json_agg(DISTINCT ( group_member_detail.id,
-                group_member_detail.first_name,
-                group_member_detail.last_name,
-                group_member_detail.email,
-                group_membership_member.create_date)
-        ) AS members
-FROM member_group_membership
-INNER JOIN member_group ON (member_group.id = member_group_membership.group_id)
-LEFT OUTER JOIN member_group_membership AS group_membership_member ON (group_membership_member.group_id = member_group.id)
-LEFT OUTER JOIN member AS group_member_detail ON (group_membership_member.member_id = group_member_detail.id)
-LEFT OUTER JOIN shared_file ON (shared_file.group_id = member_group.id)
-INNER JOIN member ON member_group.group_leader_id = member.id
-WHERE member_group_membership.member_id = %s
-GROUP BY member_group.id,
-         member_group.group_name,
-         member_group.create_date,
-         member_group.update_date,
-         member.id,
-         member.first_name,
-         member.last_name,
-         member.email,
-         member_group_membership.create_date,
-         member_group_membership.update_date
-ORDER BY member_group.create_date DESC
+            query = (f"""
+                SELECT 
+                    member_group.id AS group_id,
+                    member_group.group_name,
+                    member_group.create_date,
+                    member_group.update_date,
+                    member.id AS member_id,
+                    member.first_name,
+                    member.last_name,
+                    member.email,
+                    member_group_membership.create_date,
+                    member_group_membership.update_date,
+                    count(DISTINCT group_membership_member.member_id) AS member_count,
+                    count(DISTINCT shared_file.id) AS file_count,
+                    json_agg(DISTINCT ( group_member_detail.id,
+                                group_member_detail.first_name,
+                                group_member_detail.last_name,
+                                group_member_detail.email,
+                                group_membership_member.create_date)
+                        ) AS members
+                FROM member_group_membership
+                INNER JOIN member_group ON (member_group.id = member_group_membership.group_id)
+                LEFT OUTER JOIN member_group_membership AS group_membership_member ON (group_membership_member.group_id = member_group.id)
+                LEFT OUTER JOIN member AS group_member_detail ON (group_membership_member.member_id = group_member_detail.id)
+                LEFT OUTER JOIN shared_file ON (shared_file.group_id = member_group.id)
+                INNER JOIN member ON member_group.group_leader_id = member.id
+                WHERE member_group_membership.member_id = %s
+                GROUP BY member_group.id,
+                        member_group.group_name,
+                        member_group.create_date,
+                        member_group.update_date,
+                        member.id,
+                        member.first_name,
+                        member.last_name,
+                        member.email,
+                        member_group_membership.create_date,
+                        member_group_membership.update_date
+                ORDER BY {sort_columns_string}
             """)
             params = (member_id,)
             group_list = list()
             cls.source.execute(query, params)
             if cls.source.has_results():
                 for elem in cls.source.cursor.fetchall():
-                    # { 
-                    #     "f1": 3, 
-                    #     "f2": "taylor" , 
-                    #     "f3": "user", 
+                    # {
+                    #     "f1": 3,
+                    #     "f2": "taylor" ,
+                    #     "f3": "user",
                     #     "f4": "donald@email.com",
                     #     "f5":"2020-09-23T16:27:16.11328+00:00"
                     # }
@@ -568,12 +592,13 @@ ORDER BY member_group.create_date DESC
                 WHERE group_id = %s AND member_id = %s
             """)
             params = (group_id, member_id,)
-            res = cls.source.execute(query, params)
+            cls.source.execute(query, params)
             if commit:
                 cls.source.commit()
 
             return member_id
-        except Exception as e:
+        except Exception:
+            logger.exception('Unable to delete from group membership')
             return None
 
 
@@ -583,12 +608,12 @@ class GroupMemberInviteDA(object):
     @classmethod
     def create_invite(cls, invite_key, email, first_name, last_name,
                       inviter_member_id, group_id, country, phone_number,
-                        expiration, role, commit=True):
+                      expiration, role, commit=True):
 
         query = ("""
             INSERT INTO invite
                 (invite_key, email, first_name, last_name,
-                    inviter_member_id, group_id, country, phone_number, 
+                    inviter_member_id, group_id, country, phone_number,
                         expiration, role_id)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
@@ -680,3 +705,22 @@ class GroupMemberInviteDA(object):
             cls.source.commit()
 
         return res
+
+def formatSortingParams(sort_by, entity_dict):
+    columns_list = sort_by.split(',')
+    new_columns_list = list()
+
+    for column in columns_list:
+        if column[0] == '-':
+            column = column[1:]
+            column = entity_dict.get(column)
+            if column:
+                column = column + ' DESC'
+                new_columns_list.append(column)
+        else:
+            column = entity_dict.get(column)
+            if column:
+                column= column + ' ASC'
+                new_columns_list.append(column)
+
+    return (',').join(column for column in new_columns_list)

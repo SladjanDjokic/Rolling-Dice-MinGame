@@ -138,11 +138,11 @@ class MemberGroupResource(object):
     def on_delete(self, req, resp):
         (group_ids) = request.get_json_or_form("groupIds", req=req)
         group_ids = group_ids[0].split(',')
-        
+
         session_id = get_session_cookie(req)
         session = validate_session(session_id)
         member_id = session["member_id"]
-        
+
         delete_status = {}
         for group_id in group_ids:
             group = GroupDA().get_group(group_id)
@@ -154,7 +154,7 @@ class MemberGroupResource(object):
                     delete_status[group_id] = False
             else:
                 delete_status[group_id] = False
-            
+
         resp.body = json.dumps({
             "data": delete_status,
             "description": "Group's deleted successfully!",
@@ -206,7 +206,11 @@ class GroupMembershipResource(object):
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
 
-        group_list = GroupMembershipDA().get_group_membership_by_member_id(member_id)
+        # sort_params = '-member_group.group_name' names in descending order
+        sort_params = req.get_param('sort')
+
+        group_list = GroupMembershipDA().get_group_membership_by_member_id(
+            member_id, sort_params)
         resp.body = json.dumps({
             "data": group_list,
             "message": "All Group",
@@ -238,7 +242,7 @@ class GroupMemberInviteResource(object):
         session = validate_session(session_id)
         inviter_member_id = session["member_id"]
 
-        (email, first_name, last_name, group_id, 
+        (email, first_name, last_name, group_id,
             country, phone_number, role) = request.get_json_or_form(
                     "groupMemberEmail", "firstName", "lastName", "groupId",
                     "country", "phoneNumber", "role", req=req
