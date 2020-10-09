@@ -72,15 +72,15 @@ class MemberGroupResource(object):
         # sort_params = '-member_group.group_name' names in descending order
         sort_params = req.get_param('sort')
 
-        group_list_where_leader = GroupDA().get_group_list_by_group_leader_id(member_id, sort_params)
-        resp_list = group_list_where_leader
         if get_all:
-            group_list_where_member = GroupMembershipDA().get_group_by_member_id(member_id)
-            resp_list = group_list_where_leader + group_list_where_member
+            resp_list = GroupDA().get_all_groups_by_member_id(
+                member_id, sort_params)
+        else:
+            resp_list = GroupDA().get_groups_by_group_leader_id(
+                member_id, sort_params)
 
         resp.body = json.dumps({
             "data": resp_list,
-            "message": "All Group",
             "success": True
         }, default_parser=json.parser)
 
@@ -206,7 +206,7 @@ class GroupMembershipResource(object):
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
 
-        group_list = GroupMembershipDA().get_group_by_member_id(member_id)
+        group_list = GroupMembershipDA().get_group_membership_by_member_id(member_id)
         resp.body = json.dumps({
             "data": group_list,
             "message": "All Group",

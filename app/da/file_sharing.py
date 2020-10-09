@@ -696,8 +696,8 @@ FROM member_group
         member_group_membership.group_id = member_group.id
     )
 WHERE (
-        member_group.group_leader_id = 1
-        OR member_group_membership.member_id = 1
+        member_group.group_leader_id = %s
+        OR member_group_membership.member_id = %s
     )
     AND member_group.status = 'active'
     AND file_storage_engine.status = 'available'
@@ -708,7 +708,7 @@ GROUP BY member_group.id,
     member_group.update_date
 ORDER BY member_group.group_name ASC
         """)
-        params = (member_id,)
+        params = (member_id,member_id)
         group_list = list()
         try:
             cls.source.execute(query, params)

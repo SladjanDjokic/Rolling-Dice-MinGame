@@ -90,7 +90,7 @@ class GroupDA(object):
         return None
 
     @classmethod
-    def get_group_list_by_group_leader_id(cls, group_leader_id, sort_params):
+    def get_groups_by_group_leader_id(cls, group_leader_id, sort_params):
         sort_columns_string = 'group_name ASC'
         if sort_params:
             entity_dict = {
@@ -149,6 +149,126 @@ class GroupDA(object):
                     "update_date": row[4],
                 }
                 group_list.append(group)
+        return group_list
+
+    @classmethod
+    def get_all_groups_by_member_id(cls, member_id, sort_params):
+        sort_columns_string = 'member_groups.group_name ASC'
+        if sort_params:
+            entity_dict = {
+                'group_id': 'member_groups.group_id',
+                'group_leader_id': 'member_groups.group_leader_id',
+                'group_name': 'member_groups.group_name',
+                'group_exchange_option': 'member_groups.group_exchange_option',
+                'group_status': 'member_groups.group_status',
+                'group_role': 'member_groups.group_role',
+                'group_create_date': 'member_groups.group_create_date',
+                'group_update_date': 'member_groups.group_update_date',
+                'group_join_date': 'member_groups.group_join_date',
+                'group_leader_first_name': 'member.first_name',
+                'group_leader_last_name': 'member.last_name',
+                'group_leader_email': 'member.email',
+            }
+            sort_columns_string = cls.formatSortingParams(
+                sort_params, entity_dict)
+
+        group_list = list()
+        query = (f"""
+SELECT member_groups.group_id,
+       member_groups.group_leader_id,
+       member_groups.group_name,
+       member_groups.group_exchange_option,
+       member_groups.group_status,
+       member_groups.group_role,
+       member_groups.group_create_date,
+       member_groups.group_update_date,
+       member_groups.group_join_date,
+       member.first_name AS group_leader_first_name,
+       member.last_name AS group_leader_last_name,
+       member.email AS group_leader_email,
+       count(DISTINCT group_membership_member.member_id) AS total_member,
+       count(DISTINCT shared_file.id) AS total_files,
+       json_agg(DISTINCT ( group_member_detail.id,
+                group_member_detail.first_name,
+                group_member_detail.last_name,
+                group_member_detail.email,
+                group_membership_member.create_date)
+        ) AS members
+FROM ( SELECT member_group.id AS group_id,
+            member_group.group_leader_id,
+            member_group.group_name,
+            member_group.exchange_option AS group_exchange_option,
+            member_group.status AS group_status,
+            'group_leader' as group_role,
+            member_group.create_date AS group_create_date,
+            member_group.update_date AS group_update_date,
+            NULL as group_join_date
+    FROM member_group
+    WHERE member_group.group_leader_id = %s
+    UNION
+    SELECT member_group.id AS group_id,
+                member_group.group_leader_id,
+                member_group.group_name,
+                member_group.exchange_option AS group_exchange_option,
+                member_group.status AS group_status,
+                'group_member' as group_role,
+                member_group.create_date AS group_create_date,
+                member_group.update_date AS group_update_date,
+                member_group_membership.create_date as group_join_date
+    FROM member_group
+    INNER JOIN member_group_membership ON (member_group.id = member_group_membership.group_id)
+    WHERE member_group_membership.member_id = %s ) AS member_groups
+LEFT OUTER JOIN member_group_membership AS group_membership_member ON (group_membership_member.group_id = member_groups.group_id)
+LEFT OUTER JOIN member AS group_member_detail ON (group_membership_member.member_id = group_member_detail.id)
+LEFT OUTER JOIN shared_file ON (shared_file.group_id = member_groups.group_id)
+INNER JOIN member ON member_groups.group_leader_id = member.id
+GROUP BY member_groups.group_id,
+         member_groups.group_leader_id,
+         member_groups.group_name,
+         member_groups.group_exchange_option,
+         member_groups.group_status,
+         member_groups.group_role,
+         member_groups.group_create_date,
+         member_groups.group_update_date,
+         member_groups.group_join_date,
+         member.first_name,
+         member.last_name,
+         member.email
+ORDER BY {sort_columns_string}
+        """)
+        params = (member_id, member_id)
+        cls.source.execute(query, params)
+
+        if cls.source.has_results():
+            all_group = cls.source.cursor.fetchall()
+            for row in all_group:
+                group = {
+                    "group_id": row[0],
+                    "group_leader_id": row[1],
+                    "group_name": row[2],
+                    "group_exchange_option": row[3],
+                    "group_status": row[4],
+                    "group_role": row[5],
+                    "group_create_date": row[6],
+                    "group_update_date": row[7],
+                    "group_join_date": row[8],
+                    "group_leader_first_name": row[9],
+                    "group_leader_last_name": row[10],
+                    "group_leader_email": row[11],
+                    "total_member": row[12],
+                    "total_files": row[13],
+                    "members": row[14],
+                    "group_leader_name": f'{row[9]} {row[10]}'
+                }
+                group["members"] = [{
+                    "id": m["f1"],
+                    "first_name": m["f2"],
+                    "last_name": m["f3"],
+                    "email": m["f4"],
+                    "create_date": m["f5"]
+                } for m in group["members"]]
+                group_list.append(group)
+        
         return group_list
 
     @classmethod
@@ -274,7 +394,7 @@ class GroupMembershipDA(object):
             return None
 
     @classmethod
-    def get_group_by_member_id(cls, member_id):
+    def get_group_membership_by_member_id(cls, member_id):
         try:
             query = ("""
 SELECT member_group.id AS group_id,
