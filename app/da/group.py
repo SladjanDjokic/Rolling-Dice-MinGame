@@ -416,8 +416,8 @@ class GroupMembershipDA(object):
                 'total_member': 'member_count',
                 'total_files': 'file_count'
             }
-        sort_columns_string = formatSortingParams(
-            sort_params, group_dict) or sort_columns_string
+            sort_columns_string = formatSortingParams(
+                sort_params, group_dict) or sort_columns_string
         try:
             query = (f"""
                 SELECT 
