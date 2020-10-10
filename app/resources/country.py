@@ -6,6 +6,8 @@ from app.da.country import CountryCodeDA
 
 
 class CountryCodeResource(object):
+    exempt_methods = ['GET']
+
     @staticmethod
     def on_get(req, resp):
         # try:
@@ -14,9 +16,11 @@ class CountryCodeResource(object):
         #     group_leader_id = session["member_id"]
         # except InvalidSessionError as err:
         #     raise UnauthorizedSession() from err
-        all_country_list = CountryCodeDA().get_all_country()
+
+        # Will return countries that only have is_enabled = True
+        active_country_list = CountryCodeDA().get_active_countries()
         resp.body = json.dumps({
-            "country": all_country_list,
-            "message": "All Group",
+            "data": active_country_list,
+            "message": "Active countries",
             "success": True
         }, default_parser=json.parser)

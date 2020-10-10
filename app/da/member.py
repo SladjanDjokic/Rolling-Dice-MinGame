@@ -363,18 +363,18 @@ class MemberDA(object):
         VALUES (%s, %s, %s)
         """)
         query_phone_code = ("""
-        SELECT phone FROM country_code WHERE alpha2 = %s
+        SELECT phone FROM country_code WHERE id = %s
         """)
         query_member_contact_2 = ("""
         INSERT INTO member_contact_2
         (member_id, description, device, device_type, device_country,
          device_confirm_date, method_type, display_order, primary_contact)
-        VALUES (%s, %s, %s, %s, (SELECT id FROM country_code WHERE alpha2 = %s), %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """)
         query_member_location = ("""
         INSERT INTO member_location
-        (member_id, city, state, postal, country, location_type)
-        VALUES (%s, %s, %s, %s, %s, 'home')
+        (member_id, city, state, postal, country, country_code_id, location_type) 
+        VALUES (%s, %s, %s, %s, (SELECT name FROM country_code WHERE id = %s), %s, 'home')
         """)
 
         query_member_profile = (""" 
@@ -393,7 +393,7 @@ class MemberDA(object):
         if email:
             # Member_contact_2
             params_email_member_contact_2 = (
-                id, "Office email", email, "email", country, email_confrimation_ts, "html", 2, False)
+                id, "Office email", email, "email", country, email_confrimation_ts, "html", 2, True)
             cls.source.execute(query_member_contact_2,
                                params_email_member_contact_2)
 
@@ -417,7 +417,8 @@ class MemberDA(object):
             city = None if city == 'null' else city
             state = None if state == 'null' else state
             params_member_location = (
-                id, city, state, postal, country)
+                id, city, state, postal, country, country)
+            # FIXME: We need to store only the country_id and pull everything else from the country_code table
             cls.source.execute(query_member_location, params_member_location)
 
         # When registering a new member, the uploaded photo is set as both profile and security picture. Profile picture can be changed later on.
@@ -1159,19 +1160,22 @@ class MemberInfoDA(object):
                 member.last_name as last_name,
                 member.email as email,
                 member.company_name as company,
-                job_title.name as title,
+                member.job_title_id as job_title_id,
+                member.department_id as department_id,
                 member.create_date as create_date,
                 member.update_date as update_date,
                 json_agg(DISTINCT member_location.*) AS location_information,
                 json_agg(DISTINCT member_contact_2.*) AS contact_information,
                 json_agg(DISTINCT country_code.*) AS country_code,
-                file_storage_engine.storage_engine_id as s3_avatar_url
+                json_agg(DISTINCT member_achievement.*) AS achievement_information,
+                file_storage_engine.storage_engine_id as s3_avatar_url,
+                member_profile.biography as biography
             FROM member
                 LEFT OUTER JOIN member_location ON member_location.member_id = member.id
                 LEFT OUTER JOIN member_contact ON member_contact.member_id = member.id
                 LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = member.id
                 LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
-                LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
+                LEFT OUTER JOIN member_achievement ON member_achievement.member_id = member.id
                 LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id 
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
             WHERE member.id = %s
@@ -1182,10 +1186,12 @@ class MemberInfoDA(object):
                 member.last_name,
                 member.email,
                 member.company_name,
-                job_title.name,
+                member.job_title_id,
+                member.department_id,
                 member.create_date,
                 member.update_date,
-                file_storage_engine.storage_engine_id
+                file_storage_engine.storage_engine_id,
+                member_profile.biography
             """)
         get_member_info_params = (member_id,)
         cls.source.execute(get_member_info_query, get_member_info_params)
@@ -1196,13 +1202,16 @@ class MemberInfoDA(object):
                     last_name,
                     email,
                     company,
-                    title,
+                    job_title_id,
+                    department_id,
                     create_date,
                     update_date,
                     location_information,
                     contact_information,
                     country_code,
-                    s3_avatar_url
+                    achievement_information,
+                    s3_avatar_url,
+                    biography
             ) in cls.source.cursor:
                 member = {
                     "member_id": member_id,
@@ -1210,14 +1219,17 @@ class MemberInfoDA(object):
                     "middle_name": middle_name,
                     "last_name": last_name,
                     "email": email,
-                    "company": company,
-                    "title": title,
+                    "company_name": company,
+                    "job_title_id": job_title_id,
+                    "department_id": department_id,
                     "create_date": create_date,
                     "update_date": update_date,
                     "location_information": location_information,
                     "contact_information": contact_information,
                     "country_code": country_code,
-                    "amera_avatar_url": amerize_url(s3_avatar_url)
+                    "achievement_information": achievement_information,
+                    "amera_avatar_url": amerize_url(s3_avatar_url),
+                    "biography": biography
                 }
 
                 return member
