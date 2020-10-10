@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  SubnetID:
+    Type: String
+    Default: subnet-e8546592
+  ImageURL:
+    Type: String
+    Default: 615749211894.dkr.ecr.us-east-2.amazonaws.com/amera-web-api:test
+
+Resources:
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: amera-web-api-example
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: amera-web-api-example
+  ExecutionRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: amera-web-api-example-role
+        AssumeRolePolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: ecs-tasks.amazonaws.com
+              Action: sts:AssumeRole
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+  ContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: ContainerSecurityGroup
+      GroupDescription: Security group for API Container
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5000
+          ToPort: 5000
+          CidrIp: 0.0.0.0/0
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: amera-example-task
+      CPU: 1024
+      Memory: 2048
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !Ref ExecutionRole
+      ContainerDefinitions:
+        - Name: amera-deployment-example
+          Image: !Ref ImageURL
+          PortMappings:
+            - ContainerPort: 5000
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref LogGroup
+              awslogs-stream-prefix: ecs
+          Command: ["pipenv", "run", "server"]
+
+      RequiresCompatibilities:
+        - EC2
+        - FARGATE
+
+  Service:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: amera-example-service
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref SubnetID
+          SecurityGroups:
+            - !GetAtt ContainerSecurityGroup.GroupId

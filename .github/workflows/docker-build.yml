@@ -11,12 +11,29 @@ jobs:
     steps:
       - uses: actions/checkout@master
         name: Master Branch Checkout
-      - uses: mr-smithers-excellent/docker-build-push@v3
-        name: Build & Push Web API Container
-        with:
-          image: amera-web-api
-          registry: 615749211894.dkr.ecr.us-east-2.amazonaws.com
-          dockerfile: Dockerfile.dev
+      - name: Set output
+        id: vars
+        run: echo ::set-output name=tag::${GITHUB_REF#refs/*/}
+      - name: Check output
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.ECR_ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.ECR_SECRET_ACCESS_KEY }}
+          RELEASE_VERSION: ${{ steps.vars.outputs.tag }}
+        run: |
+          echo $RELEASE_VERSION
+          echo ${{ steps.vars.outputs.tag }}
+      - uses: kciter/aws-ecr-action@master
+        with:
+          access_key_id: ${{ secrets.ECR_ACCESS_KEY }}
+          secret_access_key: ${{ secrets.ECR_SECRET_ACCESS_KEY }}
+          account_id: 615749211894
+          repo: amera-web-api
+          region: us-east-2
+          tags: test,${{ steps.vars.outputs.tag }}
+      # - uses: mr-smithers-excellent/docker-build-push@v4
+      #   name: Build & Push Web API Container
+      #   with:
+      #     image: amera-web-api
+      #     registry: 615749211894.dkr.ecr.us-east-2.amazonaws.com
+      #     dockerfile: Dockerfile
+      #   env:
+      #     AWS_ACCESS_KEY_ID: ${{ secrets.ECR_ACCESS_KEY }}
+      #     AWS_SECRET_ACCESS_KEY: ${{ secrets.ECR_SECRET_ACCESS_KEY }}
