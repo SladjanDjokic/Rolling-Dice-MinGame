@@ -9,6 +9,7 @@ from app.da.file_sharing import FileStorageDA
 from app.da.invite import InviteDA
 from app.da.group import GroupMembershipDA, GroupDA
 from app.da.promo_codes import PromoCodesDA
+from app.da.member import MemberInfoDA
 from app.util.session import get_session_cookie, validate_session
 from app.exceptions.member import MemberNotFound, MemberDataMissing, MemberExists, MemberContactExists, MemberPasswordMismatch
 from app.exceptions.invite import InviteNotFound, InviteExpired
@@ -359,7 +360,7 @@ class ContactMembersResource(object):
             sort_params = req.get_param('sort')
 
             members = MemberContactDA.get_members(member_id, sort_params)
-            
+
             resp.body = json.dumps({
                 "members": members,
                 "success": True
@@ -367,6 +368,7 @@ class ContactMembersResource(object):
 
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
+
 
 class MemberContactResource(object):
     auth = {
@@ -462,7 +464,8 @@ class MemberContactResource(object):
             # sort_by_params = 'first_name, last_name, -company' or '+first_name, +last_name, -company'
             sort_params = req.get_param('sort')
 
-            member_contacts = MemberContactDA.get_member_contacts(member_id, sort_params)
+            member_contacts = MemberContactDA.get_member_contacts(
+                member_id, sort_params)
 
             resp.body = json.dumps({
                 "contacts": member_contacts,
@@ -486,7 +489,6 @@ class MemberInfoResource(object):
 
             resp.body = json.dumps({
                 "data": member_info,
-                "member": member_info,
                 "success": True
             }, default_parser=json.parser)
 
@@ -496,6 +498,29 @@ class MemberInfoResource(object):
             #     "member": member_info,
             #     "success": False
             # }, default_parser=json.parser)
+            raise UnauthorizedSession() from err
+
+    @staticmethod
+    def on_put(req, resp):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+
+            (member, member_profile, member_achievement, member_contact_2, member_location) = request.get_json_or_form(
+                "member", "member_profile", "member_achievement", "member_contact_2", "member_location", req=req)
+
+            updated = MemberInfoDA().update_member_info(member_id,
+                                                        member, member_profile, member_achievement, member_contact_2, member_location)
+
+            if updated:
+                member_info = MemberInfoDA().get_member_info(member_id)
+                resp.body = json.dumps({
+                    "data": member_info,
+                    "success": True
+                }, default_parser=json.parser)
+
+        except InvalidSessionError as err:
             raise UnauthorizedSession() from err
 
 
