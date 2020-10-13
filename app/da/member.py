@@ -1419,6 +1419,3 @@ class MemberInfoDA(object):
             return True
         except:
             pass
-
-
-``
