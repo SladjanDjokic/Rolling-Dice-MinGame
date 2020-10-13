@@ -345,7 +345,7 @@ class MemberDA(object):
         return None
 
     @classmethod
-    def register(cls, city, state, pin, avatar_storage_id, email, username, password, first_name,
+    def register(cls, city, state, province, pin, avatar_storage_id, email, username, password, first_name,
                  last_name, company_name, job_title_id, date_of_birth, phone_number,
                  country, postal, cell_confrimation_ts, email_confrimation_ts, department_id,
                  commit=True):
@@ -374,8 +374,9 @@ class MemberDA(object):
         """)
         query_member_location = ("""
         INSERT INTO member_location
-        (member_id, city, state, postal, country, country_code_id, location_type)
-        VALUES (%s, %s, %s, %s, (SELECT name FROM country_code WHERE id = %s), %s, 'home')
+        (member_id, city, state, province, postal,
+         country, country_code_id, location_type)
+        VALUES (%s, %s, %s, %s, %s, (SELECT name FROM country_code WHERE id = %s), %s, 'home')
         """)
 
         query_member_profile = ("""
@@ -417,8 +418,9 @@ class MemberDA(object):
             # store member location info
             city = None if city == 'null' else city
             state = None if state == 'null' else state
+            province = None if province == 'null' else province
             params_member_location = (
-                id, city, state, postal, country, country)
+                id, city, state, province, postal, country, country)
             # FIXME: We need to store only the country_id and pull everything else from the country_code table
             cls.source.execute(query_member_location, params_member_location)
 
@@ -1302,25 +1304,26 @@ class MemberInfoDA(object):
                 WHERE member_id = %s AND NOT id = ANY(%s);
             """)
 
-            achievemnt_ids_to_stay = list()
-            for achievement in member_achievement:
-                if achievement:
-                    id, entity, description, display_order = [
-                        achievement[k] for k in ('id', 'entity', 'description', 'display_order')]
-                    if (type(id) == int):
-                        cls.source.execute(
-                            member_achievement_update_query, (entity, description, display_order, id, member_id))
-                        achievemnt_ids_to_stay.append(id)
-                    else:
-                        cls.source.execute(
-                            member_achievement_insert_query, (entity, description, display_order, member_id))
-                        achievemnt_ids_to_stay.append(
-                            cls.source.get_last_row_id())
-                    cls.source.commit()
-            # Track what was deleted in the UI and kill it in db as well
-            cls.source.execute(member_achievement_delete_query,
-                               (member_id, achievemnt_ids_to_stay))
-            cls.source.commit()
+            if member_achievement:
+                achievemnt_ids_to_stay = list()
+                for achievement in member_achievement:
+                    if achievement:
+                        id, entity, description, display_order = [
+                            achievement[k] for k in ('id', 'entity', 'description', 'display_order')]
+                        if (type(id) == int):
+                            cls.source.execute(
+                                member_achievement_update_query, (entity, description, display_order, id, member_id))
+                            achievemnt_ids_to_stay.append(id)
+                        else:
+                            cls.source.execute(
+                                member_achievement_insert_query, (entity, description, display_order, member_id))
+                            achievemnt_ids_to_stay.append(
+                                cls.source.get_last_row_id())
+                        cls.source.commit()
+                # Track what was deleted in the UI and kill it in db as well
+                cls.source.execute(member_achievement_delete_query,
+                                   (member_id, achievemnt_ids_to_stay))
+                cls.source.commit()
 
             # Member contact 2
             member_contact_2_update_query = ("""
@@ -1346,25 +1349,26 @@ class MemberInfoDA(object):
                 WHERE member_id = %s AND NOT id = ANY(%s);
             """)
 
-            contact_ids_to_stay = list()
-            for contact in member_contact_2:
-                if contact:
-                    id, description, device_type, device_country, device, method_type, display_order, primary_contact = [
-                        contact[k] for k in ('id', 'description', 'device_type', 'device_country', 'device', 'method_type', 'display_order', 'primary_contact')]
-                    if (type(id) == int):
-                        cls.source.execute(
-                            member_contact_2_update_query, (description, device_type, device_country, device, method_type, display_order, primary_contact, id, member_id))
-                        contact_ids_to_stay.append(id)
-                    else:
-                        cls.source.execute(
-                            member_contact_2_insert_query, (description, device_type, device_country, device, method_type, display_order, primary_contact, member_id))
-                        contact_ids_to_stay.append(
-                            cls.source.get_last_row_id())
-                    cls.source.commit()
-            # Track what was deleted in the UI and kill it in db as well
-            cls.source.execute(member_contact_2_delete_query,
-                               (member_id, contact_ids_to_stay))
-            cls.source.commit()
+            if member_contact_2:
+                contact_ids_to_stay = list()
+                for contact in member_contact_2:
+                    if contact:
+                        id, description, device_type, device_country, device, method_type, display_order, primary_contact = [
+                            contact[k] for k in ('id', 'description', 'device_type', 'device_country', 'device', 'method_type', 'display_order', 'primary_contact')]
+                        if (type(id) == int):
+                            cls.source.execute(
+                                member_contact_2_update_query, (description, device_type, device_country, device, method_type, display_order, primary_contact, id, member_id))
+                            contact_ids_to_stay.append(id)
+                        else:
+                            cls.source.execute(
+                                member_contact_2_insert_query, (description, device_type, device_country, device, method_type, display_order, primary_contact, member_id))
+                            contact_ids_to_stay.append(
+                                cls.source.get_last_row_id())
+                        cls.source.commit()
+                # Track what was deleted in the UI and kill it in db as well
+                cls.source.execute(member_contact_2_delete_query,
+                                   (member_id, contact_ids_to_stay))
+                cls.source.commit()
 
             # Member location
             member_location_update_query = ("""
@@ -1391,26 +1395,30 @@ class MemberInfoDA(object):
                 WHERE member_id = %s AND NOT id = ANY(%s);
             """)
 
-            location_ids_to_stay = list()
-            for location in member_location:
-                if location:
-                    id, address_1, address_2, city, state, province, postal, country, country_code_id, location_type = [
-                        location[k] for k in ('id', 'address_1', 'address_2', 'city', 'state', 'province', 'postal', 'country', 'country_code_id', 'location_type')]
+            if member_location:
+                location_ids_to_stay = list()
+                for location in member_location:
+                    if location:
+                        id, address_1, address_2, city, state, province, postal, country, country_code_id, location_type = [
+                            location[k] for k in ('id', 'address_1', 'address_2', 'city', 'state', 'province', 'postal', 'country', 'country_code_id', 'location_type')]
 
-                if (type(id) == int):
-                    cls.source.execute(
-                        member_location_update_query, (address_1, address_2, city, state, province, postal, country, country_code_id, location_type, id, member_id))
-                    location_ids_to_stay.append(id)
-                else:
-                    cls.source.execute(
-                        member_location_insert_query, (address_1, address_2, city, state, province, postal, country, country_code_id, location_type, member_id))
-                    location_ids_to_stay.append(
-                        cls.source.get_last_row_id())
+                    if (type(id) == int):
+                        cls.source.execute(
+                            member_location_update_query, (address_1, address_2, city, state, province, postal, country, country_code_id, location_type, id, member_id))
+                        location_ids_to_stay.append(id)
+                    else:
+                        cls.source.execute(
+                            member_location_insert_query, (address_1, address_2, city, state, province, postal, country, country_code_id, location_type, member_id))
+                        location_ids_to_stay.append(
+                            cls.source.get_last_row_id())
+                    cls.source.commit()
+                # Track what was deleted in the UI and kill it in db as well
+                cls.source.execute(member_location_delete_query,
+                                   (member_id, location_ids_to_stay))
                 cls.source.commit()
-            # Track what was deleted in the UI and kill it in db as well
-            cls.source.execute(member_location_delete_query,
-                               (member_id, location_ids_to_stay))
-            cls.source.commit()
             return True
         except:
             pass
+
+
+``
