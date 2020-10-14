@@ -1375,6 +1375,7 @@ class MemberInfoDA(object):
                 UPDATE member_location
                 SET
                     address_1=%s,
+                    street=%s,
                     address_2=%s,               
                     city=%s, 
                     state=%s, 
@@ -1386,8 +1387,8 @@ class MemberInfoDA(object):
                 WHERE id=%s AND member_id = %s;
             """)
             member_location_insert_query = ("""
-                INSERT INTO member_location (address_1, address_2, city, state, province, postal, country, country_code_id, location_type, member_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO member_location (address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, member_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id;
             """)
             member_location_delete_query = ("""
@@ -1399,16 +1400,16 @@ class MemberInfoDA(object):
                 location_ids_to_stay = list()
                 for location in member_location:
                     if location:
-                        id, address_1, address_2, city, state, province, postal, country, country_code_id, location_type = [
-                            location[k] for k in ('id', 'address_1', 'address_2', 'city', 'state', 'province', 'postal', 'country', 'country_code_id', 'location_type')]
+                        id, street, address_1, address_2, city, state, province, postal, country, country_code_id, location_type = [
+                            location[k] for k in ('id', 'street', 'address_1', 'address_2', 'city', 'state', 'province', 'postal', 'country', 'country_code_id', 'location_type')]
 
                     if (type(id) == int):
                         cls.source.execute(
-                            member_location_update_query, (address_1, address_2, city, state, province, postal, country, country_code_id, location_type, id, member_id))
+                            member_location_update_query, (address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, id, member_id))
                         location_ids_to_stay.append(id)
                     else:
                         cls.source.execute(
-                            member_location_insert_query, (address_1, address_2, city, state, province, postal, country, country_code_id, location_type, member_id))
+                            member_location_insert_query, (address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, member_id))
                         location_ids_to_stay.append(
                             cls.source.get_last_row_id())
                     cls.source.commit()
