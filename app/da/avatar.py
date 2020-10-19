@@ -23,11 +23,12 @@ class AvatarDA(object):
     @classmethod
     def update_avatar(cls, file_storage_id, member_id):
         query = ("""
-            UPDATE member_profile
+            INSERT INTO member_profile (member_id, profile_picture_storage_id)
+            VALUES (%s, %s)
+            ON conflict(member_id) DO UPDATE 
             SET profile_picture_storage_id = %s
-            WHERE member_id = %s
         """)
-        params = (file_storage_id, member_id)
+        params = (member_id, file_storage_id, file_storage_id)
         cls.source.execute(query, params)
         try:
             cls.source.commit()

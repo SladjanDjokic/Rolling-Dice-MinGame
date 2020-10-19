@@ -1285,12 +1285,14 @@ class MemberInfoDA(object):
 
             # Member_profile
             member_profile_query = ("""
-                UPDATE member_profile
+                INSERT INTO member_profile (member_id, biography)
+                VALUES (%s, %s)
+                ON conflict(member_id) DO UPDATE
                 SET biography = %s
-                WHERE member_id = %s
             """)
 
-            member_profile_params = (member_profile["biography"], member_id)
+            member_profile_params = (
+                member_id, member_profile["biography"], member_profile["biography"])
             cls.source.execute(member_profile_query, member_profile_params)
             cls.source.commit()
 

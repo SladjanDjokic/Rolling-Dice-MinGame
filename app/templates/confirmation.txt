@@ -1,0 +1,3 @@
+Please enter this confirmation code to validate your e-mail - {{ token }}
+
+Thank you for choosing AMERA Share!

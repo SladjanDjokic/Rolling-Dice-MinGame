@@ -173,6 +173,7 @@ services:
       - ../web-api/datasource/postgresql/member_achievement.sql:/docker-entrypoint-initdb.d/e-1-member_achievement.sql
       - ../web-api/datasource/postgresql/member_profile.sql:/docker-entrypoint-initdb.d/e-2-member_profile.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-10-08_1_titles.sql:/docker-entrypoint-initdb.d/e-3-unset-titles.sql
+      - ../web-api/datasource/postgresql/email_token.sql:/docker-entrypoint-initdb.d/e-4-schema-updates.sql
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/z-3-test-schedule.sql

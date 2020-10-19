@@ -9,7 +9,8 @@ from app.middleware import CrossDomain  # , JSONTranslator
 from app.resources.member import MemberRegisterResource, MemberResource, MemberSearchResource, \
     MemberGroupSearchResource, MemberContactResource, ContactMembersResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms
-from app.resources.verify_cell import VerifyCell
+from app.resources.verification import Verification
+from app.resources.verifycell import VerifyCell
 from app.resources.promo_codes import PromoCodes
 from app.resources.invite import MemberInviteResource, ValidInviteResource
 from app.resources.login import MemberLoginResource
@@ -108,6 +109,7 @@ def _setup_routes(app):
     app.add_route("/member/register/job-title", MemberJobTitles())
     app.add_route("/member/register/terms", MemberTerms())
     # 2FA of cell during registration
+    app.add_route("/member/register/verification", Verification())
     app.add_route("/member/register/verify-cell", VerifyCell())
     app.add_route("/member/register/promo-code", PromoCodes())
 
