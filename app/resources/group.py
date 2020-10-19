@@ -199,12 +199,14 @@ class GroupMembershipResource(object):
 
     @staticmethod
     def on_get(req, resp):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
+        member_id = req.get_param('member_id')
+        if not member_id:
+            try:
+                session_id = get_session_cookie(req)
+                session = validate_session(session_id)
+                member_id = session["member_id"]
+            except InvalidSessionError as err:
+                raise UnauthorizedSession() from err
 
         # sort_params = '-member_group.group_name' names in descending order
         sort_params = req.get_param('sort')

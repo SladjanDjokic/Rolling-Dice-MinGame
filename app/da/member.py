@@ -711,6 +711,7 @@ class MemberContactDA(object):
                 'first_name': 'contact.first_name',
                 'middle_name': 'member.middle_name',
                 'last_name': 'contact.last_name',
+                'biography': 'member_profile.biography',
                 'cell_phone': 'contact.cell_phone',
                 'office_phone': 'contact.office_phone',
                 'home_phone': 'contact.home_phone',
@@ -740,6 +741,7 @@ class MemberContactDA(object):
                 contact.first_name as first_name,
                 member.middle_name as middle_name,
                 contact.last_name as last_name,
+                member_profile.biography as biography,
                 contact.cell_phone as cell_phone,
                 contact.office_phone as office_phone,
                 contact.home_phone as home_phone,
@@ -759,6 +761,7 @@ class MemberContactDA(object):
                 json_agg(DISTINCT member_location.*) AS location_information,
                 json_agg(DISTINCT member_contact_2.*) AS contact_information,
                 json_agg(DISTINCT country_code.*) AS country_code,
+                json_agg(DISTINCT member_achievement.*) AS achievement_information,
                 file_storage_engine.storage_engine_id as s3_avatar_url
             FROM contact
                 LEFT JOIN member ON member.id = contact.contact_member_id
@@ -768,6 +771,7 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
                 LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
                 LEFT OUTER JOIN member_profile ON contact.contact_member_id = member_profile.member_id
+                LEFT OUTER JOIN member_achievement ON member_achievement.member_id = member.id
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
             WHERE contact.member_id = %s
             GROUP BY
@@ -777,6 +781,7 @@ class MemberContactDA(object):
                 contact.first_name,
                 member.middle_name,
                 contact.last_name,
+                member_profile.biography,
                 contact.cell_phone,
                 contact.office_phone,
                 contact.home_phone,
@@ -804,6 +809,7 @@ class MemberContactDA(object):
                     first_name,
                     middle_name,
                     last_name,
+                    biography,
                     cell_phone,
                     office_phone,
                     home_phone,
@@ -823,6 +829,7 @@ class MemberContactDA(object):
                     location_information,
                     contact_information,
                     country_code,
+                    achievement_information,
                     s3_avatar_url
             ) in cls.source.cursor:
                 contact = {
@@ -832,6 +839,7 @@ class MemberContactDA(object):
                     "middle_name": middle_name,
                     "last_name": last_name,
                     "member_name": f'{first_name} {last_name}',
+                    "biography": biography,
                     "cell_phone": cell_phone,
                     "office_phone": office_phone,
                     "home_phone": home_phone,
@@ -851,6 +859,7 @@ class MemberContactDA(object):
                     "location_information": location_information,
                     "contact_information": contact_information,
                     "country_code": country_code,
+                    "achievement_information": achievement_information,
                     "amera_avatar_url": amerize_url(s3_avatar_url)
                     # "city": city,
                     # "state": state,

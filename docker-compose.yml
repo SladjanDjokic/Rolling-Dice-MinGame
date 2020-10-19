@@ -178,6 +178,7 @@ services:
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/z-3-test-schedule.sql
       - ../web-api/datasource/postgresql/test-amera-tos.dev.sql:/docker-entrypoint-initdb.d/z-4-test-amera-tos.dev.sql.sql
       - ../web-api/datasource/postgresql/test-promo-codes.dev.sql:/docker-entrypoint-initdb.d/z-5-test-promo-codes.dev.sql
+      - ../web-api/datasource/postgresql/test-achievements.dev.sql:/docker-entrypoint-initdb.d/z-6-test-achievements.dev.sql
     environment:
       POSTGRES_DB: ameraiot
       POSTGRES_USER: amera

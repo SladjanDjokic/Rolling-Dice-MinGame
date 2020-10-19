@@ -33,19 +33,26 @@ def setup_vyper(parser, overrides):
 
     actual_overrides = \
         {k: val for k, val in overrides.items() if defaults[k] != val}
-    app_prefix = defaults.get("environment_variables_prefix", "app").upper()
-    env_name = os.getenv("{}_ENV_NAME".format(app_prefix), "LOCAL").lower()
-    config_name = "config.{}".format(env_name)
-
-    logger.debug("VYPER ENV_NAME: {}".format(env_name))
-    logger.debug("VYPER CONFIG_NAME: {}".format(config_name))
 
     _setup_args(parser)
     _setup_overrides(actual_overrides)
 
-    v.set_env_prefix(v.get("environment_variables_prefix"))
+    env_prefix = v.get("environment_variables_prefix")
+    # env_name = os.getenv(f"{env_prefix.upper()}_ENV_NAME", "LOCAL").lower()
+    # print(f"VYPER ENV_NAME_ENV: {env_name}")
+
+    v.set_env_prefix(env_prefix)
     v.set_env_key_replacer("-", "_")
     v.automatic_env()
+
+    env_name = v.get('env_name')
+    config_name = f"config.{env_name}".lower()
+
+    # print(f"VYPER ENV_NAME: {env_name}")
+    # print(f"VYPER CONFIG_NAME: {config_name}")
+
+    logger.debug("VYPER ENV_NAME: {}".format(env_name))
+    logger.debug("VYPER CONFIG_NAME: {}".format(config_name))
 
     v.add_config_path("config")
     v.set_config_type("toml")

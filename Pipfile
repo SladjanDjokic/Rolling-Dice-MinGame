@@ -36,5 +36,6 @@ python_version = "3.7.9"
 
 [scripts]
 "dev" = "python run.py --env-name=LOCAL"
+"test-server" = "python run.py --env-name=TEST --log-level=DEBUG"
 "docker" = "env GUNICORN_CMD_ARGS=\"--reload\" python run.py --env-name=LOCAL"
-"server" = "python run.py --env-name=PROD"
+"server" = "python run.py"
