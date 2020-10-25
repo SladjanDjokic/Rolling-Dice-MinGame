@@ -50,7 +50,7 @@ class InviteDA(object):
         SELECT
             id, invite_key, email, role_id, group_id, expiration,
             first_name, last_name, inviter_member_id,
-            country, phone_number, registered_member_id
+            country_code, phone_number, registered_member_id
         FROM invite
         WHERE invite_key = %s
         """)
@@ -68,8 +68,8 @@ class InviteDA(object):
                 "id": id,
                 "invite_key": invite_key,
                 "email": email,
-                "role_id":role_id,
-                "group_id":group_id,
+                "role_id": role_id,
+                "group_id": group_id,
                 "expiration": expiration,
                 "first_name": first_name,
                 "last_name": last_name,
@@ -87,7 +87,7 @@ class InviteDA(object):
         query = ("""
         SELECT
             id, invite_key, email, group_id, expiration,
-            first_name, last_name, country, phone_number, registered_member_id
+            first_name, last_name, country_code, phone_number, registered_member_id
         FROM invite
         WHERE invite_key = %s
         """)
@@ -96,14 +96,14 @@ class InviteDA(object):
         cls.source.execute(query, params)
         if cls.source.has_results():
             (
-                id, invite_key, email, group_id, expiration, 
+                id, invite_key, email, group_id, expiration,
                 first_name, last_name, country, phone_number, registered_member_id
             ) = cls.source.cursor.fetchone()
             invite = {
                 "id": id,
                 "invite_key": invite_key,
                 "email": email,
-                "group_id":group_id,
+                "group_id": group_id,
                 "expiration": expiration,
                 "first_name": first_name,
                 "last_name": last_name,
@@ -165,14 +165,15 @@ class InviteDA(object):
                 'registered_member_id': 'invite.registered_member_id',
                 'create_date': 'invite.create_date',
                 'update_date': 'invite.update_date',
-                'inviter_first_name':'member.first_name',
+                'inviter_first_name': 'member.first_name',
                 'inviter_last_name': 'member.last_name',
                 'inviter_email': 'member.email',
                 'group_id': 'member_group.id',
                 'group_name': 'member_group.group_name',
                 'registered_date': 'registered_member.create_date'
             }
-            sort_columns_string = formatSortingParams(sort_params, invite_dict) or sort_columns_string
+            sort_columns_string = formatSortingParams(
+                sort_params, invite_dict) or sort_columns_string
 
         query = (f"""
         SELECT 
@@ -230,7 +231,7 @@ class InviteDA(object):
         like_search_key = """%{}%""".format(search_key)
         params = tuple(7 * [like_search_key])
 
-        cls.source.execute(countQuery, params);
+        cls.source.execute(countQuery, params)
 
         count = 0
         if cls.source.has_results():
@@ -289,6 +290,7 @@ class InviteDA(object):
 
         return {"activities": invites, "count": count}
 
+
 def formatSortingParams(sort_by, entity_dict):
     columns_list = sort_by.split(',')
     new_columns_list = list()
@@ -303,7 +305,7 @@ def formatSortingParams(sort_by, entity_dict):
         else:
             column = entity_dict.get(column)
             if column:
-                column= column + ' ASC'
+                column = column + ' ASC'
                 new_columns_list.append(column)
 
     return (',').join(column for column in new_columns_list)

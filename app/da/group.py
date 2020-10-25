@@ -94,16 +94,16 @@ class GroupDA(object):
         sort_columns_string = 'group_name ASC'
         if sort_params:
             group_dict = {
-                    'group_id': 'member_group.id',
-                    'group_leader_id': 'member_group.group_leader_id',
-                    'group_name': 'member_group.group_name',
-                    'create_date': 'member_group.create_date',
-                    'update_date': 'member_group.update_date',
-                    'group_leader_first_name': 'member.first_name',
-                    'group_leader_last_name': 'member.last_name',
-                    'total_member': 'total_member',
-                    'total_files': 'total_files'
-                }
+                'group_id': 'member_group.id',
+                'group_leader_id': 'member_group.group_leader_id',
+                'group_name': 'member_group.group_name',
+                'create_date': 'member_group.create_date',
+                'update_date': 'member_group.update_date',
+                'group_leader_first_name': 'member.first_name',
+                'group_leader_last_name': 'member.last_name',
+                'total_member': 'total_member',
+                'total_files': 'total_files'
+            }
             sort_columns_string = cls.formatSortingParams(
                 sort_params, group_dict) or sort_columns_string
 
@@ -562,7 +562,8 @@ class GroupMembershipDA(object):
                 """)
 
             like_search_key = """%{}%""".format(search_key)
-            params = (group_id, member_id, like_search_key, like_search_key, like_search_key, like_search_key)
+            params = (group_id, member_id, like_search_key,
+                      like_search_key, like_search_key, like_search_key)
 
             if page_size and page_number:
                 query += """LIMIT %s OFFSET %s"""
@@ -609,11 +610,10 @@ class GroupMemberInviteDA(object):
     def create_invite(cls, invite_key, email, first_name, last_name,
                       inviter_member_id, group_id, country, phone_number,
                       expiration, role, commit=True):
-
         query = ("""
             INSERT INTO invite
                 (invite_key, email, first_name, last_name,
-                    inviter_member_id, group_id, country, phone_number,
+                    inviter_member_id, group_id, country_code, phone_number,
                         expiration, role_id)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
@@ -706,6 +706,7 @@ class GroupMemberInviteDA(object):
 
         return res
 
+
 def formatSortingParams(sort_by, entity_dict):
     columns_list = sort_by.split(',')
     new_columns_list = list()
@@ -720,7 +721,7 @@ def formatSortingParams(sort_by, entity_dict):
         else:
             column = entity_dict.get(column)
             if column:
-                column= column + ' ASC'
+                column = column + ' ASC'
                 new_columns_list.append(column)
 
     return (',').join(column for column in new_columns_list)
