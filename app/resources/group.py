@@ -25,6 +25,13 @@ from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 logger = logging.getLogger(__name__)
 import pdb
 
+def is_integer(n):
+    try:
+        float(n)
+    except ValueError:
+        return False
+    else:
+        return float(n).is_integer()
 
 class MemberGroupResource(object):
     def on_post(self, req, resp):
@@ -245,11 +252,14 @@ class GroupMemberInviteResource(object):
         inviter_member_id = session["member_id"]
 
         (email, first_name, last_name, group_id,
-            country, phone_number, role) = request.get_json_or_form(
+            country, country_code, phone_number, role) = request.get_json_or_form(
                     "groupMemberEmail", "firstName", "lastName", "groupId",
-                    "country", "phoneNumber", "role", req=req
+                    "country", "countryCode", "phoneNumber", "role", req=req
                 )
-
+        if not country_code and is_integer(country):
+            country_code = country
+            country = None
+               
         expiration = datetime.now() + relativedelta(months=+1)
 
         invite_key = uuid.uuid4().hex
@@ -265,6 +275,7 @@ class GroupMemberInviteResource(object):
             "invite_key": invite_key,
             "group_id": group_id,
             "country": country,
+            "country_code": country_code,
             "phone_number": phone_number,
             "expiration": expiration,
             "role": role

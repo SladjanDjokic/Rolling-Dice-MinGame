@@ -1,5 +1,6 @@
 import logging
 import datetime
+from urllib import parse
 
 from app.util.db import source
 from app.util.config import settings
@@ -702,37 +703,43 @@ class MemberContactDA(object):
     source = source
 
     @classmethod
-    def get_member_contacts(cls, member_id, sort_params):
+    def get_member_contacts(cls, member_id, sort_params, filter_params):
         sort_columns_string = 'first_name ASC'
+        contact_dict = {
+            'id': 'contact.id',
+            'contact_member_id': 'contact.contact_member_id',
+            'first_name': 'contact.first_name',
+            'middle_name': 'member.middle_name',
+            'last_name': 'contact.last_name',
+            'biography': 'member_profile.biography',
+            'cell_phone': 'contact.cell_phone',
+            'office_phone': 'contact.office_phone',
+            'home_phone': 'contact.home_phone',
+            'email': 'contact.email',
+            'personal_email': 'contact.personal_email',
+            'company': 'member.company_name',
+            'title': 'job_title.name',
+            'country_code_id': 'member_location.country_code_id',
+            'company_name': 'contact.company_name',
+            'company_phone': 'contact.company_phone',
+            'company_web_site': 'contact.company_web_site',
+            'company_email': 'contact.company_email',
+            'company_bio': 'contact.company_bio',
+            'role': 'contact.contact_role',
+            'role_id': 'contact.role_id',
+            'create_date': 'contact.create_date',
+            'update_date': 'contact.update_date'
+        }
+
         if sort_params:
-            contact_dict = {
-                'id': 'contact.id',
-                'contact_member_id': 'contact.contact_member_id',
-                'first_name': 'contact.first_name',
-                'middle_name': 'member.middle_name',
-                'last_name': 'contact.last_name',
-                'biography': 'member_profile.biography',
-                'cell_phone': 'contact.cell_phone',
-                'office_phone': 'contact.office_phone',
-                'home_phone': 'contact.home_phone',
-                'email': 'contact.email',
-                'personal_email': 'contact.personal_email',
-                'company': 'member.company_name',
-                'title': 'job_title.name',
-                'company_name': 'contact.company_name',
-                'company_phone': 'contact.company_phone',
-                'company_web_site': 'contact.company_web_site',
-                'company_email': 'contact.company_email',
-                'company_bio': 'contact.company_bio',
-                'role': 'contact.contact_role',
-                'role_id': 'contact.role_id',
-                'create_date': 'contact.create_date',
-                'update_date': 'contact.update_date'
-            }
             sort_columns_string = cls.formatSortingParams(
                 sort_params, contact_dict) or sort_columns_string
 
-        logger.debug('sorting params for contact members {} and sort_by_columns {}'.format(
+        (filter_conditions_query, filter_conditions_params) = cls.formatFilterConditions(
+            filter_params, contact_dict)
+
+        logger.debug(f"""filter params for contact members {filter_params} and filter_by_columns string {filter_conditions_query}{filter_conditions_params}""")
+        logger.debug('sorting params for contact members {} and sort_by_columns string {}'.format(
             sort_params, sort_columns_string))
         contacts = list()
         get_contacts_query = (f"""
@@ -773,7 +780,7 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN member_profile ON contact.contact_member_id = member_profile.member_id
                 LEFT OUTER JOIN member_achievement ON member_achievement.member_id = member.id
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
-            WHERE contact.member_id = %s
+            WHERE contact.member_id = %s {filter_conditions_query}
             GROUP BY
                 contact.contact_member_id,
                 contact.id,
@@ -800,7 +807,7 @@ class MemberContactDA(object):
                 file_storage_engine.storage_engine_id
             ORDER BY {sort_columns_string}
             """)
-        get_contacts_params = (member_id,)
+        get_contacts_params = (member_id, ) + filter_conditions_params
         cls.source.execute(get_contacts_query, get_contacts_params)
         if cls.source.has_results():
             for (
@@ -955,6 +962,23 @@ class MemberContactDA(object):
                     new_columns_list.append(column)
 
         return (',').join(column for column in new_columns_list)
+
+    @classmethod
+    def formatFilterConditions(cls, filter_by, entity_dict):
+        filter_by_dict = parse.parse_qs(filter_by)
+        filter_conditions_query = ''
+        filter_conditions_params = []
+        for key in filter_by_dict:
+            filter_conditions_query = filter_conditions_query + (f""" and {entity_dict.get(key)} = %s""")
+            param = None
+            # try: 
+            #     param = int(filter_by_dict[key][0])
+            # except ValueError:
+                # param = filter_by_dict[key][0]
+            param = filter_by_dict[key][0]
+             
+            filter_conditions_params.append(param)
+        return (filter_conditions_query, tuple(filter_conditions_params))  
 
     @classmethod
     def map_member_table(cls, column_name):

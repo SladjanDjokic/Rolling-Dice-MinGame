@@ -463,9 +463,11 @@ class MemberContactResource(object):
 
             # sort_by_params = 'first_name, last_name, -company' or '+first_name, +last_name, -company'
             sort_params = req.get_param('sort')
-
+            filter_params = req.get_param('filter')
+            
             member_contacts = MemberContactDA.get_member_contacts(
-                member_id, sort_params)
+                member_id, sort_params, filter_params
+            )
 
             resp.body = json.dumps({
                 "contacts": member_contacts,

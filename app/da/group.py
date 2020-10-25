@@ -608,20 +608,20 @@ class GroupMemberInviteDA(object):
 
     @classmethod
     def create_invite(cls, invite_key, email, first_name, last_name,
-                      inviter_member_id, group_id, country, phone_number,
+                      inviter_member_id, group_id, country, country_code, phone_number,
                       expiration, role, commit=True):
         query = ("""
             INSERT INTO invite
                 (invite_key, email, first_name, last_name,
-                    inviter_member_id, group_id, country_code, phone_number,
+                    inviter_member_id, group_id, country, country_code, phone_number,
                         expiration, role_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
             """)
 
         params = (
             invite_key, email, first_name, last_name,
-            inviter_member_id, group_id, country, phone_number,
+            inviter_member_id, group_id, country, country_code, phone_number,
             expiration, role
         )
         try:
