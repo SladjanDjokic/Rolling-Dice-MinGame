@@ -19,7 +19,7 @@ class SessionDA (object):
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query = ("""
         SELECT id, email, first_name, last_name, username, status FROM member
-        WHERE username = %s AND password = crypt(%s, password)
+        WHERE lower(username) = %s AND password = crypt(%s, password)
         """)
 
         params = (username.lower(), password)
