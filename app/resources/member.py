@@ -477,6 +477,22 @@ class MemberContactResource(object):
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
 
+class MemberContactsRoles(object):
+    def on_get(self, req, resp):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+
+            roles = MemberContactDA.get_contacts_roles(member_id)
+
+            resp.body = json.dumps({
+                "roles": roles,
+                "success": True
+            }, default_parser=json.parser)
+
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
 
 class MemberInfoResource(object):
     @staticmethod
@@ -548,6 +564,24 @@ class MemberJobTitles(object):
             }, default_parser=json.parser)
 
 
+class MemberContactsCompanies(object):
+    def on_get(self, req, resp):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+
+            companies = MemberContactDA.get_contacts_companies(member_id)
+
+            resp.body = json.dumps({
+                "companies": companies,
+                "success": True
+            }, default_parser=json.parser)
+
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+
+
 class MemberTerms(object):
     auth = {
         'exempt_methods': ['GET']
@@ -568,3 +602,20 @@ class MemberTerms(object):
                 "description": "Could not get the terms and conditions",
                 "success": False
             }, default_parser=json.parser)
+
+class MemberContactsCountries(object):
+    def on_get(self, req, resp):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+
+            countries = MemberContactDA.get_contacts_countries(member_id)
+
+            resp.body = json.dumps({
+                "countries": countries,
+                "success": True
+            }, default_parser=json.parser)
+
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err

@@ -8,7 +8,8 @@ from app.config import parser, settings
 from app.middleware import CrossDomain  # , JSONTranslator
 from app.resources.member import MemberRegisterResource, MemberResource, MemberSearchResource, \
     MemberGroupSearchResource, MemberContactResource, ContactMembersResource, \
-    MemberInfoResource, MemberJobTitles, MemberTerms
+    MemberInfoResource, MemberJobTitles, MemberTerms, MemberContactsRoles, \
+    MemberContactsCompanies, MemberContactsCountries
 from app.resources.verification import Verification
 from app.resources.verifycell import VerifyCell
 from app.resources.promo_codes import PromoCodes
@@ -119,7 +120,12 @@ def _setup_routes(app):
     app.add_route("/member/search", MemberSearchResource())
     app.add_route("/member/group/search", MemberGroupSearchResource())
     app.add_route("/member/{username}", MemberResource())
+
     app.add_route("/member/contact", MemberContactResource())
+    app.add_route("/member/contacts/roles", MemberContactsRoles())
+    app.add_route("/member/contacts/companies", MemberContactsCompanies())
+    app.add_route("/member/contacts/countries", MemberContactsCountries())
+    
     app.add_route("/member/file/{file_path}", FileDownloadResource())
     app.add_route("/member-contacts", ContactMembersResource())
     app.add_route('/session/{session_id}', SessionResource)

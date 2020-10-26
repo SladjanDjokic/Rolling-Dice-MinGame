@@ -720,13 +720,13 @@ class MemberContactDA(object):
             'company': 'member.company_name',
             'title': 'job_title.name',
             'country_code_id': 'member_location.country_code_id',
-            'company_name': 'contact.company_name',
+            'company_name': 'member.company_name',
             'company_phone': 'contact.company_phone',
             'company_web_site': 'contact.company_web_site',
             'company_email': 'contact.company_email',
             'company_bio': 'contact.company_bio',
-            'role': 'contact.contact_role',
-            'role_id': 'contact.role_id',
+            'role': 'role.name',
+            'role_id': 'role.id',
             'create_date': 'contact.create_date',
             'update_date': 'contact.update_date'
         }
@@ -761,8 +761,8 @@ class MemberContactDA(object):
                 contact.company_web_site as company_web_site,
                 contact.company_email as company_email,
                 contact.company_bio as company_bio,
-                contact.contact_role as role,
-                contact.role_id as role_id,
+                role.name as role,
+                role.id as role_id,
                 contact.create_date as create_date,
                 contact.update_date as update_date,
                 json_agg(DISTINCT member_location.*) AS location_information,
@@ -772,6 +772,7 @@ class MemberContactDA(object):
                 file_storage_engine.storage_engine_id as s3_avatar_url
             FROM contact
                 LEFT JOIN member ON member.id = contact.contact_member_id
+                LEFT OUTER JOIN role ON contact.role_id = role.id
                 LEFT OUTER JOIN member_location ON member_location.member_id = contact.contact_member_id
                 LEFT OUTER JOIN member_contact ON member_contact.member_id = contact.contact_member_id
                 LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = contact.contact_member_id
@@ -782,7 +783,6 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
             WHERE contact.member_id = %s {filter_conditions_query}
             GROUP BY
-                contact.contact_member_id,
                 contact.id,
                 contact.contact_member_id,
                 contact.first_name,
@@ -801,7 +801,8 @@ class MemberContactDA(object):
                 contact.company_web_site,
                 contact.company_email,
                 contact.company_bio,
-                contact.contact_role,
+                role.name,
+                role.id,
                 contact.create_date,
                 contact.update_date,
                 file_storage_engine.storage_engine_id
@@ -875,6 +876,107 @@ class MemberContactDA(object):
                 }
                 contacts.append(contact)
         return contacts
+
+    @classmethod
+    def get_contacts_roles(cls, member_id):
+        roles = list()
+        query = (f"""
+            SELECT role.id,
+                   role.name,
+                   count(*)
+            FROM role
+            INNER JOIN contact ON (role.id = contact.role_id)
+            WHERE member_id = %s
+            GROUP BY role.id,
+                     role.name
+            ORDER BY role.name
+        """)
+        params = (member_id, )
+        cls.source.execute(query, params)
+        if cls.source.has_results:
+            for (
+                role_id,
+                contact_role,
+                count
+            ) in cls.source.cursor:
+                role = {
+                    "id": role_id,
+                    "name": contact_role,
+                    "count": count
+                }
+                roles.append(role)
+        return roles
+
+    @classmethod
+    def get_contacts_companies(cls, member_id):
+        companies = list()
+        query = (f"""
+            SELECT
+                member.company_name,
+                count(*)
+            FROM
+                member
+                INNER JOIN contact ON member.id = contact.contact_member_id
+            WHERE
+                contact.member_id = %s
+                AND member.company_name IS NOT NULL
+                AND trim(member.company_name) != ''
+            GROUP BY
+                member.company_name
+            ORDER BY
+                member.company_name
+        """)
+
+        params = (member_id, )
+        cls.source.execute(query, params)
+        if cls.source.has_results:
+            for (
+                company_name,
+                count
+            ) in cls.source.cursor:
+                company = {
+                    "company_name": company_name,
+                    "count": count
+                }
+                companies.append(company)
+
+        return companies
+
+    @classmethod
+    def get_contacts_countries(cls, member_id):
+        countries = list()
+        query = (f"""
+            SELECT
+                country_code.id as id,
+                country_code.name as name,
+                count(*) as count
+            FROM
+                contact
+                INNER JOIN member_location ON (contact.contact_member_id = member_location.member_id)
+                INNER JOIN country_code ON (member_location.country_code_id = country_code.id)
+            WHERE
+                contact.member_id = %s
+            GROUP BY
+                country_code.id,
+                country_code.name
+            ORDER BY
+                country_code.name
+        """)
+        params = (member_id, )
+        cls.source.execute(query, params)
+        if cls.source.has_results:
+            for (
+                id,
+                name,
+                total
+            ) in cls.source.cursor:
+                country = {
+                    "id": id,
+                    "name": name,
+                    "totat": total
+                }
+                countries.append(country)
+        return countries
 
     @classmethod
     def get_members(cls, member_id, sort_params):
@@ -971,14 +1073,14 @@ class MemberContactDA(object):
         for key in filter_by_dict:
             filter_conditions_query = filter_conditions_query + (f""" and {entity_dict.get(key)} = %s""")
             param = None
-            # try: 
+            # try:
             #     param = int(filter_by_dict[key][0])
             # except ValueError:
                 # param = filter_by_dict[key][0]
             param = filter_by_dict[key][0]
-             
+
             filter_conditions_params.append(param)
-        return (filter_conditions_query, tuple(filter_conditions_params))  
+        return (filter_conditions_query, tuple(filter_conditions_params))
 
     @classmethod
     def map_member_table(cls, column_name):
@@ -1411,13 +1513,13 @@ class MemberInfoDA(object):
                 SET
                     address_1=%s,
                     street=%s,
-                    address_2=%s,               
-                    city=%s, 
-                    state=%s, 
-                    province=%s, 
-                    postal=%s, 
-                    country=%s, 
-                    country_code_id=%s, 
+                    address_2=%s,
+                    city=%s,
+                    state=%s,
+                    province=%s,
+                    postal=%s,
+                    country=%s,
+                    country_code_id=%s,
                     location_type=%s
                 WHERE id=%s AND member_id = %s;
             """)
