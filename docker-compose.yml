@@ -162,7 +162,7 @@ services:
       - ../web-api/datasource/postgresql/job-title.sql:/docker-entrypoint-initdb.d/9-job-title.sql
       - ../web-api/datasource/postgresql/amera_tos.sql:/docker-entrypoint-initdb.d/a-amera_tos.sql
       - ../web-api/datasource/postgresql/member_tos.sql:/docker-entrypoint-initdb.d/b-member-tos.sql
-      - ../web-api/datasource/postgresql/cell_token.sql:/docker-entrypoint-initdb.d/c-cell-token.sql
+      - ../web-api/datasource/postgresql/cell_token.sql:/docker-entrypoint-initdb.d/c-cell-token.sql      
       - ../web-api/datasource/postgresql/schema-updates-2020-09-04_member_avatar.sql:/docker-entrypoint-initdb.d/d-1-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-09-07.sql:/docker-entrypoint-initdb.d/d-2-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-09-09.sql:/docker-entrypoint-initdb.d/d-3-schema-updates.sql
@@ -180,6 +180,9 @@ services:
       - ../web-api/datasource/postgresql/file_tree_items.sql:/docker-entrypoint-initdb.d/e-6-file_tree_items.sql
       - ../web-api/datasource/postgresql/file_shares.sql:/docker-entrypoint-initdb.d/e-7-file_shares.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-10-22_invites.sql:/docker-entrypoint-initdb.d/e-8-schema-updates.sql
+      - ../web-api/datasource/postgresql/event.sql:/docker-entrypoint-initdb.d/f-1-event.sql
+      - ../web-api/datasource/postgresql/event_invite.sql:/docker-entrypoint-initdb.d/f-2-event_invite.sql
+      - ../web-api/datasource/postgresql/event_reschedule.sql:/docker-entrypoint-initdb.d/f-3-event_reschedule.sql
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/z-3-test-schedule.sql
@@ -187,6 +190,7 @@ services:
       - ../web-api/datasource/postgresql/test-promo-codes.dev.sql:/docker-entrypoint-initdb.d/z-5-test-promo-codes.dev.sql
       - ../web-api/datasource/postgresql/test-achievements.dev.sql:/docker-entrypoint-initdb.d/z-6-test-achievements.dev.sql
       - ../web-api/datasource/postgresql/test-fileshare.sql:/docker-entrypoint-initdb.d/z-7-test-fileshare.dev.sql
+      - ../web-api/datasource/postgresql/test-event.dev.sql:/docker-entrypoint-initdb.d/z-8-test-event.dev.sql
     environment:
       POSTGRES_DB: ameraiot
       POSTGRES_USER: amera
