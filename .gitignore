@@ -108,3 +108,5 @@ ENV/
 
 # static folder - TODO: Remove this `static Folder
 /static
+
+kafka-docker

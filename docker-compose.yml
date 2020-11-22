@@ -131,10 +131,12 @@ services:
       - amera-net
     expose:
       - 5000
+    ports:
+    - 5000:5000
     volumes:
       - ../web-api:/app
       - web-api-python-packages:/root/.local/share
-    command: ["pipenv", "run", "docker"]
+    command: ["pipenv", "run", "local"]
   amera-web-db:
     container_name: amera-web-db
     image: postgres:latest
