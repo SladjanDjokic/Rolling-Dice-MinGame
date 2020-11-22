@@ -50,22 +50,36 @@ class MemberGroupResource(object):
 
         group_exist = GroupDA().get_group_by_name_and_leader_id(group_leader_id, name)
         members = json.loads(members)
-        
+
         if group_exist:
             raise GroupExists(name)
         else:
-            file = None
+            file_id = None
             group_id = None
             if exchange_option != 'NO_ENCRYPTION':
                 file = req.get_param('picture')
                 file_id = FileStorageDA().put_file_to_storage(file)
-                group_id = GroupDA().create_expanded_group(group_leader_id, name, file_id, pin, exchange_option)
             else:
-                group_id = GroupDA().create_expanded_group(group_leader_id, name, None, None, exchange_option)
-            GroupMembershipDA().bulk_create_group_membership(group_leader_id, group_id, members)
+                pin = None
+
+            # First we create empty file trees
+            # main_file_tree_id = FileTreeDA().create_tree('main')
+            # bin_file_tree_id = FileTreeDA().create_tree('bin')
+
+            # group_id = GroupDA().create_expanded_group(group_leader_id, name,
+            #                                            file_id, pin,
+            #                                            exchange_option,
+            #                                            main_file_tree_id,
+            #                                            bin_file_tree_id)
+
+            group_id = GroupDA().create_expanded_group(group_leader_id, name,
+                                                       file_id, pin,
+                                                       exchange_option)
+            GroupMembershipDA().bulk_create_group_membership(
+                group_leader_id, group_id, members)
             # self.bulk_create_invite(group_leader_id, group_id, members, req)
             group = list()
-            new_group = GroupDA().get_group(group_id)            
+            new_group = GroupDA().get_group(group_id)
             group.insert(0, new_group)
             resp.body = json.dumps({
                 "data": group,
