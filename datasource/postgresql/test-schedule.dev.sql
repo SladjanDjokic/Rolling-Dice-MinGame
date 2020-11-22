@@ -10,6 +10,11 @@ INSERT INTO file_storage_engine (storage_engine_id,storage_engine,status,create_
 ,('https://file-testing.s3.us-east-2.amazonaws.com/1597718910795-Screenshot from 2020-08-09 09-57-00.png','S3','available','2020-08-17 21:48:20.480','2020-08-17 21:48:20.480')
 ;
 
+-- INSERT INTO member_file (file_id,file_name,status,member_id,categories,file_ivalue, file_owner) VALUES 
+-- (1,'Screenshot from 2020-08-09 09-57-00.png','available',2,'EventImage',NULL, 2)
+-- ,(2,'Screenshot from 2020-08-09 09-57-00.png','available',3,'EventImage',NULL, 3)
+-- ;
+
 INSERT INTO member_file (file_id,file_name,status,member_id,categories,file_ivalue) VALUES 
 (1,'Screenshot from 2020-08-09 09-57-00.png','available',2,'EventImage',NULL)
 ,(2,'Screenshot from 2020-08-09 09-57-00.png','available',3,'EventImage',NULL)

@@ -312,14 +312,15 @@ ORDER BY {sort_columns_string}
         return id
 
     @classmethod
-    def create_expanded_group(cls, member_id, group_name, picture_file_id, pin, exchange_option, commit=True):
+    def create_expanded_group(cls, member_id, group_name, picture_file_id, pin, exchange_option, main_file_tree, bin_file_tree, commit=True):
         query = ("""
-            INSERT INTO member_group (group_leader_id, group_name, picture_file_id, pin, exchange_option)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO member_group (group_leader_id, group_name, picture_file_id, pin, exchange_option, main_file_tree, bin_file_tree)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING id
         """)
 
-        params = (member_id, group_name, picture_file_id, pin, exchange_option)
+        params = (member_id, group_name, picture_file_id, pin,
+                  exchange_option, main_file_tree, bin_file_tree)
 
         cls.source.execute(query, params)
         id = cls.source.get_last_row_id()

@@ -1,3 +1,4 @@
+import pdb
 import uuid
 import app.util.json as json
 import logging
@@ -12,6 +13,7 @@ import app.util.email as sendmail
 
 from app.da.file_sharing import FileStorageDA
 from app.da.group import GroupDA, GroupMembershipDA, GroupMemberInviteDA
+from app.da.file_sharing import FileTreeDA
 from app.da.member import MemberDA
 from app.exceptions.group import GroupExists, MemberNotFound, MemberExists, GroupNotFound
 from app.exceptions.invite import InviteExistsError, InviteDataMissingError,\
@@ -23,7 +25,7 @@ from app.exceptions.session import ForbiddenSession
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 
 logger = logging.getLogger(__name__)
-import pdb
+
 
 def is_integer(n):
     try:
@@ -32,6 +34,7 @@ def is_integer(n):
         return False
     else:
         return float(n).is_integer()
+
 
 class MemberGroupResource(object):
     def on_post(self, req, resp):
@@ -55,7 +58,7 @@ class MemberGroupResource(object):
             group_id = None
             if exchange_option != 'NO_ENCRYPTION':
                 file = req.get_param('picture')
-                file_id = FileStorageDA().store_file_to_storage(file)
+                file_id = FileStorageDA().put_file_to_storage(file)
                 group_id = GroupDA().create_expanded_group(group_leader_id, name, file_id, pin, exchange_option)
             else:
                 group_id = GroupDA().create_expanded_group(group_leader_id, name, None, None, exchange_option)
@@ -174,6 +177,7 @@ class MemberGroupResource(object):
             "success": True
         }, default_parser=json.parser)
 
+
 class GroupDetailResource(object):
     def on_get(self, req, resp, group_id=None):
         # TODO: Build pagination
@@ -193,14 +197,17 @@ class GroupDetailResource(object):
         group['total_member'] = len(members)
         return group
 
+
 class GroupMembershipResource(object):
     @staticmethod
     def on_post(req, resp):
-        (group_id, group_member_email) = request.get_json_or_form("groupId", "groupMemberEmail", req=req)
+        (group_id, group_member_email) = request.get_json_or_form(
+            "groupId", "groupMemberEmail", req=req)
         member = MemberDA().get_member_by_email(group_member_email)
         if not member:
             raise MemberNotFound(group_member_email)
-        group_member_id = GroupMembershipDA().create_group_membership(group_id, member['member_id'])
+        group_member_id = GroupMembershipDA().create_group_membership(
+            group_id, member['member_id'])
         if not group_member_id:
             raise MemberExists(group_member_email)
         group = GroupDetailResource().get_group_detail(group_id)
@@ -235,7 +242,8 @@ class GroupMembershipResource(object):
 
     @staticmethod
     def on_delete(req, resp):
-        (group_id, member_id) = request.get_json_or_form("groupId", "groupMemberId", req=req)
+        (group_id, member_id) = request.get_json_or_form(
+            "groupId", "groupMemberId", req=req)
         group_member_id = GroupMembershipDA().remove_group_member(group_id, member_id)
         if not group_member_id:
             raise MemberNotFound
@@ -259,13 +267,13 @@ class GroupMemberInviteResource(object):
 
         (email, first_name, last_name, group_id,
             country, country_code, phone_number, role) = request.get_json_or_form(
-                    "groupMemberEmail", "firstName", "lastName", "groupId",
-                    "country", "countryCode", "phoneNumber", "role", req=req
-                )
+            "groupMemberEmail", "firstName", "lastName", "groupId",
+            "country", "countryCode", "phoneNumber", "role", req=req
+        )
         if not country_code and is_integer(country):
             country_code = country
             country = None
-               
+
         expiration = datetime.now() + relativedelta(months=+1)
 
         invite_key = uuid.uuid4().hex

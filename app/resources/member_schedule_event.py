@@ -57,7 +57,8 @@ class MemberScheduleEventResource(object):
 
             event_image = None
             if (file is not None) and hasattr(file, 'filename'):
-                file_id = FileStorageDA().store_file_to_storage(file)
+                file_id = FileStorageDA().put_file_to_storage(file)
+                # file_id = FileStorageDA().store_file_to_storage(file)
                 status = 'available'
                 event_image = FileStorageDA().create_member_file_entry(
                     file_id, file.filename, event_host_member_id, status, 'EventImage')

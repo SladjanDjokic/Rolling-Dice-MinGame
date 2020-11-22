@@ -17,7 +17,8 @@ class AvatarResource(object):
             member_id = session["member_id"]
 
             avatar = req.get_param('avatar')
-            avatar_storage_id = FileStorageDA().store_file_to_storage(avatar)
+            avatar_storage_id = FileStorageDA().put_file_to_storage(avatar)
+            # avatar_storage_id = FileStorageDA().store_file_to_storage(avatar)
 
             success = AvatarDA.update_avatar(avatar_storage_id, member_id)
 

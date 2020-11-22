@@ -22,7 +22,7 @@ from app.resources.logout import MemberLogoutResource
 from app.resources.session import SessionResource, ValidateSessionResource
 from app.resources.file_download import FileDownloadResource
 from app.resources.file_sharing import FileStorage, FileStorageDetail, ShareFile, ShareFileDetail, \
-    DownloadStorageFile, DownloadSharedFile
+    DownloadStorageFile, DownloadSharedFile, MemberFileCloud, MemberFileBin, MemberShareFile, GroupFileCloud, GroupFileBin
 from app.resources.group import MemberGroupResource, GroupMembershipResource, GroupDetailResource, \
     GroupMemberInviteResource, GroupMembersResource
 from app.resources.file_sharing import FileStorage, FileStorageDetail, \
@@ -125,13 +125,16 @@ def _setup_routes(app):
     app.add_route("/member/contacts/roles", MemberContactsRoles())
     app.add_route("/member/contacts/companies", MemberContactsCompanies())
     app.add_route("/member/contacts/countries", MemberContactsCountries())
-    
     app.add_route("/member/file/{file_path}", FileDownloadResource())
     app.add_route("/member-contacts", ContactMembersResource())
     app.add_route('/session/{session_id}', SessionResource)
     app.add_route("/valid-session", ValidateSessionResource())
     # app.add_route("/cloud/files", MemberFile())
-    app.add_route("/cloud/files", FileStorage())
+    app.add_route("/cloud/files", MemberFileCloud())
+    app.add_route("/cloud/files/bin", MemberFileBin())
+    app.add_route("/cloud/files/sharing", MemberShareFile())
+    app.add_route("/cloud/files/group/{group_id}", GroupFileCloud())
+    app.add_route("/cloud/files/group/bin/{group_id}", GroupFileBin())
     app.add_route("/cloud/files/groups", FileGroupResource())
     app.add_route("/cloud/files/details/{file_id}", FileStorageDetail())
     app.add_route("/cloud/files/download/{file_id}", DownloadStorageFile())

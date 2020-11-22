@@ -348,15 +348,15 @@ class MemberDA(object):
     @classmethod
     def register(cls, city, state, province, pin, avatar_storage_id, email, username, password, first_name,
                  last_name, company_name, job_title_id, date_of_birth, phone_number,
-                 country, postal, cell_confrimation_ts, email_confrimation_ts, department_id,
+                 country, postal, cell_confrimation_ts, email_confrimation_ts, department_id, main_file_tree_id, bin_file_tree_id,
                  commit=True):
 
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query_member = ("""
         INSERT INTO member
         (pin, email, username, password, first_name, last_name,
-         date_of_birth, company_name, job_title_id, security_picture_storage_id, department_id)
-        VALUES (%s, %s, %s, crypt(%s, gen_salt('bf')), %s, %s, %s, %s, %s, %s, %s)
+         date_of_birth, company_name, job_title_id, security_picture_storage_id, department_id, main_file_tree, bin_file_tree)
+        VALUES (%s, %s, %s, crypt(%s, gen_salt('bf')), %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """)
         query_member_contact = ("""
@@ -389,7 +389,8 @@ class MemberDA(object):
         # settings.get('MEMBER_KEY')
         # store member personal info
         params_member = (pin, email, username, password, first_name,
-                         last_name, date_of_birth, company_name, job_title_id, avatar_storage_id, department_id)
+                         last_name, date_of_birth, company_name, job_title_id, 
+                         avatar_storage_id, department_id, main_file_tree_id, bin_file_tree_id)
         cls.source.execute(query_member, params_member)
         id = cls.source.get_last_row_id()
 

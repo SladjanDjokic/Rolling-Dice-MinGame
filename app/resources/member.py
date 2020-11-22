@@ -5,7 +5,7 @@ from uuid import UUID
 import app.util.json as json
 import app.util.request as request
 from app.da.member import MemberDA, MemberContactDA, MemberInfoDA
-from app.da.file_sharing import FileStorageDA
+from app.da.file_sharing import FileStorageDA, FileTreeDA
 from app.da.invite import InviteDA
 from app.da.group import GroupMembershipDA, GroupDA
 from app.da.promo_codes import PromoCodesDA
@@ -167,26 +167,22 @@ class MemberRegisterResource(object):
             # print(f"PICTURE MATCH {type(profilePicture) == 'falcon_multipart.parser.Parser'}")
 
             if profilePicture is not None:
-                avatar_storage_id = FileStorageDA().store_file_to_storage(profilePicture)
+                avatar_storage_id = FileStorageDA().put_file_to_storage(profilePicture)
+                # avatar_storage_id = FileStorageDA().store_file_to_storage(profilePicture)
 
-            logger.debug(
-                f"Job Title ID: {job_title_id} and {type(job_title_id)}")
+            # logger.debug(
+                # f"Job Title ID: {job_title_id} and {type(job_title_id)}")
 
-            if not job_title_id:
-                job_title_id = None
-
-            if not department_id:
-                department_id = None
-
-            if not country:
-                country = 'US'
+            # First we create empty file trees
+            main_file_tree_id = FileTreeDA().create_tree('main')
+            bin_file_tree_id = FileTreeDA().create_tree('bin')
 
             member_id = MemberDA.register(
                 city=city, state=state, province=province, pin=pin, avatar_storage_id=avatar_storage_id, email=email, username=email, password=password,
                 first_name=first_name, last_name=last_name, company_name=company_name, job_title_id=job_title_id,
                 date_of_birth=date_of_birth, phone_number=phone_number,
                 country=country, postal=postal, cell_confrimation_ts=cell_confrimation_ts, email_confrimation_ts=email_confrimation_ts,
-                department_id=department_id, commit=True)
+                department_id=department_id, main_file_tree_id=main_file_tree_id, bin_file_tree_id=bin_file_tree_id, commit=True)
             logger.debug("New registered member_id: {}".format(member_id))
 
             if member_id:
@@ -464,7 +460,7 @@ class MemberContactResource(object):
             # sort_by_params = 'first_name, last_name, -company' or '+first_name, +last_name, -company'
             sort_params = req.get_param('sort')
             filter_params = req.get_param('filter')
-            
+
             member_contacts = MemberContactDA.get_member_contacts(
                 member_id, sort_params, filter_params
             )
@@ -476,6 +472,7 @@ class MemberContactResource(object):
 
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
+
 
 class MemberContactsRoles(object):
     def on_get(self, req, resp):
@@ -493,6 +490,7 @@ class MemberContactsRoles(object):
 
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
+
 
 class MemberInfoResource(object):
     @staticmethod
@@ -602,6 +600,7 @@ class MemberTerms(object):
                 "description": "Could not get the terms and conditions",
                 "success": False
             }, default_parser=json.parser)
+
 
 class MemberContactsCountries(object):
     def on_get(self, req, resp):
