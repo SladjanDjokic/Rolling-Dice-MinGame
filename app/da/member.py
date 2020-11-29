@@ -1377,6 +1377,7 @@ class MemberInfoDA(object):
                 member.email as email,
                 member.company_name as company,
                 member.job_title_id as job_title_id,
+                job_title.name as job_title,
                 member.department_id as department_id,
                 member.create_date as create_date,
                 member.update_date as update_date,
@@ -1387,6 +1388,7 @@ class MemberInfoDA(object):
                 file_storage_engine.storage_engine_id as s3_avatar_url,
                 member_profile.biography as biography
             FROM member
+                LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
                 LEFT OUTER JOIN member_location ON member_location.member_id = member.id
                 LEFT OUTER JOIN member_contact ON member_contact.member_id = member.id
                 LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = member.id
@@ -1403,6 +1405,7 @@ class MemberInfoDA(object):
                 member.email,
                 member.company_name,
                 member.job_title_id,
+                job_title.name,
                 member.department_id,
                 member.create_date,
                 member.update_date,
@@ -1419,6 +1422,7 @@ class MemberInfoDA(object):
                     email,
                     company,
                     job_title_id,
+                    job_title,
                     department_id,
                     create_date,
                     update_date,
@@ -1437,6 +1441,7 @@ class MemberInfoDA(object):
                     "email": email,
                     "company_name": company,
                     "job_title_id": job_title_id,
+                    "job_title": job_title,
                     "department_id": department_id,
                     "create_date": create_date,
                     "update_date": update_date,
