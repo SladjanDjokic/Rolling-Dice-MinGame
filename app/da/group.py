@@ -345,6 +345,54 @@ ORDER BY {sort_columns_string}
         except Exception as err:
             raise err
 
+    @classmethod
+    def get_all_groups(cls):
+        groups = list()
+        query = ("""
+            SELECT 
+                id, 
+                main_file_tree, 
+                bin_file_tree
+            FROM member_group
+        """)
+        cls.source.execute(query, None)
+        if cls.source.has_results():
+            for (
+                    group_id,
+                    main_file_tree,
+                    bin_file_tree
+            ) in cls.source.cursor:
+                group = {
+                    "group_id": group_id,
+                    "main_file_tree": main_file_tree,
+                    "bin_file_tree": bin_file_tree
+                }
+
+                groups.append(group)
+
+        return groups
+
+    @classmethod
+    def assign_tree(cls, tree_type, group_id, tree_id):
+        ''' 
+            This is used to assign a tree id to an existing groups for migration purposes
+        '''
+        main_query = ("""
+            UPDATE member_group
+            SET main_file_tree = %s
+            WHERE id = %s
+        """)
+        bin_query = ("""
+            UPDATE member_group
+            SET bin_file_tree = %s
+            WHERE id = %s
+        """)
+        params = (tree_id, group_id)
+        query = main_query if tree_type == 'main' else bin_query
+        cls.source.execute(query, params)
+        cls.source.commit()
+        return True
+
 
 class GroupMembershipDA(object):
     source = source

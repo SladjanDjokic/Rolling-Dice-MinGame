@@ -1,6 +1,6 @@
-CREATE TABLE file_tree_items (
+CREATE TABLE file_tree_item (
     id            SERIAL  PRIMARY KEY,
-    tree_id       INTEGER REFERENCES file_trees (id),
+    file_tree_id       INTEGER REFERENCES file_tree (id),
     -- root_id        INTEGER DEFAULT NULL,
     is_tree_root BOOLEAN DEFAULT FALSE,
     parent_id      INTEGER DEFAULT NULL,

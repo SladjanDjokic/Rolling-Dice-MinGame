@@ -8,6 +8,8 @@ from app.config import settings
 import app.util.request as request
 from app.util.session import set_session_cookie
 from app.da.session import SessionDA
+from app.da.member import MemberDA
+from app.da.file_sharing import FileTreeDA
 from app.exceptions.session import SessionExistsError
 
 
@@ -32,6 +34,17 @@ class MemberLoginResource(object):
         if not member:
             raise falcon.HTTPUnauthorized(title="Invalid Login",
                                           description="Invalid credentials")
+
+        main_file_tree = member["main_file_tree"]
+        bin_file_tree = member["bin_file_tree"]
+        member_id = member["id"]
+        if not main_file_tree:
+            tree_id = FileTreeDA().create_tree('main', 'member')
+            MemberDA().assign_tree('main', member_id, tree_id)
+
+        if not bin_file_tree:
+            tree_id = FileTreeDA().create_tree('bin', 'member')
+            MemberDA().assign_tree('bin', member_id, tree_id)
 
         expiration_seconds = settings.get("web.session_expiration")
         expiration_datetime = datetime.now(timezone.utc) + timedelta(

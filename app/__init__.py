@@ -42,6 +42,8 @@ from app.resources.avatar import AvatarResource
 # from app.resources.memberfile import MemberFile
 # from app.resources.keygen import KeyGenResource, KeyGenFileUpload
 
+from app.da.__init__ import check_trees
+
 from app.util.config import setup_vyper
 from app.util.error import error_handler
 from app.util.logging import setup_logging
@@ -83,6 +85,8 @@ def create_app():
     app.add_error_handler(Exception, error_handler)
 
     _setup_routes(app)
+
+    check_trees()
 
     return app
 

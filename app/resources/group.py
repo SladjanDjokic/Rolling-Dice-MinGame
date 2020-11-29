@@ -63,18 +63,18 @@ class MemberGroupResource(object):
                 pin = None
 
             # First we create empty file trees
-            # main_file_tree_id = FileTreeDA().create_tree('main')
-            # bin_file_tree_id = FileTreeDA().create_tree('bin')
-
-            # group_id = GroupDA().create_expanded_group(group_leader_id, name,
-            #                                            file_id, pin,
-            #                                            exchange_option,
-            #                                            main_file_tree_id,
-            #                                            bin_file_tree_id)
+            main_file_tree_id = FileTreeDA().create_tree('main', 'group')
+            bin_file_tree_id = FileTreeDA().create_tree('bin', 'group')
 
             group_id = GroupDA().create_expanded_group(group_leader_id, name,
                                                        file_id, pin,
-                                                       exchange_option)
+                                                       exchange_option,
+                                                       main_file_tree_id,
+                                                       bin_file_tree_id)
+
+            # group_id = GroupDA().create_expanded_group(group_leader_id, name,
+            #                                            file_id, pin,
+            #                                            exchange_option)
             GroupMembershipDA().bulk_create_group_membership(
                 group_leader_id, group_id, members)
             # self.bulk_create_invite(group_leader_id, group_id, members, req)

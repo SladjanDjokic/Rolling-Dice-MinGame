@@ -174,8 +174,8 @@ class MemberRegisterResource(object):
                 # f"Job Title ID: {job_title_id} and {type(job_title_id)}")
 
             # First we create empty file trees
-            main_file_tree_id = FileTreeDA().create_tree('main')
-            bin_file_tree_id = FileTreeDA().create_tree('bin')
+            main_file_tree_id = FileTreeDA().create_tree('main', 'member')
+            bin_file_tree_id = FileTreeDA().create_tree('bin', 'member')
 
             member_id = MemberDA.register(
                 city=city, state=state, province=province, pin=pin, avatar_storage_id=avatar_storage_id, email=email, username=email, password=password,

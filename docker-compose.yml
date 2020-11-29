@@ -132,7 +132,7 @@ services:
     expose:
       - 5000
     ports:
-    - 5000:5000
+      - 5000:5000
     volumes:
       - ../web-api:/app
       - web-api-python-packages:/root/.local/share
@@ -162,7 +162,7 @@ services:
       - ../web-api/datasource/postgresql/job-title.sql:/docker-entrypoint-initdb.d/9-job-title.sql
       - ../web-api/datasource/postgresql/amera_tos.sql:/docker-entrypoint-initdb.d/a-amera_tos.sql
       - ../web-api/datasource/postgresql/member_tos.sql:/docker-entrypoint-initdb.d/b-member-tos.sql
-      - ../web-api/datasource/postgresql/cell_token.sql:/docker-entrypoint-initdb.d/c-cell-token.sql      
+      - ../web-api/datasource/postgresql/cell_token.sql:/docker-entrypoint-initdb.d/c-cell-token.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-09-04_member_avatar.sql:/docker-entrypoint-initdb.d/d-1-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-09-07.sql:/docker-entrypoint-initdb.d/d-2-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-09-09.sql:/docker-entrypoint-initdb.d/d-3-schema-updates.sql
@@ -176,9 +176,9 @@ services:
       - ../web-api/datasource/postgresql/member_profile.sql:/docker-entrypoint-initdb.d/e-2-member_profile.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-10-08_1_titles.sql:/docker-entrypoint-initdb.d/e-3-unset-titles.sql
       - ../web-api/datasource/postgresql/email_token.sql:/docker-entrypoint-initdb.d/e-4-schema-updates.sql
-      - ../web-api/datasource/postgresql/file_trees.sql:/docker-entrypoint-initdb.d/e-5-file_trees.sql
-      - ../web-api/datasource/postgresql/file_tree_items.sql:/docker-entrypoint-initdb.d/e-6-file_tree_items.sql
-      - ../web-api/datasource/postgresql/file_shares.sql:/docker-entrypoint-initdb.d/e-7-file_shares.sql
+      - ../web-api/datasource/postgresql/file_tree.sql:/docker-entrypoint-initdb.d/e-5-file_tree.sql
+      - ../web-api/datasource/postgresql/file_tree_item.sql:/docker-entrypoint-initdb.d/e-6-file_tree_item.sql
+      - ../web-api/datasource/postgresql/file_share.sql:/docker-entrypoint-initdb.d/e-7-file_share.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-10-22_invites.sql:/docker-entrypoint-initdb.d/e-8-schema-updates.sql
       - ../web-api/datasource/postgresql/event.sql:/docker-entrypoint-initdb.d/f-1-event.sql
       - ../web-api/datasource/postgresql/event_invite.sql:/docker-entrypoint-initdb.d/f-2-event_invite.sql

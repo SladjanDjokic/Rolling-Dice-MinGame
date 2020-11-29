@@ -389,7 +389,7 @@ class MemberDA(object):
         # settings.get('MEMBER_KEY')
         # store member personal info
         params_member = (pin, email, username, password, first_name,
-                         last_name, date_of_birth, company_name, job_title_id, 
+                         last_name, date_of_birth, company_name, job_title_id,
                          avatar_storage_id, department_id, main_file_tree_id, bin_file_tree_id)
         cls.source.execute(query_member, params_member)
         id = cls.source.get_last_row_id()
@@ -699,6 +699,77 @@ class MemberDA(object):
             return entry
         return None
 
+    @classmethod
+    def assign_tree(cls, tree_type, member_id, tree_id):
+        ''' 
+            This is used to assign a tree id to an existing members for migration purposes
+        '''
+        main_query = ("""
+            UPDATE member
+            SET main_file_tree = %s
+            WHERE id = %s
+        """)
+        bin_query = ("""
+            UPDATE member
+            SET bin_file_tree = %s
+            WHERE id = %s
+        """)
+        params = (tree_id, member_id)
+        query = main_query if tree_type == 'main' else bin_query
+        cls.source.execute(query, params)
+        cls.source.commit()
+        return True
+
+    @classmethod
+    def _get_all_members(cls):
+        members = list()
+        query = ("""
+            SELECT
+                id,
+                email,
+                create_date,
+                update_date,
+                username,
+                status,
+                first_name,
+                last_name,
+                main_file_tree,
+                bin_file_tree
+            FROM member
+        """)
+
+        cls.source.execute(query, None)
+        if cls.source.has_results():
+            for (
+                    member_id,
+                    email,
+                    create_date,
+                    update_date,
+                    username,
+                    status,
+                    first_name,
+                    last_name,
+                    main_file_tree,
+                    bin_file_tree
+            ) in cls.source.cursor:
+                member = {
+                    "member_id": member_id,
+                    "email": email,
+                    "create_date": create_date,
+                    "update_date": update_date,
+                    "username": username,
+                    "status": status,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "member_name": f'{first_name} {last_name}',
+                    "main_file_tree": main_file_tree,
+                    "bin_file_tree": bin_file_tree
+                }
+
+                members.append(member)
+
+        return members
+
 
 class MemberContactDA(object):
     source = source
@@ -739,7 +810,8 @@ class MemberContactDA(object):
         (filter_conditions_query, filter_conditions_params) = cls.formatFilterConditions(
             filter_params, contact_dict)
 
-        logger.debug(f"""filter params for contact members {filter_params} and filter_by_columns string {filter_conditions_query}{filter_conditions_params}""")
+        logger.debug(
+            f"""filter params for contact members {filter_params} and filter_by_columns string {filter_conditions_query}{filter_conditions_params}""")
         logger.debug('sorting params for contact members {} and sort_by_columns string {}'.format(
             sort_params, sort_columns_string))
         contacts = list()
@@ -1072,12 +1144,13 @@ class MemberContactDA(object):
         filter_conditions_query = ''
         filter_conditions_params = []
         for key in filter_by_dict:
-            filter_conditions_query = filter_conditions_query + (f""" and {entity_dict.get(key)} = %s""")
+            filter_conditions_query = filter_conditions_query + \
+                (f""" and {entity_dict.get(key)} = %s""")
             param = None
             # try:
             #     param = int(filter_by_dict[key][0])
             # except ValueError:
-                # param = filter_by_dict[key][0]
+            # param = filter_by_dict[key][0]
             param = filter_by_dict[key][0]
 
             filter_conditions_params.append(param)

@@ -18,15 +18,30 @@ class SessionDA (object):
     def auth(cls, username, password):
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query = ("""
-        SELECT id, email, first_name, last_name, username, status FROM member
+        SELECT 
+            id, 
+            email, 
+            first_name, 
+            last_name, 
+            username, 
+            status,
+            main_file_tree,
+            bin_file_tree
+        FROM member
         WHERE lower(username) = %s AND password = crypt(%s, password)
         """)
 
         params = (username.lower(), password)
         cls.source.execute(query, params)
         if cls.source.has_results():
-            (id, email, first_name, last_name, username,
-                status) = cls.source.cursor.fetchone()
+            (id,
+             email,
+             first_name,
+             last_name,
+             username,
+             status,
+             main_file_tree,
+             bin_tree_tree) = cls.source.cursor.fetchone()
 
             member = {
                 "id": id,
@@ -35,6 +50,8 @@ class SessionDA (object):
                 "last_name": last_name,
                 "username": username,
                 "status": status,
+                "main_file_tree": main_file_tree,
+                "bin_file_tree": bin_tree_tree
             }
 
             return member
@@ -259,7 +276,8 @@ class SessionDA (object):
                 'update_date': 'update_date',
                 'expiration_date': 'expiration_date'
             }
-            sort_columns_string = formatSortingParams(sort_params, session_dict) or sort_columns_string
+            sort_columns_string = formatSortingParams(
+                sort_params, session_dict) or sort_columns_string
         query = (f"""
             SELECT
                 session_id,
@@ -337,6 +355,7 @@ class SessionDA (object):
 
         return {"activities": sessions, "count": count}
 
+
 def formatSortingParams(sort_by, entity_dict):
     columns_list = sort_by.split(',')
     new_columns_list = list()
@@ -351,7 +370,7 @@ def formatSortingParams(sort_by, entity_dict):
         else:
             column = entity_dict.get(column)
             if column:
-                column= column + ' ASC'
+                column = column + ' ASC'
                 new_columns_list.append(column)
 
     return (',').join(column for column in new_columns_list)

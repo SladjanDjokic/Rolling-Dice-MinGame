@@ -181,7 +181,9 @@ class MemberFileCloud(object):
     def on_post(req, resp):
         session_id = get_session_cookie(req)
         session = validate_session(session_id)
+        logger.debug((f"Session, {session}"))
         member_id = session["member_id"]
+        logger.debug(f"Member id {member_id}")
         member = MemberDA().get_member(member_id)
 
         if not member:

@@ -494,7 +494,7 @@ class FileTreeDA(object):
     @classmethod
     def create_file_tree_entry(cls, tree_id, parent_id, member_file_id, display_name):
         query = ("""
-            INSERT into file_tree_items (tree_id, parent_id, member_file_id, display_name)
+            INSERT into file_tree_item (file_tree_id, parent_id, member_file_id, display_name)
             VALUES (%s, %s, %s, %s)
             RETURNING id
         """)
@@ -535,25 +535,25 @@ class FileTreeDA(object):
         '''
             We expect only the root node to have parent_id of NULL
             The two queries are the same except this part
-            LEFT JOIN file_tree_items ON >>>>> member.main_file_tree <<<<< = file_tree_items.tree_id
+            LEFT JOIN file_tree_item ON >>>>> member.main_file_tree <<<<< = file_tree_item.file_tree_id
         '''
         main_tree_query = ("""
             WITH RECURSIVE tree AS (
                 SELECT
-                    file_tree_items.id,
+                    file_tree_item.id,
                     parent_id,
                     member_file_id,
                     display_name,
-                    file_tree_items.update_date as node_update_date,
-                    file_tree_items.create_date as node_create_date,
+                    file_tree_item.update_date as node_update_date,
+                    file_tree_item.create_date as node_create_date,
                     0 AS level
                 FROM member
-                LEFT JOIN file_tree_items ON member.main_file_tree = file_tree_items.tree_id
-                LEFT JOIN member_file ON file_tree_items.member_file_id = member_file.id
+                LEFT JOIN file_tree_item ON member.main_file_tree = file_tree_item.file_tree_id
+                LEFT JOIN member_file ON file_tree_item.member_file_id = member_file.id
                 WHERE member.id = %s AND parent_id is null
                 UNION ALL
             SELECT ft.id, ft.parent_id, ft.member_file_id, ft.display_name, ft.update_date as  node_update_date, ft.create_date as node_create_date, tree.level + 1 AS level
-                FROM file_tree_items ft
+                FROM file_tree_item ft
                 JOIN tree ON ft.parent_id = tree.id
             )
             SELECT
@@ -569,8 +569,8 @@ class FileTreeDA(object):
 					SELECT json_agg(shares) as shared_with_individuals
 					FROM (
 						SELECT
-						  file_shares.id as share_id,
-						  file_shares.create_date as shared_date,
+						  file_share.id as share_id,
+						  file_share.create_date as shared_date,
 						  member.id as consumer_id,
 						  member.email as consumer_email,
 						  member.first_name as consumer_first_name,
@@ -578,9 +578,9 @@ class FileTreeDA(object):
 						  member.company_name as consumer_company_name,
 						  job_title.name as job_title,
 						  department.name as department
-						FROM file_shares
-						LEFT JOIN file_tree_items ON file_shares.target_node = file_tree_items.id
-						LEFT JOIN member ON file_tree_items.tree_id = member.main_file_tree
+						FROM file_share
+						LEFT JOIN file_tree_item ON file_share.target_node = file_tree_item.id
+						LEFT JOIN member ON file_tree_item.file_tree_id = member.main_file_tree
 						LEFT JOIN job_title ON member.job_title_id = job_title.id
 						LEFT JOIN department ON member.department_id = department.id
 						WHERE original_node = tree.id AND member.id IS NOT NULL
@@ -591,8 +591,8 @@ class FileTreeDA(object):
 					SELECT json_agg(shares) as shared_with_groups
 					FROM (
 						SELECT
-						  file_shares.id as share_id,
-						  file_shares.create_date as shared_date,
+						  file_share.id as share_id,
+						  file_share.create_date as shared_date,
 						  member_group.id as group_id,
 						  member_group.group_name as group_name,
 						  member_group.exchange_option as exchange_option,
@@ -602,9 +602,9 @@ class FileTreeDA(object):
 						  member.company_name as leader_company,
 						  job_title.name as job_title,
 						  department.name as department
-						FROM file_shares
-						LEFT JOIN file_tree_items ON file_shares.target_node = file_tree_items.id
-						LEFT JOIN member_group ON file_tree_items.tree_id = member_group.main_file_tree
+						FROM file_share
+						LEFT JOIN file_tree_item ON file_share.target_node = file_tree_item.id
+						LEFT JOIN member_group ON file_tree_item.file_tree_id = member_group.main_file_tree
 						LEFT JOIN member ON member_group.group_leader_id = member.id
 						LEFT JOIN job_title ON member.job_title_id = job_title.id
 						LEFT JOIN department ON member.department_id = department.id
@@ -617,8 +617,8 @@ class FileTreeDA(object):
 					FROM
 					(
 						SELECT
-						  file_shares.id as share_id,
-						  file_shares.create_date as shared_date,
+						  file_share.id as share_id,
+						  file_share.create_date as shared_date,
 						  member.id as sharer_id,
 						  member.email as sharer_email,
 						  member.first_name as sharer_first_name,
@@ -626,9 +626,9 @@ class FileTreeDA(object):
 						  member.company_name as sharer_company_name,
 						  job_title.name as job_title,
 						  department.name as department
-						FROM file_shares
-						LEFT JOIN file_tree_items ON file_shares.original_node = file_tree_items.id
-						LEFT JOIN member ON file_tree_items.tree_id = member.main_file_tree
+						FROM file_share
+						LEFT JOIN file_tree_item ON file_share.original_node = file_tree_item.id
+						LEFT JOIN member ON file_tree_item.file_tree_id = member.main_file_tree
 						LEFT JOIN job_title ON member.job_title_id = job_title.id
 						LEFT JOIN department ON member.department_id = department.id
 						WHERE target_node = tree.id
@@ -647,20 +647,20 @@ class FileTreeDA(object):
         bin_tree_query = ("""
             WITH RECURSIVE tree AS (
                 SELECT
-                    file_tree_items.id,
+                    file_tree_item.id,
                     parent_id,
                     member_file_id,
                     display_name,
-                    file_tree_items.update_date as node_update_date,
-                    file_tree_items.create_date as node_create_date,
+                    file_tree_item.update_date as node_update_date,
+                    file_tree_item.create_date as node_create_date,
                     0 AS level
                 FROM member
-                LEFT JOIN file_tree_items ON member.bin_file_tree = file_tree_items.tree_id
-                LEFT JOIN member_file ON file_tree_items.member_file_id = member_file.id
+                LEFT JOIN file_tree_item ON member.bin_file_tree = file_tree_item.file_tree_id
+                LEFT JOIN member_file ON file_tree_item.member_file_id = member_file.id
                 WHERE member.id = %s AND parent_id is null
                 UNION ALL
             SELECT ft.id, ft.parent_id, ft.member_file_id, ft.display_name, ft.update_date as node_update_date, ft.create_date as node_create_date, tree.level + 1 AS level
-                FROM file_tree_items ft
+                FROM file_tree_item ft
                 JOIN tree ON ft.parent_id = tree.id
             )
             SELECT
@@ -676,8 +676,8 @@ class FileTreeDA(object):
 					SELECT json_agg(shares) as shared_with_individuals
 					FROM (
 						SELECT
-						  file_shares.id as share_id,
-						  file_shares.create_date as shared_date,
+						  file_share.id as share_id,
+						  file_share.create_date as shared_date,
 						  member.id as consumer_id,
 						  member.email as consumer_email,
 						  member.first_name as consumer_first_name,
@@ -685,9 +685,9 @@ class FileTreeDA(object):
 						  member.company_name as consumer_company_name,
 						  job_title.name as job_title,
 						  department.name as department
-						FROM file_shares
-						LEFT JOIN file_tree_items ON file_shares.target_node = file_tree_items.id
-						LEFT JOIN member ON file_tree_items.tree_id = member.main_file_tree
+						FROM file_share
+						LEFT JOIN file_tree_item ON file_share.target_node = file_tree_item.id
+						LEFT JOIN member ON file_tree_item.file_tree_id = member.main_file_tree
 						LEFT JOIN job_title ON member.job_title_id = job_title.id
 						LEFT JOIN department ON member.department_id = department.id
 						WHERE original_node = tree.id AND member.id IS NOT NULL
@@ -698,8 +698,8 @@ class FileTreeDA(object):
 					SELECT json_agg(shares) as shared_with_groups
 					FROM (
 						SELECT
-						  file_shares.id as share_id,
-						  file_shares.create_date as shared_date,
+						  file_share.id as share_id,
+						  file_share.create_date as shared_date,
 						  member_group.id as group_id,
 						  member_group.group_name as group_name,
 						  member_group.exchange_option as exchange_option,
@@ -709,9 +709,9 @@ class FileTreeDA(object):
 						  member.company_name as leader_company,
 						  job_title.name as job_title,
 						  department.name as department
-						FROM file_shares
-						LEFT JOIN file_tree_items ON file_shares.target_node = file_tree_items.id
-						LEFT JOIN member_group ON file_tree_items.tree_id = member_group.main_file_tree
+						FROM file_share
+						LEFT JOIN file_tree_item ON file_share.target_node = file_tree_item.id
+						LEFT JOIN member_group ON file_tree_item.file_tree_id = member_group.main_file_tree
 						LEFT JOIN member ON member_group.group_leader_id = member.id
 						LEFT JOIN job_title ON member.job_title_id = job_title.id
 						LEFT JOIN department ON member.department_id = department.id
@@ -724,8 +724,8 @@ class FileTreeDA(object):
 					FROM
 					(
 						SELECT
-						  file_shares.id as share_id,
-						  file_shares.create_date as shared_date,
+						  file_share.id as share_id,
+						  file_share.create_date as shared_date,
 						  member.id as shared_id,
 						  member.email as sharer_email,
 						  member.first_name as sharer_first_name,
@@ -733,9 +733,9 @@ class FileTreeDA(object):
 						  member.company_name as sharer_company_name,
 						  job_title.name as job_title,
 						  department.name as department
-						FROM file_shares
-						LEFT JOIN file_tree_items ON file_shares.original_node = file_tree_items.id
-						LEFT JOIN member ON file_tree_items.tree_id = member.main_file_tree
+						FROM file_share
+						LEFT JOIN file_tree_item ON file_share.original_node = file_tree_item.id
+						LEFT JOIN member ON file_tree_item.file_tree_id = member.main_file_tree
 						LEFT JOIN job_title ON member.job_title_id = job_title.id
 						LEFT JOIN department ON member.department_id = department.id
 						WHERE target_node = tree.id
@@ -748,7 +748,7 @@ class FileTreeDA(object):
                 tree.node_create_date as node_createDate
             FROM tree
             LEFT JOIN member_file ON tree.member_file_id =member_file.id
-            LEFT JOIN file_storage_engine ON member_file.file_id = file_storage_engine.ID
+            LEFT JOIN file_storage_engine ON member_file.file_id = file_storage_engine.id
             ORDER BY level, display_name
         """)
 
@@ -800,20 +800,20 @@ class FileTreeDA(object):
         main_tree_query = ("""
          WITH RECURSIVE tree AS (
                 SELECT
-                    file_tree_items.id,
+                    file_tree_item.id,
                     parent_id,
                     member_file_id,
                     display_name,
-                    file_tree_items.update_date as node_update_date,
-                    file_tree_items.create_date as node_create_date,
+                    file_tree_item.update_date as node_update_date,
+                    file_tree_item.create_date as node_create_date,
                     0 AS level
                 FROM member_group
-                LEFT JOIN file_tree_items ON member_group.main_file_tree = file_tree_items.tree_id
-                LEFT JOIN member_file ON file_tree_items.member_file_id = member_file.id
+                LEFT JOIN file_tree_item ON member_group.main_file_tree = file_tree_item.file_tree_id
+                LEFT JOIN member_file ON file_tree_item.member_file_id = member_file.id
                 WHERE member_group.id = %s AND parent_id is null
                 UNION ALL
             SELECT ft.id, ft.parent_id, ft.member_file_id, ft.display_name, ft.update_date as  node_update_date, ft.create_date as node_create_date, tree.level + 1 AS level
-                FROM file_tree_items ft
+                FROM file_tree_item ft
                 JOIN tree ON ft.parent_id = tree.id
             )
             SELECT
@@ -830,8 +830,8 @@ class FileTreeDA(object):
 					FROM
 					(
 						SELECT
-						  file_shares.id as share_id,
-						  file_shares.create_date as shared_date,
+						  file_share.id as share_id,
+						  file_share.create_date as shared_date,
 						  member.id as sharer_id,
 						  member.email as sharer_email,
 						  member.first_name as sharer_first_name,
@@ -839,9 +839,9 @@ class FileTreeDA(object):
 						  member.company_name as sharer_company_name,
 						  job_title.name as job_title,
 						  department.name as department
-						FROM file_shares
-						LEFT JOIN file_tree_items ON file_shares.original_node = file_tree_items.id
-						LEFT JOIN member ON file_tree_items.tree_id = member.main_file_tree
+						FROM file_share
+						LEFT JOIN file_tree_item ON file_share.original_node = file_tree_item.id
+						LEFT JOIN member ON file_tree_item.file_tree_id = member.main_file_tree
 						LEFT JOIN job_title ON member.job_title_id = job_title.id
 						LEFT JOIN department ON member.department_id = department.id
 						WHERE target_node = tree.id
@@ -861,20 +861,20 @@ class FileTreeDA(object):
         bin_tree_query = ("""
          WITH RECURSIVE tree AS (
                 SELECT
-                    file_tree_items.id,
+                    file_tree_item.id,
                     parent_id,
                     member_file_id,
                     display_name,
-                    file_tree_items.update_date as node_update_date,
-                    file_tree_items.create_date as node_create_date,
+                    file_tree_item.update_date as node_update_date,
+                    file_tree_item.create_date as node_create_date,
                     0 AS level
                 FROM member_group
-                LEFT JOIN file_tree_items ON member_group.bin_file_tree = file_tree_items.tree_id
-                LEFT JOIN member_file ON file_tree_items.member_file_id = member_file.id
+                LEFT JOIN file_tree_item ON member_group.bin_file_tree = file_tree_item.file_tree_id
+                LEFT JOIN member_file ON file_tree_item.member_file_id = member_file.id
                 WHERE member_group.id = %s AND parent_id is null
                 UNION ALL
             SELECT ft.id, ft.parent_id, ft.member_file_id, ft.display_name, ft.update_date as  node_update_date, ft.create_date as node_create_date, tree.level + 1 AS level
-                FROM file_tree_items ft
+                FROM file_tree_item ft
                 JOIN tree ON ft.parent_id = tree.id
             )
             SELECT
@@ -891,8 +891,8 @@ class FileTreeDA(object):
 					FROM
 					(
 						SELECT
-						  file_shares.id as share_id,
-						  file_shares.create_date as shared_date,
+						  file_share.id as share_id,
+						  file_share.create_date as shared_date,
 						  member.id as sharer_id,
 						  member.email as sharer_email,
 						  member.first_name as sharer_first_name,
@@ -900,9 +900,9 @@ class FileTreeDA(object):
 						  member.company_name as sharer_company_name,
 						  job_title.name as job_title,
 						  department.name as department
-						FROM file_shares
-						LEFT JOIN file_tree_items ON file_shares.original_node = file_tree_items.id
-						LEFT JOIN member ON file_tree_items.tree_id = member.main_file_tree
+						FROM file_share
+						LEFT JOIN file_tree_item ON file_share.original_node = file_tree_item.id
+						LEFT JOIN member ON file_tree_item.file_tree_id = member.main_file_tree
 						LEFT JOIN job_title ON member.job_title_id = job_title.id
 						LEFT JOIN department ON member.department_id = department.id
 						WHERE target_node = tree.id
@@ -985,8 +985,8 @@ class FileTreeDA(object):
     @classmethod
     def get_tree_root_id(cls, tree_id):
         query = ("""
-            SELECT id FROM file_tree_items
-            WHERE is_tree_root = TRUE AND tree_id = %s
+            SELECT id FROM file_tree_item
+            WHERE is_tree_root = TRUE AND file_tree_id = %s
         """)
         params = (tree_id,)
         cls.source.execute(query, params)
@@ -994,25 +994,32 @@ class FileTreeDA(object):
         return root_id
 
     @classmethod
-    def create_tree(cls, tree_type):
+    def create_tree(cls, tree_type, target_type):
         '''
             We use to create empty trees (having only root folders) when member is created
             tree id is returned to be written in member table
         '''
         query = ("""
             WITH rows AS (
-                INSERT INTO file_trees (type) VALUES (%s) RETURNING id
+                INSERT INTO file_tree (type) VALUES (%s) RETURNING id
             )
 
-            INSERT INTO file_tree_items (tree_id, is_tree_root, display_name)
+            INSERT INTO file_tree_item (file_tree_id, is_tree_root, display_name)
                 SELECT
                     id,
                     TRUE,
                     %s
                 FROM rows
-                RETURNING tree_id
+                RETURNING file_tree_id
         """)
-        params = (tree_type, 'My Files' if tree_type == 'main' else 'Bin')
+        if tree_type == 'main':
+            if target_type == 'member':
+                node_name = 'My files'
+            elif target_type == 'group':
+                node_name = 'Group Files'
+        elif tree_type == 'bin':
+            node_name = 'Bin'
+        params = (tree_type, node_name)
         cls.source.execute(query, params)
         (tree_id,) = cls.source.cursor.fetchone()
         cls.source.commit()
@@ -1027,25 +1034,25 @@ class FileTreeDA(object):
         query = ("""
              WITH RECURSIVE tree AS (
                 SELECT
-                    file_tree_items.id,
+                    file_tree_item.id,
                     parent_id,
                     0 AS level
-                FROM file_tree_items
+                FROM file_tree_item
                 WHERE id = %s
                 UNION ALL
             SELECT ft.id, ft.parent_id, tree.level + 1 AS level
-                FROM file_tree_items ft
+                FROM file_tree_item ft
                 JOIN tree ON ft.parent_id = tree.id
             )
-            UPDATE file_tree_items
+            UPDATE file_tree_item
                 SET tree_id = %s
                 WHERE id IN (SELECT id FROM tree ORDER BY level);
 
-            UPDATE file_tree_items
+            UPDATE file_tree_item
             -- 	this is the bin root
                 SET parent_id = sq.bin_root_id
                 FROM (SELECT id AS bin_root_id
-                    FROM file_tree_items WHERE parent_id IS NULL AND tree_id=%s) as sq
+                    FROM file_tree_item WHERE parent_id IS NULL AND file_tree_id=%s) as sq
                 WHERE id=%s;
         """)
         params = (branch_root_id, bin_tree_id, bin_tree_id, branch_root_id)
@@ -1060,25 +1067,25 @@ class FileTreeDA(object):
         query = ("""
             WITH RECURSIVE tree AS (
                 SELECT
-                    file_tree_items.id,
+                    file_tree_item.id,
                     parent_id,
                     0 AS level
-                FROM file_tree_items
+                FROM file_tree_item
                 WHERE id = %s
                 UNION ALL
             SELECT ft.id, ft.parent_id, tree.level + 1 AS level
-                FROM file_tree_items ft
+                FROM file_tree_item ft
                 JOIN tree ON ft.parent_id = tree.id
             )
-            UPDATE file_tree_items
-                SET tree_id = %s
+            UPDATE file_tree_item
+                SET file_tree_id = %s
                 WHERE id IN (SELECT id FROM tree ORDER BY level);
 
-            UPDATE file_tree_items
+            UPDATE file_tree_item
             -- 	this is the main root
                 SET parent_id = sq.main_root_id
                 FROM (SELECT id AS main_root_id
-                    FROM file_tree_items WHERE parent_id IS NULL AND tree_id=%s) as sq
+                    FROM file_tree_item WHERE parent_id IS NULL AND file_tree_id=%s) as sq
                 WHERE id=%s;
         """)
         params = (branch_root_id, main_tree_id, main_tree_id, branch_root_id)
@@ -1087,26 +1094,26 @@ class FileTreeDA(object):
 
     @classmethod
     def delete_branch_forever(cls, branch_root_id):
-        '''Deletes member_file entries and file_tree_items entries'''
+        '''Deletes member_file entries and file_tree_item entries'''
         query = ("""
              WITH RECURSIVE tree AS (
                 SELECT
-                    file_tree_items.id,
+                    file_tree_item.id,
                     parent_id,
 	 				member_file_id,
                     0 AS level
-                FROM file_tree_items
+                FROM file_tree_item
                 WHERE id = %s
                 UNION ALL
             SELECT ft.id, ft.parent_id, ft.member_file_id, tree.level + 1 AS level
-                FROM file_tree_items ft
+                FROM file_tree_item ft
                 JOIN tree ON ft.parent_id = tree.id
             )
 
             DELETE FROM member_file
             WHERE id IN (SELECT member_file_id FROM tree);
 
-            DELETE FROM file_tree_items
+            DELETE FROM file_tree_item
             WHERE id=%s
         """)
         params = (branch_root_id, branch_root_id)
@@ -1117,7 +1124,7 @@ class FileTreeDA(object):
     def modify_branch(cls, branch_root_id, display_name, parent_id):
         ''' Changes name and/or location of a branch'''
         query = ('''
-            UPDATE file_tree_items
+            UPDATE file_tree_item
             SET
                 display_name = %s,
                 parent_id = %s
@@ -1135,18 +1142,18 @@ class FileTreeDA(object):
         get_branch_query = ('''
             WITH RECURSIVE tree AS (
                 SELECT 
-                    file_tree_items.id as original_node_id, 
+                    file_tree_item.id as original_node_id, 
                     parent_id as original_parent_id, 
                     member_file_id,
                     display_name, 
                     0 AS level
                 FROM member
-                LEFT JOIN file_tree_items ON member.main_file_tree = file_tree_items.tree_id
-                LEFT JOIN member_file ON file_tree_items.member_file_id = member_file.id
-                WHERE member.id = %s AND file_tree_items.id = %s
+                LEFT JOIN file_tree_item ON member.main_file_tree = file_tree_item.file_tree_id
+                LEFT JOIN member_file ON file_tree_item.member_file_id = member_file.id
+                WHERE member.id = %s AND file_tree_item.id = %s
                 UNION ALL
             SELECT ft.id, ft.parent_id, ft.member_file_id, ft.display_name, tree.level + 1 AS level
-                FROM file_tree_items ft
+                FROM file_tree_item ft
                 JOIN tree ON ft.parent_id = tree.original_node_id
             )
             SELECT * FROM tree
@@ -1200,7 +1207,7 @@ class FileTreeDA(object):
     @classmethod
     def create_share_entry(cls, original_node_id, target_node_id):
         query = ('''
-            INSERT INTO file_shares (original_node, target_node) VALUES (%s,%s)
+            INSERT INTO file_share (original_node, target_node) VALUES (%s,%s)
         ''')
         params = (original_node_id, target_node_id,)
         cls.source.execute(query, params)
@@ -1210,8 +1217,8 @@ class FileTreeDA(object):
     def unshare_node(cls, share_id):
         ''' This will automatically delete file_shares entry due to ON DELETE CASCADE constraint'''
         query = ('''
-            DELETE FROM file_tree_items 
-            WHERE id IN (SELECT target_node FROM file_shares WHERE id = %s)
+            DELETE FROM file_tree_item 
+            WHERE id IN (SELECT target_node FROM file_share WHERE id = %s)
         ''')
         params = (share_id,)
         cls.source.execute(query, params)
@@ -1249,18 +1256,18 @@ class FileTreeDA(object):
         get_branch_query = ('''
              WITH RECURSIVE tree AS (
                 SELECT 
-                    file_tree_items.id as original_node_id, 
+                    file_tree_item.id as original_node_id, 
                     parent_id as original_parent_id, 
                     member_file_id,
                     display_name, 
                     0 AS level
                 FROM member
-                LEFT JOIN file_tree_items ON member.main_file_tree = file_tree_items.tree_id
-                LEFT JOIN member_file ON file_tree_items.member_file_id = member_file.id
-                WHERE member.id = %s AND file_tree_items.id = %s
+                LEFT JOIN file_tree_item ON member.main_file_tree = file_tree_item.file_tree_id
+                LEFT JOIN member_file ON file_tree_item.member_file_id = member_file.id
+                WHERE member.id = %s AND file_tree_item.id = %s
                 UNION ALL
             SELECT ft.id, ft.parent_id, ft.member_file_id, ft.display_name, tree.level + 1 AS level
-                FROM file_tree_items ft
+                FROM file_tree_item ft
                 JOIN tree ON ft.parent_id = tree.original_node_id
             )
             SELECT * FROM tree
