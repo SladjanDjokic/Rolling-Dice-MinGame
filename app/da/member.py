@@ -17,6 +17,19 @@ class MemberDA(object):
     source = source
 
     @classmethod
+    def member_exists(cls, member_id):
+        check_query = """
+            SELECT EXISTS(
+                SELECT id FROM member WHERE id = %s
+            );
+        """
+        cls.source.execute(check_query, (member_id, ))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        else:
+            return False
+
+    @classmethod
     def get_member(cls, member_id):
         return cls.__get_member('id', member_id)
 
@@ -1476,9 +1489,9 @@ class MemberInfoDA(object):
                     first_name = %s,
                     middle_name = %s,
                     last_name = %s,
-                    company_name =%s,
-                    job_title_id =%s,
-                    department_id=%s
+                    company_name = %s,
+                    job_title_id = %s,
+                    department_id = %s
                 WHERE id = %s
             """)
 
@@ -1505,9 +1518,9 @@ class MemberInfoDA(object):
             member_achievement_update_query = ("""
                 UPDATE member_achievement
                 SET
-                    entity=%s,
-                    description=%s,
-                    display_order=%s
+                    entity = %s,
+                    description = %s,
+                    display_order = %s
                 WHERE id=%s AND member_id=%s;
             """)
             member_achievement_insert_query = ("""
@@ -1521,39 +1534,39 @@ class MemberInfoDA(object):
             """)
 
             if member_achievement:
-                achievemnt_ids_to_stay = list()
+                achievement_ids_to_stay = list()
                 for achievement in member_achievement:
                     if achievement:
-                        id, entity, description, display_order = [
+                        id_, entity, description, display_order = [
                             achievement[k] for k in ('id', 'entity', 'description', 'display_order')]
-                        if (type(id) == int):
+                        if type(id_) == int:
                             cls.source.execute(
-                                member_achievement_update_query, (entity, description, display_order, id, member_id))
-                            achievemnt_ids_to_stay.append(id)
+                                member_achievement_update_query, (entity, description, display_order, id_, member_id))
+                            achievement_ids_to_stay.append(id_)
                         else:
                             cls.source.execute(
                                 member_achievement_insert_query, (entity, description, display_order, member_id))
-                            achievemnt_ids_to_stay.append(
+                            achievement_ids_to_stay.append(
                                 cls.source.get_last_row_id())
                         cls.source.commit()
                 # Track what was deleted in the UI and kill it in db as well
                 cls.source.execute(member_achievement_delete_query,
-                                   (member_id, achievemnt_ids_to_stay))
+                                   (member_id, achievement_ids_to_stay))
                 cls.source.commit()
 
             # Member contact 2
             member_contact_2_update_query = ("""
                 UPDATE member_contact_2
                 SET
-                    description=%s,
-                    device_type=%s,
-                    device_country=%s,
-                    device=%s,
-                    method_type=%s,
-                    display_order=%s,
-                    primary_contact=%s,
+                    description = %s,
+                    device_type = %s,
+                    device_country = %s,
+                    device = %s,
+                    method_type = %s,
+                    display_order = %s,
+                    primary_contact = %s,
                     device_confirm_date=CURRENT_TIMESTAMP
-                WHERE id=%s AND member_id=%s;
+                WHERE id = %s AND member_id = %s;
             """)
             member_contact_2_insert_query = ("""
                 INSERT INTO member_contact_2 (description, device_type, device_country, device, method_type, display_order, primary_contact, device_confirm_date, member_id)
@@ -1569,12 +1582,12 @@ class MemberInfoDA(object):
                 contact_ids_to_stay = list()
                 for contact in member_contact_2:
                     if contact:
-                        id, description, device_type, device_country, device, method_type, display_order, primary_contact = [
+                        id_, description, device_type, device_country, device, method_type, display_order, primary_contact = [
                             contact[k] for k in ('id', 'description', 'device_type', 'device_country', 'device', 'method_type', 'display_order', 'primary_contact')]
-                        if (type(id) == int):
+                        if (type(id_) == int):
                             cls.source.execute(
-                                member_contact_2_update_query, (description, device_type, device_country, device, method_type, display_order, primary_contact, id, member_id))
-                            contact_ids_to_stay.append(id)
+                                member_contact_2_update_query, (description, device_type, device_country, device, method_type, display_order, primary_contact, id_, member_id))
+                            contact_ids_to_stay.append(id_)
                         else:
                             cls.source.execute(
                                 member_contact_2_insert_query, (description, device_type, device_country, device, method_type, display_order, primary_contact, member_id))
@@ -1590,16 +1603,16 @@ class MemberInfoDA(object):
             member_location_update_query = ("""
                 UPDATE member_location
                 SET
-                    address_1=%s,
-                    street=%s,
-                    address_2=%s,
-                    city=%s,
-                    state=%s,
-                    province=%s,
-                    postal=%s,
-                    country=%s,
-                    country_code_id=%s,
-                    location_type=%s
+                    address_1 = %s,
+                    street = %s,
+                    address_2 = %s,
+                    city = %s,
+                    state = %s,
+                    province = %s,
+                    postal = %s,
+                    country = %s,
+                    country_code_id = %s,
+                    location_type = %s
                 WHERE id=%s AND member_id = %s;
             """)
             member_location_insert_query = ("""
@@ -1616,13 +1629,13 @@ class MemberInfoDA(object):
                 location_ids_to_stay = list()
                 for location in member_location:
                     if location:
-                        id, street, address_1, address_2, city, state, province, postal, country, country_code_id, location_type = [
+                        id_, street, address_1, address_2, city, state, province, postal, country, country_code_id, location_type = [
                             location[k] for k in ('id', 'street', 'address_1', 'address_2', 'city', 'state', 'province', 'postal', 'country', 'country_code_id', 'location_type')]
 
-                    if (type(id) == int):
+                    if type(id_) == int:
                         cls.source.execute(
-                            member_location_update_query, (address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, id, member_id))
-                        location_ids_to_stay.append(id)
+                            member_location_update_query, (address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, id_, member_id))
+                        location_ids_to_stay.append(id_)
                     else:
                         cls.source.execute(
                             member_location_insert_query, (address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, member_id))

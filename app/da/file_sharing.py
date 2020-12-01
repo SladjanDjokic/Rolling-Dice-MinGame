@@ -9,7 +9,7 @@ from urllib.parse import urlparse, urljoin
 import secrets
 import logging
 import boto3
-from botocore.exceptions import NoCredentialsError  # , ClientError
+from botocore.exceptions import NoCredentialsError, ClientError  # , ClientError
 
 from app.util.db import source
 from app.util.filestorage import amerize_url
@@ -367,8 +367,8 @@ class FileStorageDA(object):
         try:
             if commit:
                 cls.source.commit()
-                return True
-        finally:
+            return True
+        except Exception as e:
             return False
 
     @classmethod
@@ -485,6 +485,22 @@ class FileStorageDA(object):
             return s3_response
         except Exception as e:
             raise e
+
+    @classmethod
+    def get_download_url_for_object(cls, file_key, bucket=None):
+        if not bucket:
+            bucket = settings.get("storage.s3.bucket")
+        logger.debug(f"GET DOWNLOAD URL PARAMETERS:\n{file_key}\n{bucket}")
+        s3 = cls.aws_s3_client()
+        # Generate the URL to get 'key-name' from 'bucket-name'
+        url = s3.generate_presigned_url(
+            ClientMethod='get_object',
+            Params={
+                'Bucket': bucket,
+                'Key': file_key
+            }
+        )
+        return url
 
 
 class FileTreeDA(object):

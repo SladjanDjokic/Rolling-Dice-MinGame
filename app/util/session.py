@@ -45,7 +45,7 @@ def set_session_cookie(req, resp, session_id, expiration_datetime=None):
     domains = settings.get("web.domains")
     logger.debug(f"REQUEST_DOMAIN: {request_domain}")
     logger.debug(f"ALLOWED_DOMAINS: {pformat(domains)}")
-    domains = next((d for d in domains if d in request_domain))
+    domains = next((d for d in domains if d in request_domain), None)
     logger.debug(f"DOMAINS FOUND: {domains}")
     cookie_domain = default_domain
     if domains:

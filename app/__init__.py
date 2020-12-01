@@ -22,7 +22,8 @@ from app.resources.logout import MemberLogoutResource
 from app.resources.session import SessionResource, ValidateSessionResource
 from app.resources.file_download import FileDownloadResource
 from app.resources.file_sharing import FileStorage, FileStorageDetail, ShareFile, ShareFileDetail, \
-    DownloadStorageFile, DownloadSharedFile, MemberFileCloud, MemberFileBin, MemberShareFile, GroupFileCloud, GroupFileBin
+    DownloadStorageFile, DownloadSharedFile, MemberFileCloud, MemberFileBin, MemberShareFile, GroupFileCloud, \
+    GroupFileBin
 from app.resources.group import MemberGroupResource, GroupMembershipResource, GroupDetailResource, \
     GroupMemberInviteResource, GroupMembersResource
 from app.resources.file_sharing import FileStorage, FileStorageDetail, \
@@ -37,6 +38,8 @@ from app.resources.member_schedule_holiday import MemberScheduleHolidayResource
 from app.resources.member_schedule_event_invite import MemberScheduleEventInviteResource, \
     MemberScheduleEventInviteAddSingleResource, MemberScheduleEventInviteSetStatusResource
 from app.resources.country import CountryCodeResource
+from app.resources.mail import MailDraftComposeResource, MailAttachmentResource, MailInboxResource, MailStaredResource, \
+    MailTrashResource, MailArchiveResource, MailSettingsResource
 from app.resources.role import RolesResource
 from app.resources.avatar import AvatarResource
 # from app.resources.memberfile import MemberFile
@@ -47,10 +50,12 @@ from app.da.__init__ import check_trees
 from app.util.config import setup_vyper
 from app.util.error import error_handler
 from app.util.logging import setup_logging
+
 # from app.util.auth import validate_token
 
 
 logger = logging.getLogger(__name__)
+
 
 # auth_backend = TokenAuthBackend(validate_token)
 
@@ -175,3 +180,51 @@ def _setup_routes(app):
     app.add_route("/member/register/country", CountryCodeResource())
     app.add_route("/member/role", RolesResource())
     app.add_route("/member/avatar", AvatarResource())
+
+    # Draft
+    draft_resource = MailDraftComposeResource()
+    app.add_route("/mail/draft", draft_resource)    # POST
+    app.add_route("/mail/draft/list", draft_resource, suffix="list")     # GET
+    app.add_route("/mail/draft/{mail_id}", draft_resource, suffix="draft")  # DELETE
+    app.add_route("/mail/draft/get/{mail_id}", draft_resource, suffix="detail")  # GET
+    app.add_route("/mail/draft/send", draft_resource, suffix="send")    # POST
+
+    # Attachment
+    attach_resource = MailAttachmentResource()
+    app.add_route("/mail/attach", attach_resource)
+    app.add_route("/mail/attach/{mail_id}/{attachment_id}", attach_resource, suffix="attachment")
+
+    # Inbox
+    mail_inbox_resource = MailInboxResource()
+    app.add_route("/mail/inbox", mail_inbox_resource, suffix="list")
+    app.add_route("/mail/{mail_id}", mail_inbox_resource, suffix="detail")
+    app.add_route("/mail/forward", mail_inbox_resource, suffix="forward")
+
+    # Star
+    mail_star_resource = MailStaredResource()
+    app.add_route("/mail/star", mail_star_resource)  # POST
+    app.add_route("/mail/star/list", mail_star_resource, suffix="list")  # GET
+    app.add_route("/mail/star/{mail_id}", mail_star_resource, suffix="detail")
+
+    # Trash
+    mail_trash_resource = MailTrashResource()
+    app.add_route("/mail/trash", mail_trash_resource)  # POST - Add to trash
+    app.add_route("/mail/trash/list", mail_trash_resource, suffix="list")  # GET - Trash list
+    app.add_route("/mail/trash/{mail_id}", mail_trash_resource, suffix="detail")    # GET - Trash mail detail
+    #                                                                                 DELETE - delete email for ever
+    app.add_route("/mail/trash/mv/origin", mail_trash_resource, suffix="remove")    # POST - move mail to origin
+    app.add_route("/mail/trash/mv/archive", mail_trash_resource, suffix="archive")  # POST - Add to archive
+
+    # Archive
+    mail_archive_resource = MailArchiveResource()
+    app.add_route("/mail/archive", mail_archive_resource)  # POST - Add to trash
+    app.add_route("/mail/archive/list", mail_archive_resource, suffix="list")  # GET - Trash list
+    app.add_route("/mail/archive/{mail_id}", mail_archive_resource, suffix="detail")    # GET - Trash mail detail
+    #                                                                                 DELETE - delete email for ever
+    app.add_route("/mail/archive/mv/origin", mail_archive_resource, suffix="remove")    # POST - move mail to origin
+    app.add_route("/mail/archive/mv/trash", mail_archive_resource, suffix="trash")  # POST - Add to archive
+
+    # Signature
+    mail_sign_resource = MailSettingsResource()
+    app.add_route("/mail/sign", mail_sign_resource, suffix="settings")    # POST - move mail to origin
+    app.add_route("/mail/sign/list", mail_sign_resource, suffix="list")  # POST - Add to archive

@@ -49,11 +49,6 @@ def send_mail(to_email, subject, template,
         logger.debug("No FROM EMAIL passed, using settings")
         logger.debug("From_email: {}".format(from_email))
 
-    message = MIMEMultipart()
-    message["Subject"] = subject
-    message["From"] = from_email
-    message["To"] = to_email
-
     data.update({
         "product_name": "AMERA Share"
     })
@@ -64,8 +59,23 @@ def send_mail(to_email, subject, template,
     html_content = get_rendered_template("{}.html".format(template), data)
     logger.debug("HTML Email: {}".format(html_content))
 
-    message.attach(MIMEText(text_content, "plain"))
-    # message.attach(MIMEText(html_content, "html"))
+    send_text_email_with_content_type(from_email, to_email, subject, [
+        (text_content, "plain"),
+        # (html_content, "html")
+    ])
+
+
+def send_text_email_with_content_type(from_m, to_m, subject, parts=None):
+    if parts is None:
+        parts = list()
+    message = MIMEMultipart()
+    message["Subject"] = subject
+    message["From"] = from_m
+    message["To"] = to_m
+    for (part_data, part_type) in parts:
+        message.attach(MIMEText(part_data, "plain"))
+        if part_type == "html":
+           message.attach(MIMEText(part_data, "html"))
 
     msgBody = message.as_string()
 
@@ -76,12 +86,12 @@ def send_mail(to_email, subject, template,
 
     # # Create a secure SSL context
     # context = ssl.create_default_context()
-
+    server = None
     try:
         server = smtplib.SMTP_SSL(settings.get("smtp.server"))
         server.login(settings.get("smtp.user"), settings.get("smtp.password"))
         # server = smtplib.SMTP("localhost")
-        server.sendmail(from_email, to_email, msgBody)
+        server.sendmail(from_m, to_m, msgBody)
     except AttributeError:
         logger.exception("Unable to authenticate with SMTP server, "
                          "most likely PASSWORD is Empty in config and "
