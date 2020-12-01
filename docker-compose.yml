@@ -183,14 +183,13 @@ services:
       - ../web-api/datasource/postgresql/event.sql:/docker-entrypoint-initdb.d/f-1-event.sql
       - ../web-api/datasource/postgresql/event_invite.sql:/docker-entrypoint-initdb.d/f-2-event_invite.sql
       - ../web-api/datasource/postgresql/event_reschedule.sql:/docker-entrypoint-initdb.d/f-3-event_reschedule.sql
+      - ../web-api/datasource/postgresql/mail-tables.sql:/docker-entrypoint-initdb.d/f-4-mail-tables.sql
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/z-3-test-schedule.sql
       - ../web-api/datasource/postgresql/test-amera-tos.dev.sql:/docker-entrypoint-initdb.d/z-4-test-amera-tos.dev.sql.sql
       - ../web-api/datasource/postgresql/test-promo-codes.dev.sql:/docker-entrypoint-initdb.d/z-5-test-promo-codes.dev.sql
       - ../web-api/datasource/postgresql/test-achievements.dev.sql:/docker-entrypoint-initdb.d/z-6-test-achievements.dev.sql
-      - ../web-api/datasource/postgresql/mail-tables.sql:/docker-entrypoint-initdb.d/z-7-mail-tables.sql
-      - ../web-api/datasource/postgresql/message-2.sql:/docker-entrypoint-initdb.d/z-8-message-2.sql
       - ../web-api/datasource/postgresql/test-fileshare.sql:/docker-entrypoint-initdb.d/z-7-test-fileshare.dev.sql
       - ../web-api/datasource/postgresql/test-event.dev.sql:/docker-entrypoint-initdb.d/z-8-test-event.dev.sql
     environment:
