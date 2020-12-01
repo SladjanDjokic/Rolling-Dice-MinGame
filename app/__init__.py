@@ -8,7 +8,7 @@ from app.config import parser, settings
 from app.middleware import CrossDomain  # , JSONTranslator
 from app.resources.member import MemberRegisterResource, MemberResource, MemberSearchResource, \
     MemberGroupSearchResource, MemberContactResource, ContactMembersResource, \
-    MemberInfoResource, MemberJobTitles, MemberTerms, MemberContactsRoles, \
+    MemberInfoResource, MemberJobTitles, MemberTerms, MemberDepartments, MemberContactsRoles, \
     MemberContactsCompanies, MemberContactsCountries
 from app.resources.verification import Verification
 from app.resources.verifycell import VerifyCell
@@ -112,6 +112,7 @@ def _setup_routes(app):
     app.add_route("/member/register", MemberRegisterResource())  # noqa: E501
     # get the job titles list
     app.add_route("/member/register/job-title", MemberJobTitles())
+    app.add_route("/member/register/departments", MemberDepartments())
     app.add_route("/member/register/terms", MemberTerms())
     # 2FA of cell during registration
     app.add_route("/member/register/verification", Verification())

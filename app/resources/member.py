@@ -547,17 +547,37 @@ class MemberJobTitles(object):
 
     def on_get(self, req, resp):
         job_title_list = MemberDA().get_job_list()
-        department_list = MemberDA().get_department_list()
         # TODO: Replace with try/except and raise an exception
         # if unable to get a list
-        if job_title_list and department_list:
+        if job_title_list:
             resp.body = json.dumps({
-                "data": {"job_list": job_title_list, "deps_list": department_list},
+                "data": job_title_list,
                 "success": True
             }, default_parser=json.parser)
         else:
             resp.body = json.dumps({
-                "description": "Could not get the job title or department list",
+                "description": "Could not get the job title list",
+                "success": False
+            }, default_parser=json.parser)
+
+
+class MemberDepartments(object):
+    auth = {
+        'exempt_methods': ['GET']
+    }
+
+    def on_get(self, req, resp):
+        department_list = MemberDA().get_department_list()
+        # TODO: Replace with try/except and raise an exception
+        # if unable to get a list
+        if department_list:
+            resp.body = json.dumps({
+                "data": department_list,
+                "success": True
+            }, default_parser=json.parser)
+        else:
+            resp.body = json.dumps({
+                "description": "Could not get the departments list",
                 "success": False
             }, default_parser=json.parser)
 
