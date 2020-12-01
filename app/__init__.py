@@ -86,7 +86,7 @@ def create_app():
 
     _setup_routes(app)
 
-    check_trees()
+    # check_trees()
 
     return app
 
