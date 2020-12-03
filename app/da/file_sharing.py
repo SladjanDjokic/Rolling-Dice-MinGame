@@ -1061,7 +1061,7 @@ class FileTreeDA(object):
                 JOIN tree ON ft.parent_id = tree.id
             )
             UPDATE file_tree_item
-                SET tree_id = %s
+                SET file_tree_id = %s
                 WHERE id IN (SELECT id FROM tree ORDER BY level);
 
             UPDATE file_tree_item
