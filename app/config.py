@@ -40,6 +40,8 @@ gu.add_argument("--max-requests-jitter", type=int, default=0,
 gu.add_argument("--worker-class", type=str,
                default="egg:meinheld#gunicorn_worker",
                help="The type of workers to use. (default %(default)s)")
+gu.add_argument("--worker-connections", type=int, default=1000,
+               help="The number of concurrent requests per worker ")
 gu.add_argument("--workers", type=int, default=0,
                help="The number of worker processes for handling requests. "
                     "0 means using the following formula: CPU cores*2+1. "
@@ -71,5 +73,6 @@ l.add_argument("--log-handlers", type=list, default=["console"],
                help="Log handlers (default %(default)s)")
 l.add_argument("--log-level", type=str, default="INFO",
                help="Log level (default %(default)s)")
+
 
 parser = p

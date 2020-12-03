@@ -4,6 +4,8 @@ import falcon
 # from falcon_auth import FalconAuthMiddleware, TokenAuthBackend
 from falcon_multipart.middleware import MultipartMiddleware
 
+from app.calls.views import IncomingCallView
+from app.chat.views import ChatView
 from app.config import parser, settings
 from app.middleware import CrossDomain  # , JSONTranslator
 from app.resources.member import MemberRegisterResource, MemberResource, MemberSearchResource, \
@@ -228,3 +230,9 @@ def _setup_routes(app):
     mail_sign_resource = MailSettingsResource()
     app.add_route("/mail/sign", mail_sign_resource, suffix="settings")    # POST - move mail to origin
     app.add_route("/mail/sign/list", mail_sign_resource, suffix="list")  # POST - Add to archive
+
+    # Routes for Chat App
+    app.add_route("/chat", ChatView())
+
+    # Call Notificaitons
+    app.add_route("/notifications/incoming-call", IncomingCallView())

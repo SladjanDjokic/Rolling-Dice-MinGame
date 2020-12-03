@@ -110,3 +110,5 @@ ENV/
 /static
 
 kafka-docker
+# Kafka
+deployment/zk-single-kafka-single

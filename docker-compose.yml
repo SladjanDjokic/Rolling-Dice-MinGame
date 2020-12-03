@@ -33,15 +33,15 @@ services:
     ports:
       - 9000:9000
       - 9443:443
-    # command: [nginx-debug, "-g", "daemon off;"] # Uncomment if want to enable debug mode
+#    command: [nginx-debug, "-g", "daemon off;"] # Uncomment if want to enable debug mode
     networks:
       amera-net:
         aliases:
           - amera-tmp
-          # - amera-web-share
+          - amera-web-share
           - amera-web-auth
           # - amera-web-main
-          - amera-web-notifications
+          # - amera-web-notifications
     volumes:
       - ../web:/app/main:ro
       - ../web-share:/app/share:ro
@@ -51,6 +51,7 @@ services:
       - amera-web-api
       # - amera-web-auth
       - amera-web-db
+      - amera-eventserver
   amera-web-main:
     container_name: amera-web-main
     image: amera-web-main:latest
@@ -94,26 +95,26 @@ services:
     stdin_open: true
     command: ["yarn", "start"]
   # amera-web-auth:
-  #   container_name: amera-web-auth
-  #   image: amera-web-auth:latest
-  #   restart: always
-  #   logging:
-  #     options:
-  #       max-size: "500k"
-  #       max-file: "1"
-  #   build:
-  #     context: ../web-api
-  #     dockerfile: Dockerfile.dev
-  #   depends_on:
-  #     - amera-web-db
-  #   networks:
-  #     - amera-net
-  #   expose:
-  #     - 5000
-  #   volumes:
-  #     - ../web-api:/app
-  #     - web-api-python-packages:/root/.local/share
-  #   command: ['pipenv', 'run', 'docker']
+  #    container_name: amera-web-auth
+  #    image: amera-web-auth:latest
+  #    restart: always
+  #    logging:
+  #      options:
+  #        max-size: "500k"
+  #        max-file: "1"
+  #    build:
+  #      context: ../web-api
+  #      dockerfile: Dockerfile.dev
+  #    depends_on:
+  #      - amera-web-db
+  #    networks:
+  #      - amera-net
+  #    expose:
+  #      - 5000
+  #    volumes:
+  #      - ../web-api:/app
+  #      - web-api-python-packages:/root/.local/share
+  #    command: ['pipenv', 'run', 'docker']
   amera-web-api:
     container_name: amera-web-api
     image: amera-web-api:latest
@@ -124,7 +125,7 @@ services:
         max-file: "1"
     build:
       context: ../web-api
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     depends_on:
       - amera-web-db
     networks:
@@ -137,6 +138,7 @@ services:
       - ../web-api:/app
       - web-api-python-packages:/root/.local/share
     command: ["pipenv", "run", "local"]
+
   amera-web-db:
     container_name: amera-web-db
     image: postgres:latest
@@ -200,11 +202,134 @@ services:
       - amera-net
     ports:
       - 5432:5432
+
+# Kafka and Zookeeper Single Deploy
+  zookeeper:
+    image: 'bitnami/zookeeper:latest'
+    container_name: zookeeper
+    ports:
+      - '2181:2181'
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - amera-net
+  kafka:
+    image: 'bitnami/kafka:latest'
+    container_name: kafka
+    ports:
+      - '29092:29092'
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:29092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:29092
+      - KAFKA_INTER_BROKER_LISTENER_NAME=CLIENT
+    depends_on:
+      - zookeeper
+    networks:
+      - amera-net
+
+  amera-eventserver:
+    container_name: amera-eventserver
+    image: amera-eventserver:latest
+    restart: always
+    build:
+      context: ../web-api
+      dockerfile: Dockerfile
+    depends_on:
+      - amera-web-api
+    networks:
+      - amera-net
+    expose:
+      - 4000
+    ports:
+      - 4000:4000
+    volumes:
+      - ../web-api:/app
+      - web-eventserver-python-packages:/root/.local/share
+#    command: [ "uvicorn", "--app-dir=./eventserver", "test-star:app", "--host", "0.0.0.0", "--port", "4000", "--reload" ]
+    command: ["gunicorn", "--chdir", "eventserver", "sse:app", "--reload", "--bind=0.0.0.0:4000", "-k", "uvicorn.workers.UvicornWorker", "--log-level=DEBUG"]
+
+  amera-call-consumer:
+    container_name: amera-call-consumer
+    image: amera-consumer:latest
+    restart: always
+    build:
+      context: ../web-api
+      dockerfile: Dockerfile
+    networks:
+      - amera-net
+    volumes:
+      - ../web-api:/app
+      - web-consumer-call-python-packages:/root/.local/share
+    environment:
+      - AMERA_API_KAFKA.SERVER=kafka:9092
+    depends_on:
+      - kafka
+      - zookeeper
+      - amera-eventserver
+#    command: [ "pipenv", "run", "calls"]
+    command: [ "pipenv", "run", "dev-calls" ]
+
+
+  amera-email-consumer:
+    container_name: amera-email-consumer
+    image: amera-consumer:latest
+    restart: always
+    build:
+      context: ../web-api
+      dockerfile: Dockerfile
+    networks:
+      - amera-net
+    volumes:
+      - ../web-api:/app
+      - web-consumer-email-python-packages:/root/.local/share
+    environment:
+      - AMERA_API_KAFKA.SERVER=kafka:9092
+    depends_on:
+      - kafka
+      - zookeeper
+      - amera-eventserver
+#    command: [ "pipenv", "run", "emails" ]
+    command: ["pipenv", "run", "dev-email"]
+
+  amera-sms-consumer:
+    container_name: amera-sms-consumer
+    image: amera-consumer:latest
+    restart: always
+    build:
+      context: ../web-api
+      dockerfile: Dockerfile
+    networks:
+      - amera-net
+    volumes:
+      - ../web-api:/app
+      - web-consumer-sms-python-packages:/root/.local/share
+    environment:
+      - AMERA_API_KAFKA.SERVER=kafka:9092
+    depends_on:
+      - kafka
+      - zookeeper
+      - amera-eventserver
+#    command: [ "pipenv", "run", "sms" ]
+    command: [ "pipenv", "run", "dev-sms" ]
+
+
+
 volumes:
   web-api-python-packages:
     name: amera-web-api-python-packages
   web-main-python-packages:
     name: amera-web-main-python-packages
+  web-eventserver-python-packages:
+    name: amera-web-eventserver-python-packages
+  web-consumer-call-python-packages:
+    name: amera-consumer-call-python-packages
+  web-consumer-email-python-packages:
+    name: amera-consumer-email-python-packages
+  web-consumer-sms-python-packages:
+    name: amera-consumer-sms-python-packages
 networks:
   amera-net:
     name: amera-net

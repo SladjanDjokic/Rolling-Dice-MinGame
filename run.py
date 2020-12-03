@@ -2,11 +2,14 @@ import logging
 import multiprocessing
 
 import gunicorn.app.base
+import gevent.monkey
+gevent.monkey.patch_all()
 
 from pprint import pformat
 
 from app import configure, create_app, start
 from app.config import parser, settings
+
 
 gunicorn.SERVER_SOFTWARE = "gunicorn"  # hide gunicorn version
 

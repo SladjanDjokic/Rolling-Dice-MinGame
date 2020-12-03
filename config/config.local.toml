@@ -52,3 +52,6 @@ bucket = "file-testing"
 arn = "arn:aws:s3:::file-testing"
 user = "file-upload-test"
 file_location_host = "https://file-testing.s3.us-east-2.amazonaws.com"
+
+[kafka]
+server = "kafka:9092"

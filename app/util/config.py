@@ -40,7 +40,6 @@ def setup_vyper(parser, overrides):
     env_prefix = v.get("environment_variables_prefix")
     # env_name = os.getenv(f"{env_prefix.upper()}_ENV_NAME", "LOCAL").lower()
     # print(f"VYPER ENV_NAME_ENV: {env_name}")
-
     v.set_env_prefix(env_prefix)
     v.set_env_key_replacer("-", "_")
     v.automatic_env()

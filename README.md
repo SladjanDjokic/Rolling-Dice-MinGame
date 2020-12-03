@@ -46,7 +46,7 @@ end
 
 ## Environment File
 
-`amera-web-api.env` is the environment file that will beed to be kept up to date with credentials as needed:
+`.env` is the environment file that will beed to be kept up to date with credentials and other secrets:
 
 ```shell
 AMERA_API_ENV_NAME=LOCAL
@@ -55,4 +55,8 @@ AMERA_API_SERVICES.AWS.REGION_NAME=
 AMERA_API_SERVICES.AWS.ACCESS_KEY_ID=
 AMERA_API_SERVICES.AWS.SECRET_ACCESS_KEY=
 AMERA_API_SMTP.PASSWORD=
+AMERA_API_KAFKA.SMS_TOPIC=
+AMERA_API_KAFKA.EMAIL_TOPIC=
+AMERA_API_KAFKA.CHAT_TOPIC=
+AMERA_API_KAFKA.CALLS_TOPIC=
 ```

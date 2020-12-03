@@ -31,13 +31,40 @@ pytz = "*"
 cryptography = "*"
 requests = "*"
 twilio = "*"
+confluent-kafka = "*"
+gevent = "*"
+aiokafka = "*"
+starlette = "*"
+loguru = "*"
+fastapi = "*"
+uvicorn = "*"
+websockets = "*"
+sse-starlette = "*"
+flask = "*"
+sseclient = "*"
+uvloop = "*"
+httptools = "*"
+python-dotenv = "*"
+watchdog = "*"
+argh = "*"
+importlib-metadata = "*"
 
 [requires]
 python_version = "3.7.9"
 
 [scripts]
 "dev" = "python run.py --env-name=LOCAL"
-"test-server" = "python run.py --env-name=TEST --log-level=DEBUG"
+"test-server" = "env GUNICORN_CMD_ARGS=\"--reload\" python run.py --env-name=LOCAL --log-level=DEBUG --worker-class=gevent --worker-connections=1000 --reload"
 "docker" = "env GUNICORN_CMD_ARGS=\"--reload\" python run.py --env-name=LOCAL"
 "server" = "python run.py"
-"local" = "gunicorn --reload --bind=0.0.0.0:5000 --worker-class=gevent --worker-connections=1000 start:app"
+"local" = "gunicorn --reload --bind=0.0.0.0:5000 --worker-class=gevent --worker-connections=1000 local-start:app"
+
+# Kafka Consumer scripts for local dev with reload
+"dev-calls" = "watchmedo auto-restart -p '*.py' -R python -- run-consumers.py --consumer-name=calls"
+"dev-email" = "watchmedo auto-restart -p '*.py' -R python -- run-consumers.py --consumer-name=email"
+"dev-sms" = "watchmedo auto-restart -p '*.py' -R python -- run-consumers.py --consumer-name=sms"
+
+# Kafka production (no watchdog)
+"calls" = "python run-consumers.py --consumer-name=calls"
+"emails" = "python run-consumers.py --consumer-name=email"
+"sms" = "python run-consumers.py --consumer-name=sms"

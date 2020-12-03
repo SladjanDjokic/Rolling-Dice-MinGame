@@ -38,6 +38,7 @@ password = "${SMTP_PASSWORD}"
 
 [services]
 [services.aws]
+region_name = "us-east-2"
 access_key_id = "${AWS_ACCESS_KEY_ID}"
 secret_access_key = "${AWS_SECRET_ACCESS_KEY}"
 [services.twilio]
@@ -50,3 +51,6 @@ bucket = "file-testing"
 arn = "arn:aws:s3:::file-testing"
 user = "file-upload-test"
 file_location_host = "https://file-testing.s3.us-east-2.amazonaws.com"
+
+[kafka]
+server = "localhost:9092"
