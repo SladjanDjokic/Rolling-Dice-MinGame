@@ -41,7 +41,7 @@ from app.resources.member_schedule_event_invite import MemberScheduleEventInvite
     MemberScheduleEventInviteAddSingleResource, MemberScheduleEventInviteSetStatusResource
 from app.resources.country import CountryCodeResource
 from app.resources.mail import MailDraftComposeResource, MailAttachmentResource, MailInboxResource, MailStaredResource, \
-    MailTrashResource, MailArchiveResource, MailSettingsResource
+    MailTrashResource, MailArchiveResource, MailSettingsResource, MailSentResource
 from app.resources.role import RolesResource
 from app.resources.avatar import AvatarResource
 # from app.resources.memberfile import MemberFile
@@ -226,9 +226,15 @@ def _setup_routes(app):
     app.add_route("/mail/archive/mv/origin", mail_archive_resource, suffix="remove")    # POST - move mail to origin
     app.add_route("/mail/archive/mv/trash", mail_archive_resource, suffix="trash")  # POST - Add to archive
 
+    # Sent
+    mail_sent_resource = MailSentResource()
+    app.add_route("/mail/sent/list", mail_sent_resource, suffix="list")  # GET
+    app.add_route("/mail/sent/{mail_id}", mail_sent_resource, suffix="detail")
+
     # Signature
     mail_sign_resource = MailSettingsResource()
-    app.add_route("/mail/sign", mail_sign_resource, suffix="settings")    # POST - move mail to origin
+    app.add_route("/mail/settings", mail_sign_resource)    # POST - move mail to origin
+    app.add_route("/mail/sign", mail_sign_resource, suffix="sign")    # POST - move mail to origin
     app.add_route("/mail/sign/list", mail_sign_resource, suffix="list")  # POST - Add to archive
 
     # Routes for Chat App

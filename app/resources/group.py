@@ -2,6 +2,7 @@ import pdb
 import uuid
 import app.util.json as json
 import logging
+from pprint import pformat
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from urllib.parse import urljoin
@@ -311,13 +312,39 @@ class GroupMemberInviteResource(object):
         try:
             invite_id = GroupMemberInviteDA().create_invite(**invite_params)
 
+            # This section here overrides the `access-control-allow-origin`
+            # to be dynamic, this means that if the requests come from any
+            # domains defined in web.domains, then we allow the origin
+            # TODO: Remove this logic
+            # request_domain is the domain being used by the original requester
+            # we use forwarded_host because these API calls will be proxied in by
+            # a load balancer like AWS ELB or NGINX, thus we need to know how
+            # this is being requested as:
+            #  (e.g. https://ameraiot.com/api/valid-session)
+            request_domain = req.env.get('HTTP_ORIGIN', req.forwarded_host)
+
+            logger.debug(f"REQUEST Forwarded Host: {request_domain}")
+            logger.debug(f"REQUEST Host: {req.host}")
+            logger.debug(f"REQUEST Access Route: {req.access_route}")
+            logger.debug(f"REQUEST Netloc: {req.netloc}")
+            logger.debug(f"REQUEST Port: {req.port}")
+            # logger.debug(f"ENV: {pformat(req.env)}")
+
+            domains = settings.get("web.domains")
+            logger.debug(f"REQUEST_DOMAIN: {request_domain}")
+            logger.debug(f"ALLOWED_DOMAINS: {pformat(domains)}")
+            domains = next((d for d in domains if d in request_domain), None)
+            logger.debug(f"DOMAINS FOUND: {domains}")
+            register_domain = request_domain
+            logger.debug(f"REGISTER DOMAIN: {register_domain}")
+            
             register_url = settings.get(
                 "web.member_invite_register_url"
             ).format(invite_key)
 
             register_url = urljoin(request.get_url_base(req), register_url)
             register_url = "/registration/{}".format(invite_key)
-            register_url = urljoin("https://amerashare.com", register_url)
+            register_url = urljoin(register_domain, register_url)
 
             self._send_email(
                 email=email,

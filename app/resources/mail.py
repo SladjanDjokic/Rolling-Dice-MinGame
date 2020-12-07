@@ -3,7 +3,7 @@ import logging
 from falcon.errors import HTTPBadRequest
 
 from app.da.file_sharing import FileStorageDA
-from app.da.mail import DraftMailDA, InboxMailDa, StarMailDa, TrashMailDa, ArchiveMailDa, MailSettingsDA
+from app.da.mail import DraftMailDA, InboxMailDa, StarMailDa, TrashMailDa, ArchiveMailDa, MailSettingsDA, SentMailDA
 from app.exceptions.data import DataMissingError
 from app.util import request, json
 from app.util.auth import inject_member
@@ -86,15 +86,22 @@ class MailBaseResource(object):
             "receivers", "mail_id", req=req)
         if not mail_id:
             raise DataMissingError
-        if receiver and not type(receiver) == list:
-            raise DataMissingError
-        receiver_mail_list = []
+        if receiver and not (type(receiver) == dict and ("amera" in receiver and "external" in receiver)):
+            raise HTTPBadRequest
+
         if receiver:
-            for eachMail in receiver:
+            receiver_mail_list = []
+            for eachMail in receiver["external"]:
                 validated_mail = validate_mail(eachMail)
                 if validated_mail:
                     receiver_mail_list.append(validated_mail)
-        return_data = self.main_da_class.forward_mail(member["member_id"], mail_id, receiver_mail_list)
+            receiver["external"] = receiver_mail_list
+        else:
+            receiver = {
+                "amera": [],
+                "external": []
+            }
+        return_data = self.main_da_class.forward_mail(member["member_id"], mail_id, receiver)
         response.body = json.dumps(return_data)
 
 
@@ -106,22 +113,26 @@ class MailDraftComposeResource(MailBaseResource):
         (subject, body, receiver, mail_id, reply_id) = request.get_json_or_form(
             "subject", "body", "receivers", "mail_id", "reply_id", req=req)
 
-        if receiver and not type(receiver) == list:
-            raise DataMissingError
-
-        receiver_mail_list = []
+        if receiver and not (type(receiver) == dict and ("amera" in receiver and "external" in receiver)):
+            raise HTTPBadRequest
 
         if receiver:
-            for eachMail in receiver:
+            receiver_mail_list = []
+            for eachMail in receiver["external"]:
                 validated_mail = validate_mail(eachMail)
                 if validated_mail:
                     receiver_mail_list.append(validated_mail)
-
+            receiver["external"] = receiver_mail_list
+        else:
+            receiver = {
+                "amera": [],
+                "external": []
+            }
         draft_id = DraftMailDA.cu_draft_mail_for_member(
             member,
             subject,
             body,
-            receiver_mail_list,
+            receiver,
             update=False if not mail_id else True,
             mail_header_id=mail_id,
             reply_id=reply_id
@@ -181,7 +192,7 @@ class MailStaredResource(MailBaseResource):
                 rm = bool(rm)
             except ValueError:
                 raise HTTPBadRequest
-        self.main_da_class.add_mail_to_star(mail_id, member["member_id"], not rm)
+        self.main_da_class.add_remove_mail_to_star(mail_id, member["member_id"], not rm)
 
 
 class MailTrashResource(MailBaseResource):
@@ -250,10 +261,27 @@ class MailArchiveResource(MailBaseResource):
         self.main_da_class.add_to_trash(mail_id, member["member_id"])
 
 
+class MailSentResource(MailBaseResource):
+    main_da_class = SentMailDA
+
+
 class MailSettingsResource(object):
 
     @inject_member
-    def on_post_settings(self, req, response, member):
+    def on_get(self, req, response, member):
+        response.body = json.dumps(MailSettingsDA.settings_get(member["member_id"]))
+
+    @inject_member
+    def on_post(self, req, response, member):
+        (default_style, grammar, spelling, autocorrect) = request.get_json_or_form(
+            "default_style", "grammar", "spelling", "autocorrect", req=req)
+
+        if not default_style or not grammar or not spelling or not autocorrect:
+            raise HTTPBadRequest
+        MailSettingsDA.settings_cu(member["member_id"], default_style, grammar, spelling, autocorrect)
+
+    @inject_member
+    def on_post_sign(self, req, response, member):
         (sign_id, name, content) = request.get_json_or_form(
             "sign_id", "name", "content", req=req)
         if not content or not name:
@@ -265,7 +293,7 @@ class MailSettingsResource(object):
         })
 
     @inject_member
-    def on_delete_settings(self, req, response, member):
+    def on_delete_sign(self, req, response, member):
         (sign_id, ) = request.get_json_or_form(
             "sign_id", req=req)
         if not sign_id:

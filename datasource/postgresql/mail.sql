@@ -113,11 +113,13 @@ CREATE TABLE mail_folder_xref (
 -- Description:  table for email settings
 -- ------------------------------------------------------------------------------
 CREATE TABLE mail_setting (
-    member_id         BIGINT        NOT NULL UNIQUE REFERENCES member(id) ON DELETE CASCADE ,
-    default_style     JSON          NOT NULL DEFAULT '{}',
-    grammar           BOOLEAN       NOT NULL DEFAULT TRUE,
-    spelling          BOOLEAN       NOT NULL DEFAULT TRUE,
-    autocorrect       BOOLEAN       NOT NULL DEFAULT TRUE,
+    member_id                   BIGINT        NOT NULL UNIQUE REFERENCES member(id) ON DELETE CASCADE ,
+    default_style               JSON          NOT NULL DEFAULT '{}',
+    grammar                     BOOLEAN       NOT NULL DEFAULT TRUE,
+    spelling                    BOOLEAN       NOT NULL DEFAULT TRUE,
+    autocorrect                 BOOLEAN       NOT NULL DEFAULT TRUE,
+    reply_forward_signature     INTEGER,
+    compose_signature           INTEGER,
     PRIMARY KEY (member_id)
 );
 -- ------------------------------------------------------------------------------
@@ -136,5 +138,9 @@ CREATE TABLE mail_signature (
 ALTER TABLE mail_xref
     ADD FOREIGN KEY (replied_id) REFERENCES mail_header (id) ON DELETE SET NULL ,
     ADD FOREIGN KEY (forward_id) REFERENCES mail_header (id) ON DELETE SET NULL;
+
+ALTER TABLE mail_setting
+    ADD FOREIGN KEY (reply_forward_signature) REFERENCES mail_signature(id) ON DELETE SET NULL ,
+    ADD FOREIGN KEY (compose_signature) REFERENCES mail_signature(id) ON DELETE SET NULL;
 
 CREATE INDEX mail_xref_member_id_idx ON mail_xref(member_id);
