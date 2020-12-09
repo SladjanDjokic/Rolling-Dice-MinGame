@@ -100,6 +100,7 @@ class BaseMailDA(BaseDA):
                 head.subject,
                 body.message,
                 head.message_ts,
+                m.id,
                 m.email,
                 m.first_name,
                 m.last_name,
@@ -261,6 +262,7 @@ class BaseMailDA(BaseDA):
                 subject,
                 body,
                 time,
+                sender_member_id,
                 sender_mail,
                 first_name,
                 last_name,
@@ -279,6 +281,7 @@ class BaseMailDA(BaseDA):
                 "subject": subject,
                 "body": body,
                 "time": time.isoformat() if time else None,
+                "sender_member_id": sender_member_id,
                 "sender_mail": sender_mail,
                 "first_name": first_name,
                 "last_name": last_name,
@@ -310,7 +313,7 @@ class BaseMailDA(BaseDA):
             elif mail_id:
                 pass
             if not read:
-                cls.source.execute(header_update, (mail_id, member_id, folder_id))
+                cls.source.execute(header_update, (mail_id, member_id))
             cls.source.commit()
             return data
         return {}
@@ -874,7 +877,6 @@ class TrashMailDa(BaseMailDA):
         return (f"""AND mfx.mail_folder_id = {folder_id}
                 AND xref.deleted = TRUE
                 AND xref.archived = FALSE
-                AND xref.starred = FALSE
                 """,
                 """INNER JOIN mail_folder_xref mfx on xref.id = mfx.mail_xref_id""")
 
@@ -897,9 +899,7 @@ class TrashMailDa(BaseMailDA):
                 deleted = TRUE,
                 deleted_ts = CURRENT_TIMESTAMP,
                 archived = FALSE,
-                archived_ts = NULL,
-                starred = False,
-                starred_ts = NULL
+                archived_ts = NULL
             WHERE (
                 member_id = %s
                 AND id = %s
@@ -909,7 +909,7 @@ class TrashMailDa(BaseMailDA):
         cls.source.execute(xref_query, (member_id, mail_id))
         if cls.source.has_results():
             xref_id = cls.source.cursor.fetchone()[0]
-            MailFolderDA.remove_all_non_origin_folders_from_mail(xref_id, member_id, False)
+            MailFolderDA.remove_all_non_origin_folders_from_mail(xref_id, member_id, False, ["sent"])
             MailFolderDA.add_folder_to_mail(cls.folder_name, xref_id, member_id, False)
             cls.source.execute(xref_update, (member_id, xref_id))
             if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
@@ -938,9 +938,7 @@ class TrashMailDa(BaseMailDA):
                 archived = TRUE,
                 archived_ts = CURRENT_TIMESTAMP,
                 deleted = FALSE,
-                deleted_ts = NULL,
-                starred = False,
-                starred_ts = NULL
+                deleted_ts = NULL
             WHERE (
                 member_id = %s
                 AND id = %s
@@ -1021,7 +1019,6 @@ class ArchiveMailDa(BaseMailDA):
         return (f"""AND mfx.mail_folder_id = {folder_id}
                 AND xref.deleted = FALSE
                 AND xref.archived = TRUE
-                AND xref.starred = FALSE
                 """,
                 """INNER JOIN mail_folder_xref mfx on xref.id = mfx.mail_xref_id""")
 
@@ -1043,9 +1040,7 @@ class ArchiveMailDa(BaseMailDA):
                 archived = TRUE,
                 archived_ts = CURRENT_TIMESTAMP,
                 deleted = FALSE,
-                deleted_ts = NULL,
-                starred = False,
-                starred_ts = NULL
+                deleted_ts = NULL
             WHERE (
                 member_id = %s
                 AND id = %s
@@ -1055,7 +1050,7 @@ class ArchiveMailDa(BaseMailDA):
         cls.source.execute(xref_query, (member_id, mail_id))
         if cls.source.has_results():
             xref_id = cls.source.cursor.fetchone()[0]
-            MailFolderDA.remove_all_non_origin_folders_from_mail(xref_id, member_id, False)
+            MailFolderDA.remove_all_non_origin_folders_from_mail(xref_id, member_id, False, ["sent"])
             MailFolderDA.add_folder_to_mail(cls.folder_name, xref_id, member_id, False)
             cls.source.execute(xref_update, (member_id, xref_id))
             if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
@@ -1085,9 +1080,7 @@ class ArchiveMailDa(BaseMailDA):
                 deleted = TRUE,
                 deleted_ts = CURRENT_TIMESTAMP,
                 archived = FALSE,
-                archived_ts = NULL,
-                starred = False,
-                starred_ts = NULL
+                archived_ts = NULL
             WHERE (
                 member_id = %s
                 AND id = %s

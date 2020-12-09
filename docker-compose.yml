@@ -128,6 +128,8 @@ services:
       dockerfile: Dockerfile
     depends_on:
       - amera-web-db
+    env_file:
+      - .env
     networks:
       - amera-net
     expose:
@@ -186,6 +188,7 @@ services:
       - ../web-api/datasource/postgresql/event_invite.sql:/docker-entrypoint-initdb.d/f-2-event_invite.sql
       - ../web-api/datasource/postgresql/event_reschedule.sql:/docker-entrypoint-initdb.d/f-3-event_reschedule.sql
       - ../web-api/datasource/postgresql/mail.sql:/docker-entrypoint-initdb.d/f-4-mail.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-12-04.sql:/docker-entrypoint-initdb.d/f-5-schema-updates.sql
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/z-3-test-schedule.sql
