@@ -1,13 +1,10 @@
 import logging
 
-from falcon.errors import HTTPBadRequest
-
 from app.da.file_sharing import FileStorageDA
 from app.da.mail import DraftMailDA, InboxMailDa, StarMailDa, TrashMailDa, ArchiveMailDa, MailSettingsDA, SentMailDA
-from app.exceptions.data import DataMissingError
 from app.util import request, json
 from app.util.auth import inject_member
-
+from app.exceptions.data import HTTPBadRequest
 # from app.util.email import send_text_email_with_content_type
 from app.util.validators import validate_mail
 
@@ -21,7 +18,7 @@ class MailAttachmentResource(object):
         (mail_id, file) = request.get_json_or_form("mail_id", "file", req=req)
 
         if not mail_id:
-            raise DataMissingError
+            raise HTTPBadRequest("Email is not specified")
 
         file_storage_id = FileStorageDA().store_file_to_storage(file)
         filename, filetype = DraftMailDA.save_file_for_mail(file_storage_id, file, mail_id, member["member_id"])
@@ -51,23 +48,23 @@ class MailBaseResource(object):
         try:
             start = int(start)
         except ValueError:
-            raise HTTPBadRequest
+            raise HTTPBadRequest("Start is not valid")
         size = req.params.get('size', 20)
         try:
             size = int(size)
         except ValueError:
-            raise HTTPBadRequest
+            raise HTTPBadRequest("Size of list is not valid")
         search = req.params.get('se', None)
         sort = req.params.get('sr', None)
         order = req.params.get('or', 1)
         try:
             order = int(order)
         except ValueError:
-            raise HTTPBadRequest
+            raise HTTPBadRequest("Only number is acceptable for order")
         if order not in (-1, 1):
-            raise HTTPBadRequest
+            raise HTTPBadRequest("Order is not valid number. order can be -1 or 1")
         data, total = self.main_da_class.list_folder(member["member_id"], start, size,
-                                              ("%" + str(search) + "%") if search else None, sort, order)
+                                                     ("%" + str(search) + "%") if search else None, sort, order)
         response.body = json.dumps({
             "total": total,
             "data": data
@@ -76,7 +73,7 @@ class MailBaseResource(object):
     @inject_member
     def on_get_detail(self, req, response, member, mail_id):
         if not mail_id:
-            raise DataMissingError
+            raise HTTPBadRequest("Email is not specified")
         return_data = self.main_da_class.get_mail_detail(mail_id, member["member_id"])
         response.body = json.dumps(return_data)
 
@@ -85,9 +82,9 @@ class MailBaseResource(object):
         (receiver, mail_id,) = request.get_json_or_form(
             "receivers", "mail_id", req=req)
         if not mail_id:
-            raise DataMissingError
+            raise HTTPBadRequest("Email is not specified")
         if receiver and not (type(receiver) == dict and ("amera" in receiver and "external" in receiver)):
-            raise HTTPBadRequest
+            raise HTTPBadRequest("Receiver is not a valid object")
 
         if receiver:
             receiver_mail_list = []
@@ -114,7 +111,7 @@ class MailDraftComposeResource(MailBaseResource):
             "subject", "body", "receivers", "mail_id", "reply_id", req=req)
 
         if receiver and not (type(receiver) == dict and ("amera" in receiver and "external" in receiver)):
-            raise HTTPBadRequest
+            raise HTTPBadRequest("Receiver is not a valid object")
 
         if receiver:
             receiver_mail_list = []
@@ -148,7 +145,7 @@ class MailDraftComposeResource(MailBaseResource):
             "mail_id", req=req)
 
         if not mail_id:
-            raise DataMissingError
+            raise HTTPBadRequest("Email is not specified")
 
         failed_receivers = DraftMailDA.process_send_mail(mail_id, member["member_id"], )
 
@@ -162,7 +159,7 @@ class MailDraftComposeResource(MailBaseResource):
     @inject_member
     def on_delete_draft(self, req, response, member, mail_id):
         if not mail_id:
-            raise DataMissingError
+            raise HTTPBadRequest("Email is not specified")
         DraftMailDA.delete_draft_mail(mail_id, member["member_id"])
         response.body = json.dumps({
             "id": mail_id
@@ -183,7 +180,7 @@ class MailStaredResource(MailBaseResource):
             "mail_id", "rm", req=req)
 
         if not mail_id:
-            raise DataMissingError
+            raise HTTPBadRequest("Email is not specified")
 
         if not rm:
             rm = False
@@ -191,7 +188,7 @@ class MailStaredResource(MailBaseResource):
             try:
                 rm = bool(rm)
             except ValueError:
-                raise HTTPBadRequest
+                raise HTTPBadRequest("Only boolean is allowed for 'rm'")
         self.main_da_class.add_remove_mail_to_star(mail_id, member["member_id"], not rm)
 
 
@@ -201,29 +198,29 @@ class MailTrashResource(MailBaseResource):
     @inject_member
     def on_post(self, req, res, member):
 
-        (mail_id, ) = request.get_json_or_form(
+        (mail_id,) = request.get_json_or_form(
             "mail_id", req=req)
 
         if not mail_id:
-            raise DataMissingError
+            raise HTTPBadRequest("Email is not specified")
 
         self.main_da_class.add_to_trash(mail_id, member["member_id"])
 
     @inject_member
     def on_delete_detail(self, req, response, member, mail_id):
         if not mail_id:
-            raise DataMissingError
+            raise HTTPBadRequest("Email is not specified")
         self.main_da_class.delete_mail(mail_id, member["member_id"])
 
     @inject_member
     def on_post_remove(self, req, response, member):
-        (mail_id, ) = request.get_json_or_form(
+        (mail_id,) = request.get_json_or_form(
             "mail_id", req=req)
         self.main_da_class.remove_from_trash(mail_id, member["member_id"])
 
     @inject_member
     def on_post_archive(self, req, response, member):
-        (mail_id, ) = request.get_json_or_form(
+        (mail_id,) = request.get_json_or_form(
             "mail_id", req=req)
         self.main_da_class.add_to_archive(mail_id, member["member_id"])
 
@@ -234,29 +231,29 @@ class MailArchiveResource(MailBaseResource):
     @inject_member
     def on_post(self, req, res, member):
 
-        (mail_id, ) = request.get_json_or_form(
+        (mail_id,) = request.get_json_or_form(
             "mail_id", req=req)
 
         if not mail_id:
-            raise DataMissingError
+            raise HTTPBadRequest("Email is not specified")
 
         self.main_da_class.add_to_archive(mail_id, member["member_id"])
 
     @inject_member
     def on_delete_detail(self, req, response, member, mail_id):
         if not mail_id:
-            raise DataMissingError
+            raise HTTPBadRequest("Email is not specified")
         self.main_da_class.delete_mail(mail_id, member["member_id"])
 
     @inject_member
     def on_post_remove(self, req, response, member):
-        (mail_id, ) = request.get_json_or_form(
+        (mail_id,) = request.get_json_or_form(
             "mail_id", req=req)
         self.main_da_class.remove_from_archive(mail_id, member["member_id"])
 
     @inject_member
     def on_post_trash(self, req, response, member):
-        (mail_id, ) = request.get_json_or_form(
+        (mail_id,) = request.get_json_or_form(
             "mail_id", req=req)
         self.main_da_class.add_to_trash(mail_id, member["member_id"])
 
@@ -277,7 +274,7 @@ class MailSettingsResource(object):
             "default_style", "grammar", "spelling", "autocorrect", req=req)
 
         if not default_style or not grammar or not spelling or not autocorrect:
-            raise HTTPBadRequest
+            raise HTTPBadRequest("Receiver is not object")
         MailSettingsDA.settings_cu(member["member_id"], default_style, grammar, spelling, autocorrect)
 
     @inject_member
@@ -285,7 +282,7 @@ class MailSettingsResource(object):
         (sign_id, name, content) = request.get_json_or_form(
             "sign_id", "name", "content", req=req)
         if not content or not name:
-            raise HTTPBadRequest
+            raise HTTPBadRequest("content and name are required")
         sign = MailSettingsDA.cu_setting_signature(member["member_id"], name, content,
                                                    sign_id if sign_id else None, True if sign_id else False)
         response.body = json.dumps({
@@ -294,11 +291,11 @@ class MailSettingsResource(object):
 
     @inject_member
     def on_delete_sign(self, req, response, member):
-        (sign_id, ) = request.get_json_or_form(
+        (sign_id,) = request.get_json_or_form(
             "sign_id", req=req)
         if not sign_id:
-            raise HTTPBadRequest
-        sign = MailSettingsDA.cu_setting_signature(member["member_id"], sign_id)
+            raise HTTPBadRequest("signature id is not specified")
+        sign = MailSettingsDA.setting_signature_delete(member["member_id"], sign_id)
         response.body = json.dumps({
             "sign_id": sign
         })

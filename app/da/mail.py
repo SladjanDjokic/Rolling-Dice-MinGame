@@ -5,12 +5,12 @@ import logging
 import os
 import sys
 
-from falcon import HTTPBadRequest, HTTPInternalServerError, HTTPNotFound
+from falcon import HTTPInternalServerError
 
 from app.da.file_sharing import FileStorageDA
 from app.da.mail_folder import MailFolderDA
 from app.da.member import MemberDA
-from app.exceptions.data import DataMissingError
+from app.exceptions.data import DataMissingError, HTTPBadRequest, HTTPNotFound
 from app.util.db import source
 from app.util.filestorage import amerize_url
 
@@ -173,7 +173,7 @@ class BaseMailDA(BaseDA):
             if sort == 'rec_date':
                 sort_param = 'head.message_ts'
             else:
-                raise HTTPBadRequest
+                raise HTTPBadRequest("Sort type is not supported")
             order_query = f"""
                 ORDER BY {sort_param}{' DESC' if order == -1 else ''}
             """
@@ -337,7 +337,7 @@ class InboxMailDa(BaseMailDA):
     def forward_mail(cls, member_id, orig_mail_id, receivers_l):
         folder_query, folder_join = cls.folder_query(member_id)
         if not cls.can_forward_mail(member_id, orig_mail_id):
-            raise HTTPBadRequest
+            raise HTTPBadRequest("You don't have permission for forwarding this email")
         failed_receivers = []
         receiver_insert_xref = """
             INSERT INTO mail_xref (member_id, owner_member_id, mail_header_id, recipient_type, message_type,
@@ -433,23 +433,31 @@ class InboxMailDa(BaseMailDA):
                         cls.source.execute(insert_attachment, (created_mail_id, attach_file_id,
                                                                filename, filesize, filetype))
 
-                for receive in receivers_l:
-                    reci_mem = MemberDA.get_member_by_email(receive)
-                    if reci_mem:
+                    if receivers_l["amera"]:
+                        receivers_l["amera"] = [i for i in receivers_l["amera"] if i]
+                    else:
+                        receivers_l["amera"] = []
+                    if receivers_l["external"]:
+                        receivers_l["external"] = [i for i in receivers_l["external"] if i]
+                    else:
+                        receivers_l["external"] = []
+                    if len(receivers_l["amera"]) + len(receivers_l["external"]) < 1:
+                        raise HTTPBadRequest("Receiver list is empty")
+                    failed_receivers = []
+                    for each_receive in receivers_l["amera"]:
                         cls.source.execute(receiver_insert_xref,
-                                           (reci_mem["member_id"], member_id, created_mail_id, orig_mail_id))
+                                           (each_receive, member_id, created_mail_id, orig_mail_id))
                         if cls.source.has_results():
                             xref_id = cls.source.cursor.fetchone()[0]
-                            MailFolderDA.add_folder_to_mail("inbox", xref_id, reci_mem["member_id"], False)
+                            MailFolderDA.add_folder_to_mail("inbox", xref_id, each_receive, False)
                         else:
                             failed_receivers.append({
-                                "id": reci_mem["member_id"],
-                                "email": receive
+                                "id": each_receive,
+                                "email": "-"
                             })
-                    else:
+                    for each_receive in receivers_l["external"]:
                         logger.debug("OPS! EXTERNAL")
                         # EXTERNAL SEND
-                        pass
                 cls.source.execute(sender_insert_xref, (member_id, member_id, created_mail_id,
                                                         orig_mail_id))
                 if cls.source.has_results():
@@ -485,7 +493,7 @@ class DraftMailDA(BaseMailDA):
             receiver = []
 
         if reply_id and not cls.can_reply_to(member["member_id"], reply_id):
-            raise HTTPBadRequest
+            raise HTTPBadRequest("You don't have permission to reply this email")
 
         if update:
             if not mail_header_id:
@@ -568,7 +576,7 @@ class DraftMailDA(BaseMailDA):
             cls.source.execute(body_query, (*bod_query_data, created_mail_id))
             cls.source.commit()
             return created_mail_id
-        raise HTTPNotFound
+        raise HTTPNotFound("Draft not found or failed to create draft")
 
     @classmethod
     def save_file_for_mail(cls, file_id, file, mail_id, member_id):
@@ -598,22 +606,24 @@ class DraftMailDA(BaseMailDA):
             cls.source.execute(insert, (mail_id, file_id, filename, size, file_extension[1:]))
             cls.source.commit()
             return filename + file_extension, file_extension
-        else:
-            raise HTTPBadRequest()
+        raise HTTPBadRequest("Email not found")
 
     @classmethod
     def delete_file_for_mail(cls, file_id, mail_id, member_id):
         delete_query = """
             DELETE FROM mail_attachment
             USING mail_header
-            WHERE file_id = %s AND mail_header_id = %s AND member_id = %s AND message_locked = FALSE;
+            WHERE file_id = %s AND mail_header_id = %s AND member_id = %s AND message_locked = FALSE
+            RETURNING mail_attachment.mail_header_id;
         """
 
         cls.source.execute(delete_query, (file_id, mail_id, member_id))
-        if FileStorageDA.delete_file(file_id):
-            cls.source.commit()
-            return file_id
-        raise HTTPBadRequest()
+        if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
+            if FileStorageDA.delete_file(file_id):
+                cls.source.commit()
+                return file_id
+            raise HTTPBadRequest("Failed to delete file from storage")
+        raise HTTPBadRequest("File or email mail not found")
 
     @classmethod
     def delete_draft_mail(cls, mail_id, member_id):
@@ -682,7 +692,10 @@ class DraftMailDA(BaseMailDA):
                     if cls.source.has_results():
                         cls.source.commit()
                         return mail_id
-        raise HTTPBadRequest()
+                    raise HTTPBadRequest("Failed to delete email", description="failed to delete header")
+                raise HTTPBadRequest("Failed to delete email", description="failed to delete xref")
+            raise HTTPBadRequest("Email not found or is not yours")
+        raise HTTPBadRequest("Failed to delete email", description="failed to delete body")
 
     @classmethod
     def process_send_mail(cls, mail_id, member_id):
@@ -761,13 +774,22 @@ class DraftMailDA(BaseMailDA):
                 if cls.source.has_results():
 
                     failed_receivers = []
-                    receivers_list = json.loads(str(receivers))
-                    receiver_data = receivers_list
+                    receiver_data = json.loads(str(receivers))
+                    if receiver_data["amera"]:
+                        receiver_data["amera"] = [i for i in receiver_data["amera"] if i]
+                    else:
+                        receiver_data["amera"] = []
+                    if receiver_data["external"]:
+                        receiver_data["external"] = [i for i in receiver_data["external"] if i]
+                    else:
+                        receiver_data["external"] = []
+                    if len(receiver_data["amera"]) + len(receiver_data["external"]) < 1:
+                        raise HTTPBadRequest("Receiver list is empty")
+
                     for each_receive in receiver_data["amera"]:
                         cls.source.execute(insert_xref, (each_receive, member_id, mail_id,
                                                          None if not reply_id else datetime.datetime.now(),
                                                          reply_id, bool(reply_id)))
-
                         if cls.source.has_results():
                             xref_id = cls.source.cursor.fetchone()[0]
                             MailFolderDA.add_folder_to_mail("Inbox", xref_id, each_receive, False)
@@ -804,7 +826,7 @@ class DraftMailDA(BaseMailDA):
                             cls.source.commit()
                             return failed_receivers
             raise HTTPInternalServerError
-        raise HTTPNotFound
+        raise HTTPNotFound("Email not found")
 
 
 class StarMailDa(BaseMailDA):
@@ -862,7 +884,8 @@ class StarMailDa(BaseMailDA):
             if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
                 cls.source.commit()
                 return
-        raise HTTPBadRequest
+            raise HTTPBadRequest("failed to add email to starred folder")
+        raise HTTPBadRequest("email not found")
 
 
 class TrashMailDa(BaseMailDA):
@@ -915,7 +938,7 @@ class TrashMailDa(BaseMailDA):
             if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
                 cls.source.commit()
                 return
-        raise HTTPBadRequest
+        raise HTTPBadRequest("Email not exists!")
 
     @classmethod
     def add_to_archive(cls, mail_id, member_id):
@@ -954,7 +977,7 @@ class TrashMailDa(BaseMailDA):
             if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
                 cls.source.commit()
                 return
-        raise HTTPBadRequest
+        raise HTTPBadRequest("Email not exists")
 
     @classmethod
     def remove_from_trash(cls, mail_id, member_id):
@@ -986,7 +1009,7 @@ class TrashMailDa(BaseMailDA):
             if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
                 cls.source.commit()
                 return
-        raise HTTPBadRequest
+        raise HTTPBadRequest("Email not exists")
 
     @classmethod
     def delete_mail(cls, mail_id, member_id):
@@ -1000,11 +1023,10 @@ class TrashMailDa(BaseMailDA):
             RETURNING id;
         """
         cls.source.execute(xref_query, (member_id, mail_id))
-        if cls.source.has_results():
-            if cls.source.cursor.fetchone()[0]:
-                cls.source.commit()
-                return
-        raise HTTPBadRequest
+        if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
+            cls.source.commit()
+            return
+        raise HTTPBadRequest("Email not exists")
 
 
 class ArchiveMailDa(BaseMailDA):
@@ -1056,7 +1078,7 @@ class ArchiveMailDa(BaseMailDA):
             if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
                 cls.source.commit()
                 return
-        raise HTTPBadRequest
+        raise HTTPBadRequest("Email not exists")
 
     @classmethod
     def add_to_trash(cls, mail_id, member_id):
@@ -1096,7 +1118,7 @@ class ArchiveMailDa(BaseMailDA):
             if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
                 cls.source.commit()
                 return
-        raise HTTPBadRequest
+        raise HTTPBadRequest("Email not exists")
 
     @classmethod
     def remove_from_archive(cls, mail_id, member_id):
@@ -1129,7 +1151,7 @@ class ArchiveMailDa(BaseMailDA):
             if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
                 cls.source.commit()
                 return
-        raise HTTPBadRequest
+        raise HTTPBadRequest("Email not exists")
 
     @classmethod
     def delete_mail(cls, mail_id, member_id):
@@ -1147,7 +1169,7 @@ class ArchiveMailDa(BaseMailDA):
         if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
             cls.source.commit()
             return
-        raise HTTPBadRequest
+        raise HTTPBadRequest("Email not exists")
 
 
 class MailSettingsDA(BaseDA):
@@ -1178,7 +1200,7 @@ class MailSettingsDA(BaseDA):
         if cls.source.has_results():
             sign_id = cls.source.cursor.fetchone()[0]
             return sign_id
-        raise HTTPBadRequest
+        raise HTTPBadRequest("Signature not found" if update else "Failed to create signature")
 
     @classmethod
     def setting_signature_delete(cls, member_id, sign_id):
@@ -1196,7 +1218,7 @@ class MailSettingsDA(BaseDA):
         if cls.source.has_results():
             sign_id = cls.source.cursor.fetchone()[0]
             return sign_id
-        raise HTTPBadRequest
+        raise HTTPBadRequest("Signature not found")
 
     @classmethod
     def setting_signature_list(cls, member_id):

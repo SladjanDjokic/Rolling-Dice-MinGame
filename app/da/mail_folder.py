@@ -1,8 +1,9 @@
 import logging
 
-from falcon import HTTPBadRequest, HTTPInternalServerError
+from falcon import HTTPInternalServerError
 
 from app.util.db import source
+from app.exceptions.data import HTTPBadRequest
 
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ class MailFolderDA:
         elif create:
             return cls.create_folder_for_member(folder_name, member_id, commit)
         else:
-            raise HTTPBadRequest
+            raise HTTPBadRequest("server error in accessing mail folder")
 
     @classmethod
     def add_folder_to_mail(cls, folder_name, xref_id, member_id, commit=True):
