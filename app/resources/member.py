@@ -131,11 +131,10 @@ class MemberRegisterResource(object):
 
             logger.debug(
                 f"Job Title ID: {job_title_id} and {type(job_title_id)}")
-            if job_title_id:
-                job_title_id = job_title_id.strip() or None
 
-            if department_id:
-                department_id = department_id.strip() or None
+            job_title_id = None if job_title_id == 'not_applicable' else job_title_id
+            department_id = None if department_id == 'not_applicable' else department_id
+            company_name = None if company_name == 'null' else company_name
 
             if (not email or not password or
                     not first_name or not last_name):  # or

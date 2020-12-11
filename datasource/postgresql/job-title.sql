@@ -20,27 +20,28 @@ COMMENT ON COLUMN job_title.name      IS 'Job Title description';
 -- Data Insert:  Job Titles           
 -- ------------------------------------------------------------------------------
 
-INSERT INTO job_title ( name ) VALUES
+INSERT INTO job_title ( id, name ) VALUES
 
-   ( 'Advisor'         ),
-   ( 'Board Member'    ),
-   ( 'Consultant'      ),
-   ( 'CFO'             ),
-   ( 'CIO/CTO'         ),
-   ( 'CMO'             ),
-   ( 'Director'        ),
-   ( 'Finance'         ),
-   ( 'Human Resources' ),
-   ( 'IT Developer'    ),
-   ( 'IT Manager'      ),
-   ( 'Manager'         ),
-   ( 'Marketing'       ),
-   ( 'Operations'      ),
-   ( 'President/CEO'   ),
-   ( 'Purchasing'      ),
-   ( 'Sales'           ),
-   ( 'Sales Rep'       ),
-   ( 'Vice President'  );
-
+   ( 2, 'Advisor'         ),
+   ( 3, 'Board Member'    ),
+   ( 4, 'Consultant'      ),
+   ( 5, 'CFO'             ),
+   ( 6, 'CIO/CTO'         ),
+   ( 7, 'CMO'             ),
+   ( 8, 'Director'        ),
+   ( 9, 'Finance'         ),
+   ( 10, 'Human Resources' ),
+   ( 11, 'IT Developer'    ),
+   ( 12, 'IT Manager'      ),
+   ( 13, 'Manager'         ),
+   ( 14, 'Marketing'       ),
+   ( 15, 'Operations'      ),
+   ( 16, 'President/CEO'   ),
+   ( 17, 'Purchasing'      ),
+   ( 18, 'QA Manager'      ),
+   ( 19, 'Sales'           ),
+   ( 20, 'Sales Rep'       ),
+   ( 21, 'Vice President'  ),
+   ( 43, 'Owner'  );
 
 -- <eof>--

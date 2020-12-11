@@ -20,21 +20,20 @@ COMMENT ON COLUMN department.name      IS 'Department description';
 -- Data Insert: Departments
 -- ------------------------------------------------------------------------------
 
-INSERT INTO department ( name ) VALUES
+INSERT INTO department ( id, name ) VALUES
 
-   ( 'Not Available'          ),
-   ( 'Accounting'             ),
-   ( 'Compliance'             ),
-   ( 'Executive'              ),
-   ( 'Facilities'             ),
-   ( 'Finance'                ),
-   ( 'Human Resources'        ),
-   ( 'Information Technology' ),
-   ( 'Marketing'              ),
-   ( 'Operations'             ),
-   ( 'Production'             ),
-   ( 'Purchasing'             ),
-   ( 'Research & Development' ),
-   ( 'Sales'                  );
+   ( 2, 'Accounting'             ),
+   ( 3, 'Compliance'             ),
+   ( 4, 'Executive'              ),
+   ( 5, 'Facilities'             ),
+   ( 6, 'Finance'                ),
+   ( 7, 'Human Resources'        ),
+   ( 8, 'Information Technology' ),
+   ( 9, 'Marketing'              ),
+   ( 10, 'Operations'             ),
+   ( 11, 'Production'             ),
+   ( 12, 'Purchasing'             ),
+   ( 13, 'Research & Development' ),
+   ( 14, 'Sales'                  );
 
 -- <eof>--

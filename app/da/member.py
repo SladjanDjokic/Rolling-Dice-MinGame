@@ -649,6 +649,7 @@ class MemberDA(object):
             id as job_title_id,
             name as job_title
         FROM job_title
+        ORDER BY name
         """
         params = ()
         cls.source.execute(query, params)
@@ -670,6 +671,7 @@ class MemberDA(object):
             id as department_id,
             name as department_name
         FROM department
+        ORDER BY name
         """
         params = ()
         cls.source.execute(query, params)
