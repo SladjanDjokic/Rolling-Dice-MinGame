@@ -128,8 +128,6 @@ services:
       dockerfile: Dockerfile
     depends_on:
       - amera-web-db
-    env_file:
-      - .env
     networks:
       - amera-net
     expose:
