@@ -538,6 +538,24 @@ class MemberInfoResource(object):
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
 
+class MemberInfoByIdResource(object):
+    def on_get(self, req, resp, member_id):
+
+        try:
+            member_info = MemberInfoDA().get_member_info(member_id)
+
+            resp.body = json.dumps({
+                "data": member_info,
+                "success": True
+            }, default_parser=json.parser)
+
+        except InvalidSessionError as err:
+            #  resp.body = json.dumps({
+            #     "description": 'Unauthorized session',
+            #     "member": member_info,
+            #     "success": False
+            # }, default_parser=json.parser)
+            raise UnauthorizedSession() from err
 
 class MemberJobTitles(object):
     auth = {

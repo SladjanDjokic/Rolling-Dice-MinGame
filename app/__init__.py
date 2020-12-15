@@ -11,7 +11,7 @@ from app.middleware import CrossDomain  # , JSONTranslator
 from app.resources.member import MemberRegisterResource, MemberResource, MemberSearchResource, \
     MemberGroupSearchResource, MemberContactResource, ContactMembersResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms, MemberDepartments, MemberContactsRoles, \
-    MemberContactsCompanies, MemberContactsCountries
+    MemberContactsCompanies, MemberContactsCountries, MemberInfoByIdResource
 from app.resources.verification import Verification
 from app.resources.verifycell import VerifyCell
 from app.resources.promo_codes import PromoCodes
@@ -112,6 +112,7 @@ def _setup_routes(app):
     app.add_route("/member/change-password", MemberChangePasswordResource())
     app.add_route("/member/logout", MemberLogoutResource())
     app.add_route("/member/invite", MemberInviteResource())
+    app.add_route("/member/info/{member_id}", MemberInfoByIdResource())
     app.add_route("/member/info", MemberInfoResource())
     app.add_route("/member/invite/{invite_key:uuid}", MemberInviteResource())
     app.add_route("/valid-invite/{invite_key:uuid}", ValidInviteResource())
