@@ -7,6 +7,7 @@ from app.exceptions.data import DuplicateKeyError, DataMissingError, \
     RelationshipReferenceError
 from app.exceptions.invite import InviteExistsError, InviteDataMissingError, \
     InviteInvalidInviterError
+from app.util.filestorage import amerize_url
 
 logger = logging.getLogger(__name__)
 
@@ -558,13 +559,21 @@ class GroupMembershipDA(object):
         try:
             query = ("""
                 SELECT
-                    member.id,
+                    member.id as id,
                     member.first_name,
+                    member.middle_name,
                     member.last_name,
                     member.email,
-                    member_group_membership.create_date
+                    member_group_membership.create_date,
+                    job_title.name as title,
+                    member.company_name,
+                    file_storage_engine.storage_engine_id
                 FROM  member_group_membership
                 LEFT JOIN member ON member_group_membership.member_id = member.id
+                LEFT JOIN contact ON member.id = contact.contact_member_id
+                LEFT JOIN job_title ON member.job_title_id = job_title.id
+                LEFT JOIN member_profile ON contact.contact_member_id = member_profile.member_id
+                LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
                 WHERE member_group_membership.group_id = %s
             """)
             params = (group_id,)
@@ -575,10 +584,14 @@ class GroupMembershipDA(object):
                     member = {
                         "member_id": elem[0],
                         "first_name": elem[1],
-                        "last_name": elem[2],
-                        "email": elem[3],
-                        "joined_date": elem[4],
-                        "member_name": f'{elem[1]} {elem[2]}'
+                        "middle_name": elem[2],
+                        "last_name": elem[3],
+                        "email": elem[4],
+                        "joined_date": elem[5],
+                        "member_name": f'{elem[1]} {elem[3]}',
+                        "title": elem[6],
+                        "company": elem[7],
+                        "amera_avatar_url": amerize_url(elem[8])
                     }
                     members.append(member)
             return members
