@@ -109,8 +109,8 @@ class MailFolderDA:
     def remove_all_non_origin_folders_from_mail(cls, xref_id, member_id, commit=True, exceptions=None):
         if exceptions is None:
             exceptions = []
-        exceptions = [str(each).upper() for each in exceptions ]
-        exceptions_list = ",".join(exceptions)
+        exceptions = [str(each).upper() for each in exceptions]
+        exceptions_list = "'" + ("','".join(exceptions)) + "'"
         check_query = f"""
             DELETE FROM mail_folder_xref
             WHERE (
@@ -119,7 +119,7 @@ class MailFolderDA:
                     WHERE (
                         member_id = %s
                         AND UPPER(name) NOT IN ('INBOX', 'SENT'{','+exceptions_list
-                                                                if exceptions_list and len(exceptions_list) > 0 else ''
+                                                                if exceptions_list and len(exceptions_list) > 2 else ''
                                                             }))
                     )
                 )

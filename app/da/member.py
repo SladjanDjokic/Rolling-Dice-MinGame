@@ -1189,6 +1189,10 @@ class MemberContactDA(object):
         return cls.__get_member_contact('contact.email', email)
 
     @classmethod
+    def get_member_contact_by_member_id(cls, member_id):
+        return cls.__get_member_contact("contact.contact_member_id", member_id)
+
+    @classmethod
     def __get_member_contact(cls, key, value):
         get_contact_query = ("""
             SELECT contact.id as id,

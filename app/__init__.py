@@ -132,7 +132,9 @@ def _setup_routes(app):
     # app.add_route("/member/register", MemberRegistrationResource())  # noqa: E501
     app.add_route("/member/search", MemberSearchResource())
     app.add_route("/member/group/search", MemberGroupSearchResource())
-    app.add_route("/member/{username}", MemberResource())
+    member_resource = MemberResource()
+    app.add_route("/member/{username}", member_resource)
+    app.add_route("/member_id/{member_id}", member_resource, suffix="id")
 
     app.add_route("/member/contact", MemberContactResource())
     app.add_route("/member/contacts/roles", MemberContactsRoles())

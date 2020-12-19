@@ -6,7 +6,7 @@ from app.util import request, json
 from app.util.auth import inject_member
 from app.exceptions.data import HTTPBadRequest
 # from app.util.email import send_text_email_with_content_type
-from app.util.validators import validate_mail
+from app.util.validators import validate_mail, receiver_dict_validator
 
 logger = logging.getLogger(__name__)
 
@@ -79,26 +79,33 @@ class MailBaseResource(object):
 
     @inject_member
     def on_post_forward(self, req, response, member):
-        (receiver, mail_id,) = request.get_json_or_form(
-            "receivers", "mail_id", req=req)
+        (receiver, mail_id, bcc, cc) = request.get_json_or_form(
+            "receivers", "mail_id", "bcc", "cc", req=req)
         if not mail_id:
             raise HTTPBadRequest("Email is not specified")
         if receiver and not (type(receiver) == dict and ("amera" in receiver and "external" in receiver)):
             raise HTTPBadRequest("Receiver is not a valid object")
 
         if receiver:
-            receiver_mail_list = []
-            for eachMail in receiver["external"]:
-                validated_mail = validate_mail(eachMail)
-                if validated_mail:
-                    receiver_mail_list.append(validated_mail)
-            receiver["external"] = receiver_mail_list
+            if "external" in receiver:
+                receiver_mail_list = []
+                for eachMail in receiver["external"]:
+                    validated_mail = validate_mail(eachMail)
+                    if validated_mail:
+                        receiver_mail_list.append(validated_mail)
+                receiver["external"] = receiver_mail_list
         else:
             receiver = {
                 "amera": [],
                 "external": []
             }
-        return_data = self.main_da_class.forward_mail(member["member_id"], mail_id, receiver)
+        receiver = receiver_dict_validator(receiver)
+        if cc:
+            cc = receiver_dict_validator(cc, False)
+        if bcc:
+            bcc = receiver_dict_validator(bcc, False)
+
+        return_data = self.main_da_class.forward_mail(member["member_id"], mail_id, receiver, cc, bcc)
         response.body = json.dumps(return_data)
 
 
@@ -107,8 +114,8 @@ class MailDraftComposeResource(MailBaseResource):
 
     @inject_member
     def on_post(self, req, response, member):
-        (subject, body, receiver, mail_id, reply_id) = request.get_json_or_form(
-            "subject", "body", "receivers", "mail_id", "reply_id", req=req)
+        (subject, body, receiver, bcc, cc, mail_id, reply_id) = request.get_json_or_form(
+            "subject", "body", "receivers", "bcc", "cc", "mail_id", "reply_id", req=req)
 
         if receiver and not (type(receiver) == dict and ("amera" in receiver and "external" in receiver)):
             raise HTTPBadRequest("Receiver is not a valid object")
@@ -132,7 +139,9 @@ class MailDraftComposeResource(MailBaseResource):
             receiver,
             update=False if not mail_id else True,
             mail_header_id=mail_id,
-            reply_id=reply_id
+            reply_id=reply_id,
+            cc=cc,
+            bcc=bcc
         )
 
         response.body = json.dumps({
@@ -141,6 +150,7 @@ class MailDraftComposeResource(MailBaseResource):
 
     @inject_member
     def on_post_send(self, req, response, member):
+        self.on_post(req, response)
         (mail_id,) = request.get_json_or_form(
             "mail_id", req=req)
 
@@ -273,14 +283,18 @@ class MailSettingsResource(object):
         (default_style, grammar, spelling, autocorrect) = request.get_json_or_form(
             "default_style", "grammar", "spelling", "autocorrect", req=req)
 
-        if not default_style or not grammar or not spelling or not autocorrect:
-            raise HTTPBadRequest("Receiver is not object")
+        # if not default_style or not grammar or not spelling or not autocorrect:
+        if not default_style:
+            default_style = "{}"
+        if grammar is None or spelling is None or autocorrect is None:
+            raise HTTPBadRequest("Invalid data")
         MailSettingsDA.settings_cu(member["member_id"], default_style, grammar, spelling, autocorrect)
+        response.body = json.dumps({})
 
     @inject_member
     def on_post_sign(self, req, response, member):
         (sign_id, name, content) = request.get_json_or_form(
-            "sign_id", "name", "content", req=req)
+            "id", "name", "content", req=req)
         if not content or not name:
             raise HTTPBadRequest("content and name are required")
         sign = MailSettingsDA.cu_setting_signature(member["member_id"], name, content,
