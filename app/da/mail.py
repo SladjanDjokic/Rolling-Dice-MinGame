@@ -210,7 +210,7 @@ class BaseMailDA(BaseDA):
                     "mail_id": header_id,
                     "subject": subject,
                     "body": body,
-                    "time": time.isoformat() if time else None,
+                    "time": time,
                     "sender_mail": sender_mail,
                     "first_name": first_name,
                     "last_name": last_name,
@@ -280,7 +280,7 @@ class BaseMailDA(BaseDA):
             data = {
                 "subject": subject,
                 "body": body,
-                "time": time.isoformat() if time else None,
+                "time": time,
                 "sender_member_id": sender_member_id,
                 "sender_mail": sender_mail,
                 "first_name": first_name,
@@ -290,7 +290,7 @@ class BaseMailDA(BaseDA):
                     "id": reply_id,
                     "subject": reply_subject,
                     "body": reply_body,
-                    "time": reply_time.isoformat() if reply_time else None
+                    "time": reply_time
                 },
                 "attachments": [],
                 "is_stared": is_starred,
@@ -399,11 +399,10 @@ class InboxMailDa(BaseMailDA):
                 INSERT INTO mail_header (
                     member_id,
                     subject,
-                    message_from,
                     message_to,
                     number_attachments,
                     message_locked
-                ) VALUES (%s, %s, %s, %s, %s, TRUE)
+                ) VALUES (%s, %s, %s, %s, TRUE)
                 RETURNING id;
             """, """
                 INSERT INTO mail_body (member_id, message, mail_header_id)
@@ -411,7 +410,7 @@ class InboxMailDa(BaseMailDA):
             """
 
             query_data = (
-                member_id, subject, member_id, json.dumps(receivers_l), 0
+                member_id, subject, json.dumps(receivers_l), 0
             )
             bod_query_data = (
                 member_id, str(body) + str(extra_text)
@@ -677,7 +676,7 @@ class DraftMailDA(BaseMailDA):
                     "mail_id": header_id,
                     "subject": subject,
                     "body": body,
-                    "time": time.isoformat() if time else None,
+                    "time": time,
                     "attachments_count": attachments_count,
                     "receivers": message_to,
                     "cc": message_cc,
@@ -770,7 +769,7 @@ class DraftMailDA(BaseMailDA):
             data = {
                 "subject": subject,
                 "body": body,
-                "time": time.isoformat() if time else None,
+                "time": time,
                 "attachments_count": attachments_count,
                 "receivers": message_to,
                 "cc": message_cc,
@@ -784,7 +783,7 @@ class DraftMailDA(BaseMailDA):
                     "id": reply_id,
                     "subject": reply_subject,
                     "body": reply_body,
-                    "time": reply_time.isoformat() if reply_time else None
+                    "time": reply_time
                 },
                 "attachments": [],
                 "is_stared": is_starred,
@@ -875,13 +874,12 @@ class DraftMailDA(BaseMailDA):
                 INSERT INTO mail_header (
                     member_id,
                     subject,
-                    message_from,
                     message_to,
                     message_cc,
                     message_bcc,
                     number_attachments,
                     message_locked
-                ) VALUES (%s, %s, %s, %s, %s, %s, 0, FALSE)
+                ) VALUES (%s, %s, %s, %s, %s, 0, FALSE)
                 RETURNING id;
             """, """
                 INSERT INTO mail_body (member_id, message, mail_header_id)
@@ -893,7 +891,7 @@ class DraftMailDA(BaseMailDA):
                 RETURNING id;
             """
             query_data = (
-                member["member_id"], subject, member["email"],
+                member["member_id"], subject,
                 json.dumps(receiver), json.dumps(cc) if cc else None, json.dumps(bcc) if bcc else None
             )
             bod_query_data = (

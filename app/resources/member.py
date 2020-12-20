@@ -43,19 +43,6 @@ class MemberResource(object):
             "success": True
         })
 
-    def on_get_id(self, req, resp, member_id=None):
-        member = MemberContactDA.get_member_contact_by_member_id(member_id)
-
-        if not member:
-            raise MemberNotFound(member_id)
-
-        member["create_date"] = member["create_date"].isoformat() if member["create_date"] else member["create_date"]
-        member["update_date"] = member["update_date"].isoformat() if member["update_date"] else member["update_date"]
-
-        resp.body = json.dumps({
-            "member": member,
-            "success": True
-        })
 
 
 class MemberSearchResource(object):

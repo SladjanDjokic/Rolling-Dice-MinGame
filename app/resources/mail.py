@@ -26,14 +26,14 @@ class MailAttachmentResource(object):
             "file_name": str(filename),
             "file_type": str(filetype),
             "file_id": str(file_storage_id)
-        })
+        }, default_parser=json.parser)
 
     @inject_member
     def on_delete_attachment(self, req, response, member, mail_id, attachment_id):
         file_id = DraftMailDA.delete_file_for_mail(attachment_id, mail_id, member["member_id"])
         response.body = json.dumps({
             "file_id": file_id
-        })
+        }, default_parser=json.parser)
 
 
 class MailBaseResource(object):
@@ -68,14 +68,14 @@ class MailBaseResource(object):
         response.body = json.dumps({
             "total": total,
             "data": data
-        })
+        }, default_parser=json.parser)
 
     @inject_member
     def on_get_detail(self, req, response, member, mail_id):
         if not mail_id:
             raise HTTPBadRequest("Email is not specified")
         return_data = self.main_da_class.get_mail_detail(mail_id, member["member_id"])
-        response.body = json.dumps(return_data)
+        response.body = json.dumps(return_data, default_parser=json.parser)
 
     @inject_member
     def on_post_forward(self, req, response, member):
@@ -106,7 +106,7 @@ class MailBaseResource(object):
             bcc = receiver_dict_validator(bcc, False)
 
         return_data = self.main_da_class.forward_mail(member["member_id"], mail_id, receiver, cc, bcc)
-        response.body = json.dumps(return_data)
+        response.body = json.dumps(return_data, default_parser=json.parser)
 
 
 class MailDraftComposeResource(MailBaseResource):
@@ -146,7 +146,7 @@ class MailDraftComposeResource(MailBaseResource):
 
         response.body = json.dumps({
             "draft_id": str(draft_id)
-        })
+        }, default_parser=json.parser)
 
     @inject_member
     def on_post_send(self, req, response, member):
@@ -161,7 +161,7 @@ class MailDraftComposeResource(MailBaseResource):
 
         response.body = json.dumps({
             "fails": failed_receivers
-        })
+        }, default_parser=json.parser)
         #         for eachRecive in receiver_mail_list:
         #             send_text_email_with_content_type()
         # send_text_email_with_content_type()
@@ -173,7 +173,7 @@ class MailDraftComposeResource(MailBaseResource):
         DraftMailDA.delete_draft_mail(mail_id, member["member_id"])
         response.body = json.dumps({
             "id": mail_id
-        })
+        }, default_parser=json.parser)
 
 
 class MailInboxResource(MailBaseResource):
@@ -276,7 +276,7 @@ class MailSettingsResource(object):
 
     @inject_member
     def on_get(self, req, response, member):
-        response.body = json.dumps(MailSettingsDA.settings_get(member["member_id"]))
+        response.body = json.dumps(MailSettingsDA.settings_get(member["member_id"]), default_parser=json.parser)
 
     @inject_member
     def on_post(self, req, response, member):
@@ -289,7 +289,7 @@ class MailSettingsResource(object):
         if grammar is None or spelling is None or autocorrect is None:
             raise HTTPBadRequest("Invalid data")
         MailSettingsDA.settings_cu(member["member_id"], default_style, grammar, spelling, autocorrect)
-        response.body = json.dumps({})
+        response.body = json.dumps({}, default_parser=json.parser)
 
     @inject_member
     def on_post_sign(self, req, response, member):
@@ -301,7 +301,7 @@ class MailSettingsResource(object):
                                                    sign_id if sign_id else None, True if sign_id else False)
         response.body = json.dumps({
             "sign_id": sign
-        })
+        }, default_parser=json.parser)
 
     @inject_member
     def on_delete_sign(self, req, response, member):
@@ -312,9 +312,9 @@ class MailSettingsResource(object):
         sign = MailSettingsDA.setting_signature_delete(member["member_id"], sign_id)
         response.body = json.dumps({
             "sign_id": sign
-        })
+        }, default_parser=json.parser)
 
     @inject_member
     def on_get_list(self, req, response, member):
         data = MailSettingsDA.setting_signature_list(member["member_id"])
-        response.body = json.dumps(data)
+        response.body = json.dumps(data, default_parser=json.parser)

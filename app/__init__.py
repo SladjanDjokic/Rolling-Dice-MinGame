@@ -134,7 +134,6 @@ def _setup_routes(app):
     app.add_route("/member/group/search", MemberGroupSearchResource())
     member_resource = MemberResource()
     app.add_route("/member/{username}", member_resource)
-    app.add_route("/member_id/{member_id}", member_resource, suffix="id")
 
     app.add_route("/member/contact", MemberContactResource())
     app.add_route("/member/contacts/roles", MemberContactsRoles())
