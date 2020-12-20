@@ -1,0 +1,3 @@
+ALTER TABLE invite
+  ADD COLUMN confirm_phone_required BOOLEAN NOT NULL DEFAULT FALSE;
+

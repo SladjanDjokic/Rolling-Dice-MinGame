@@ -671,20 +671,20 @@ class GroupMemberInviteDA(object):
     @classmethod
     def create_invite(cls, invite_key, email, first_name, last_name,
                       inviter_member_id, group_id, country, country_code, phone_number,
-                      expiration, role, commit=True):
+                      expiration, role, confirm_phone_required, commit=True):
         query = ("""
             INSERT INTO invite
                 (invite_key, email, first_name, last_name,
                     inviter_member_id, group_id, country, country_code, phone_number,
-                        expiration, role_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        expiration, role_id, confirm_phone_required)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
             """)
 
         params = (
             invite_key, email, first_name, last_name,
             inviter_member_id, group_id, country, country_code, phone_number,
-            expiration, role
+            expiration, role, confirm_phone_required
         )
         try:
             cls.source.execute(query, params)
