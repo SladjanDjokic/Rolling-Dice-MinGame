@@ -34,7 +34,7 @@
  "app.exchangeOptions.NO_ENCRYPTION": "No Encyption no key required",
  "app.exchangeOptions.SECURE": "Exchange Picture using System and PIN via SMS (Secure)",
  "app.exchangeOptions.VERY_SECURE": "Exchange Picture using System and PIN Verbally (Very Secure)",
- "app.fileSharing.title": "File Sharing",
+ "app.fileSharing.title": "Drive",
  "app.groups.title": "Groups",
  "app.guest.header.aboutUs": "About Us",
  "app.guest.header.demo": "Demo",

@@ -564,6 +564,25 @@ class GroupFileCloud(object):
         logger.debug(f"Group tree {group_id}")
         main_tree = FileTreeDA().get_group_tree(group_id, "main")
         bin_tree = FileTreeDA().get_group_tree(group_id, "bin")
+        logger.debug(f'GroupFileCloud. group_id: {group_id} len of main_tree: {len(main_tree)} main_tree: {main_tree[0]["id"]}')
+
+        if len(main_tree) > 0 and main_tree[0]['id'] is None:
+            logger.debug(f'main_tree for groud with id {group_id} not exist. Will create it')
+            main_file_tree_id = FileTreeDA().create_group_tree("main")
+            bin_file_tree_id = FileTreeDA().create_group_tree("bin")
+            logger.debug(f'file_tree id: {main_file_tree_id} {bin_file_tree_id}')
+            updated_row_id = FileTreeDA.bind_group_tree_with(main_file_tree_id=main_file_tree_id,
+                                            bin_file_tree_id=bin_file_tree_id,
+                                            member_group_id=group_id)
+            logger.debug(f'updated_row_id: {updated_row_id}')
+            main_file_tree_root_folder_id = FileTreeDA().create_group_tree_root_folder(main_file_tree_id, 'main folder')
+            bin_file_tree_root_folder_id = FileTreeDA().create_group_tree_root_folder(bin_file_tree_id, 'bin folder')
+            logger.debug(f'root folders for group with id {group_id} created: main: {main_file_tree_root_folder_id} bin: {bin_file_tree_root_folder_id}')
+
+            main_tree = FileTreeDA().get_group_tree(group_id, "main")
+            bin_tree = FileTreeDA().get_group_tree(group_id, "bin")
+            logger.debug(f'GroupFileCloud. group_id: {group_id} len of main_tree: {len(main_tree)} main_tree: {main_tree[0]["id"]}')
+
         resp.body = json.dumps({
             "main_tree": main_tree,
             "bin_tree": bin_tree,
@@ -577,26 +596,122 @@ class GroupFileCloud(object):
         '''
         (target_folder_id, folder_name) = request.get_json_or_form(
             "tagetFolderId", "folder_name", req=req)
-        try:
-            tree_id = FileTreeDA().get_tree_id(group_id, "group", "main")
-            FileTreeDA().create_file_tree_entry(tree_id, target_folder_id, None, folder_name)
-            main_tree = FileTreeDA().get_group_tree(group_id, "main")
-            bin_tree = FileTreeDA().get_group_tree(group_id, "bin")
-            resp.body = json.dumps({
-                "main_tree": main_tree,
-                "bin_tree": bin_tree,
-                "success": True
-            }, default_parser=json.parser)
-        except FileStorageUploadError as e:
-            resp.body = json.dumps({
-                "message": e,
-                "success": False
-            })
-        except Exception as e:
-            resp.body = json.dumps({
-                "message": e,
-                "success": False
-            })
+        if folder_name:
+            try:
+                tree_id = FileTreeDA().get_tree_id(group_id, "group", "main")
+                FileTreeDA().create_file_tree_entry(tree_id, target_folder_id, None, folder_name)
+                main_tree = FileTreeDA().get_group_tree(group_id, "main")
+                bin_tree = FileTreeDA().get_group_tree(group_id, "bin")
+                resp.body = json.dumps({
+                    "main_tree": main_tree,
+                    "bin_tree": bin_tree,
+                    "success": True
+                }, default_parser=json.parser)
+            except FileStorageUploadError as e:
+                resp.body = json.dumps({
+                    "message": e,
+                    "success": False
+                })
+            except Exception as e:
+                resp.body = json.dumps({
+                    "message": e,
+                    "success": False
+                })
+        else:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            logger.debug((f"Session, {session}"))
+            member_id = session["member_id"]
+            (metadata,) = request.get_json_or_form("metadata", req=req)
+
+            target_folder_id, nodes_to_bin, nodes_meta = itemgetter(
+                "tagetFolderId", "nodesToDelete", "meta")(json.loads(metadata))
+            # logger.debug("pusho", json.loads(metadata),
+            #  target_folder_id, nodes_to_bin, nodes_meta
+
+            try:
+                tree_id = FileTreeDA().get_tree_id(group_id, "group", "main")
+                # tree_id = FileTreeDA().get_tree_id(target_id=member_id,
+                #                                    target_type='member', tree_type='main')
+                ''' 
+                    We iterate over nodes_meta starting with the nodes having level 0 and moving down
+                    We keep an xref between node_temp_id <=> inserted node_id  
+                '''
+
+                # 1) Inserting nodes accordingly
+                sorted_nodes = sorted(
+                    nodes_meta, key=itemgetter('level'), reverse=False)
+
+                temp_inserted_node_xref = dict()
+
+                for node in sorted_nodes:
+                    (node_temp_id,
+                     name,
+                     isDir,
+                     size,
+                     parentId,
+                     level,
+                     iv
+                     ) = itemgetter('node_temp_id', 'name', 'isDir', 'size', 'parentId', 'level', 'iv')(node)
+
+                    file_entry_id = None
+                    if not isDir:
+                        # upload and insert file first
+                        file = req.get_param(f"file_{node_temp_id}")
+                        logger.error('file: ' + str(file))
+                        # storage_file_id = FileStorageDA().store_file_to_storage(file)
+                        storage_file_id = FileStorageDA().put_file_to_storage(file)
+                        # Create member file entry
+                        member_file_id = FileTreeDA().create_member_file_entry(
+                            file_id=storage_file_id,
+                            file_name=name,
+                            member_id=member_id,
+                            status="available",
+                            file_size_bytes=size,
+                            iv=iv)
+                        if not member_file_id:
+                            raise FileUploadCreateException
+                        else:
+                            file_entry_id = member_file_id
+
+                    inserted_id = FileTreeDA().create_file_tree_entry(
+                        tree_id=tree_id,
+                        # Insert to folder if level == 0, otherwise, check our xref dict for parant
+                        parent_id=target_folder_id if level == 0 else temp_inserted_node_xref[
+                            parentId],
+                        member_file_id=file_entry_id,
+                        display_name=name
+                    )
+                    temp_inserted_node_xref[node_temp_id] = inserted_id
+
+                # 2) Send overwrited nodes to Bin, if any
+                if len(nodes_to_bin) > 0:
+                    bin_tree_id = FileTreeDA().get_tree_id(target_id=member_id,
+                                                           target_type='member', tree_type='bin')
+                    for node_id in nodes_to_bin:
+                        FileTreeDA().delete_branch(node_id, bin_tree_id)
+
+                # 3) Compose and send new trees backj
+                main_tree = FileTreeDA().get_group_tree(group_id, "main")
+                bin_tree = FileTreeDA().get_group_tree(group_id, "bin")
+                # main_tree = FileTreeDA().get_tree(member_id, "main")
+                # bin_tree = FileTreeDA().get_tree(member_id, "bin")
+                resp.body = json.dumps({
+                    "main_tree": main_tree,
+                    "bin_tree": bin_tree,
+                    "success": True
+                }, default_parser=json.parser)
+
+            except FileStorageUploadError as e:
+                resp.body = json.dumps({
+                    "message": e,
+                    "success": False
+                })
+            except Exception as e:
+                resp.body = json.dumps({
+                    "message": e,
+                    "success": False
+                })
 
     @staticmethod
     def on_delete(req, resp, group_id):

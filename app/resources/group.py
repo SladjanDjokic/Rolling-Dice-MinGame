@@ -59,7 +59,8 @@ class MemberGroupResource(object):
             group_id = None
             if exchange_option != 'NO_ENCRYPTION':
                 file = req.get_param('picture')
-                file_id = FileStorageDA().put_file_to_storage(file)
+                if file != '':
+                    file_id = FileStorageDA().put_file_to_storage(file)
             else:
                 pin = None
 

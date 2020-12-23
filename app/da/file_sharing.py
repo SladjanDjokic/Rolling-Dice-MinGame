@@ -657,7 +657,8 @@ class FileTreeDA(object):
                 file_storage_engine.storage_engine_id as fs_url,
                 file_storage_engine.create_date as create_date,
                 tree.node_update_date as node_modDate,
-                tree.node_create_date as node_createDate
+                tree.node_create_date as node_createDate,
+                member_file.member_id as create_member_id
             FROM tree
             LEFT JOIN member_file ON tree.member_file_id =member_file.id
             LEFT JOIN file_storage_engine ON member_file.file_id = file_storage_engine.ID
@@ -764,7 +765,8 @@ class FileTreeDA(object):
                 file_storage_engine.storage_engine_id as fs_url,
                 file_storage_engine.create_date as create_date,
                 tree.node_update_date as node_modDate,
-                tree.node_create_date as node_createDate
+                tree.node_create_date as node_createDate,
+                member_file.member_id as create_member_id
             FROM tree
             LEFT JOIN member_file ON tree.member_file_id =member_file.id
             LEFT JOIN file_storage_engine ON member_file.file_id = file_storage_engine.id
@@ -792,6 +794,7 @@ class FileTreeDA(object):
                 create_date = entry_da[12]
                 node_modDate = entry_da[13]
                 node_createDate = entry_da[14]
+                create_member = entry_da[15]
 
                 entry_element = {
                     "id": entry_da[0],
@@ -808,11 +811,63 @@ class FileTreeDA(object):
                     "size": size,
                     "modDate": node_modDate if file_id == None else mod_date,
                     "amera_file_url": amera_url,
-                    "create_date": node_createDate if file_id == None else create_date
+                    "create_date": node_createDate if file_id == None else create_date,
+                    "create_member": create_member
                 }
                 entry.append(entry_element)
             return entry
         return None
+
+    @classmethod
+    def create_group_tree(cls, tree_type):
+        query = ("""
+            INSERT into file_tree (type)
+            VALUES (%s)
+            RETURNING id
+        """)
+        params = (tree_type)
+        logger.debug(f'params: {params}')
+        cls.source.execute(query, [params])
+        cls.source.commit()
+        id = cls.source.get_last_row_id()
+        logger.debug(
+            f"[create_group_tree] TRANSACTION IDENTIFIER: {id}")
+        return id
+
+    @classmethod
+    def bind_group_tree_with(cls, member_group_id, main_file_tree_id, bin_file_tree_id):
+        logger.debug(f'bind_group_tree_with group_id {member_group_id} with file_tree_id {main_file_tree_id} {bin_file_tree_id}')
+        query = ("""
+            UPDATE member_group 
+            SET main_file_tree = %s,
+                bin_file_tree = %s
+            WHERE id = %s
+            RETURNING id
+        """)
+        params = (main_file_tree_id, bin_file_tree_id, member_group_id)
+        logger.debug(f'params: {params}')
+        cls.source.execute(query, params)
+        cls.source.commit()
+        id = cls.source.get_last_row_id()
+        logger.debug(
+            f"[bind_group_tree_with] TRANSACTION IDENTIFIER: {id}")
+        return id
+
+    @classmethod
+    def create_group_tree_root_folder(cls, file_tree_id, folder_name):
+        query = ("""
+            INSERT into file_tree_item (file_tree_id, is_tree_root, display_name)
+            VALUES (%s, true, %s)
+            RETURNING id
+        """)
+        params = (file_tree_id, folder_name)
+        logger.debug(f'params: {params}')
+        cls.source.execute(query, params)
+        cls.source.commit()
+        id = cls.source.get_last_row_id()
+        logger.debug(
+            f"[create_group_tree_root_folder] TRANSACTION IDENTIFIER: {id}")
+        return id
 
     @classmethod
     def get_group_tree(cls, groupId, tree_type):
@@ -870,7 +925,8 @@ class FileTreeDA(object):
                 file_storage_engine.storage_engine_id as fs_url,
                 file_storage_engine.create_date as create_date,
                 tree.node_update_date as node_modDate,
-                tree.node_create_date as node_createDate
+                tree.node_create_date as node_createDate,
+                member_file.member_id as create_member_id
             FROM tree
             LEFT JOIN member_file ON tree.member_file_id =member_file.id
             LEFT JOIN file_storage_engine ON member_file.file_id = file_storage_engine.ID
@@ -931,7 +987,8 @@ class FileTreeDA(object):
                 file_storage_engine.storage_engine_id as fs_url,
                 file_storage_engine.create_date as create_date,
                 tree.node_update_date as node_modDate,
-                tree.node_create_date as node_createDate
+                tree.node_create_date as node_createDate,
+                member_file.member_id as create_member_id
             FROM tree
             LEFT JOIN member_file ON tree.member_file_id =member_file.id
             LEFT JOIN file_storage_engine ON member_file.file_id = file_storage_engine.ID
@@ -957,6 +1014,7 @@ class FileTreeDA(object):
                 create_date = entry_da[10]
                 node_modDate = entry_da[11]
                 node_createDate = entry_da[12]
+                create_member = entry_da[13]
 
                 entry_element = {
                     "id": entry_da[0],
@@ -971,7 +1029,8 @@ class FileTreeDA(object):
                     "size": size,
                     "modDate": node_modDate if file_id == None else mod_date,
                     "amera_file_url": amera_url,
-                    "create_date": node_createDate if file_id == None else create_date
+                    "create_date": node_createDate if file_id == None else create_date,
+                    "create_member": create_member
                 }
                 entry.append(entry_element)
             return entry
@@ -1585,10 +1644,14 @@ class ShareFileDA(object):
                 member_group.group_name AS group_name,
                 member_group.create_date AS create_date,
                 member_group.update_date AS update_date,
-                count(DISTINCT shared_file.id) AS total_files
+                count(DISTINCT file_tree_item.id) AS total_files
             FROM member_group
-                INNER JOIN shared_file ON (shared_file.group_id = member_group.id)
-                INNER JOIN file_storage_engine ON (shared_file.file_id = file_storage_engine.id)
+                LEFT OUTER JOIN file_tree ON (file_tree.id = member_group.main_file_tree)
+                LEFT OUTER JOIN (
+                  SELECT id, file_tree_id
+                  FROM file_tree_item
+                  WHERE file_tree_item.member_file_id is NOT NULL
+                ) as file_tree_item ON (file_tree_item.file_tree_id = file_tree.id)
                 LEFT OUTER JOIN member_group_membership ON (
                     member_group_membership.group_id = member_group.id
                 )

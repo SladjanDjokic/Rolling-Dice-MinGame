@@ -119,11 +119,16 @@ class GroupDA(object):
                 member.first_name AS group_leader_first_name,
                 member.last_name AS group_leader_last_name,
                 count(DISTINCT member_group_membership.member_id) AS total_member,
-                count(DISTINCT shared_file.id) AS total_files
+                count(DISTINCT file_tree_item.id) AS total_files
             FROM member_group
             LEFT JOIN member ON member_group.group_leader_id = member.id
             LEFT OUTER JOIN member_group_membership ON (member_group_membership.group_id = member_group.id)
-            LEFT OUTER JOIN shared_file ON (shared_file.group_id = member_group.id)
+            LEFT OUTER JOIN file_tree ON (file_tree.id = member_group.main_file_tree)
+            LEFT OUTER JOIN (
+              SELECT id, file_tree_id
+              FROM file_tree_item
+              WHERE file_tree_item.member_file_id is NOT NULL
+            ) as file_tree_item ON (file_tree_item.file_tree_id = file_tree.id)
             WHERE
                 member_group.group_leader_id = %s AND
                 member_group.status = 'active'
@@ -178,67 +183,76 @@ class GroupDA(object):
 
         group_list = list()
         query = (f"""
-SELECT member_groups.group_id,
-       member_groups.group_leader_id,
-       member_groups.group_name,
-       member_groups.group_exchange_option,
-       member_groups.group_status,
-       member_groups.group_role,
-       member_groups.group_create_date,
-       member_groups.group_update_date,
-       member_groups.group_join_date,
-       member.first_name AS group_leader_first_name,
-       member.last_name AS group_leader_last_name,
-       member.email AS group_leader_email,
-       count(DISTINCT group_membership_member.member_id) AS total_member,
-       count(DISTINCT shared_file.id) AS total_files,
-       json_agg(DISTINCT ( group_member_detail.id,
-                group_member_detail.first_name,
-                group_member_detail.last_name,
-                group_member_detail.email,
-                group_membership_member.create_date)
-        ) AS members
-FROM ( SELECT member_group.id AS group_id,
-            member_group.group_leader_id,
-            member_group.group_name,
-            member_group.exchange_option AS group_exchange_option,
-            member_group.status AS group_status,
-            'group_leader' as group_role,
-            member_group.create_date AS group_create_date,
-            member_group.update_date AS group_update_date,
-            NULL as group_join_date
-    FROM member_group
-    WHERE member_group.group_leader_id = %s
-    UNION
-    SELECT member_group.id AS group_id,
-                member_group.group_leader_id,
-                member_group.group_name,
-                member_group.exchange_option AS group_exchange_option,
-                member_group.status AS group_status,
-                'group_member' as group_role,
-                member_group.create_date AS group_create_date,
-                member_group.update_date AS group_update_date,
-                member_group_membership.create_date as group_join_date
-    FROM member_group
-    INNER JOIN member_group_membership ON (member_group.id = member_group_membership.group_id)
-    WHERE member_group_membership.member_id = %s ) AS member_groups
-LEFT OUTER JOIN member_group_membership AS group_membership_member ON (group_membership_member.group_id = member_groups.group_id)
-LEFT OUTER JOIN member AS group_member_detail ON (group_membership_member.member_id = group_member_detail.id)
-LEFT OUTER JOIN shared_file ON (shared_file.group_id = member_groups.group_id)
-INNER JOIN member ON member_groups.group_leader_id = member.id
-GROUP BY member_groups.group_id,
-         member_groups.group_leader_id,
-         member_groups.group_name,
-         member_groups.group_exchange_option,
-         member_groups.group_status,
-         member_groups.group_role,
-         member_groups.group_create_date,
-         member_groups.group_update_date,
-         member_groups.group_join_date,
-         member.first_name,
-         member.last_name,
-         member.email
-ORDER BY {sort_columns_string}
+          SELECT member_groups.group_id,
+                member_groups.group_leader_id,
+                member_groups.group_name,
+                member_groups.group_exchange_option,
+                member_groups.group_status,
+                member_groups.group_role,
+                member_groups.group_create_date,
+                member_groups.group_update_date,
+                member_groups.group_join_date,
+                member.first_name AS group_leader_first_name,
+                member.last_name AS group_leader_last_name,
+                member.email AS group_leader_email,
+                count(DISTINCT group_membership_member.member_id) AS total_member,
+                count(DISTINCT file_tree_item.id) AS total_files,
+                json_agg(DISTINCT ( group_member_detail.id,
+                          group_member_detail.first_name,
+                          group_member_detail.last_name,
+                          group_member_detail.email,
+                          group_membership_member.create_date)
+                  ) AS members
+          FROM ( SELECT member_group.id AS group_id,
+                      member_group.group_leader_id,
+                      member_group.group_name,
+                      member_group.exchange_option AS group_exchange_option,
+                      member_group.status AS group_status,
+                      'group_leader' as group_role,
+                      member_group.create_date AS group_create_date,
+                      member_group.update_date AS group_update_date,
+                      NULL as group_join_date,
+                      member_group.main_file_tree,
+                      member_group.bin_file_tree
+              FROM member_group
+              WHERE member_group.group_leader_id = %s
+              UNION
+              SELECT member_group.id AS group_id,
+                          member_group.group_leader_id,
+                          member_group.group_name,
+                          member_group.exchange_option AS group_exchange_option,
+                          member_group.status AS group_status,
+                          'group_member' as group_role,
+                          member_group.create_date AS group_create_date,
+                          member_group.update_date AS group_update_date,
+                          member_group_membership.create_date as group_join_date,
+                          member_group.main_file_tree,
+                          member_group.bin_file_tree
+              FROM member_group
+              INNER JOIN member_group_membership ON (member_group.id = member_group_membership.group_id)
+              WHERE member_group_membership.member_id = %s ) AS member_groups
+          LEFT OUTER JOIN member_group_membership AS group_membership_member ON (group_membership_member.group_id = member_groups.group_id)
+          LEFT OUTER JOIN member AS group_member_detail ON (group_membership_member.member_id = group_member_detail.id)
+          LEFT OUTER JOIN file_tree ON (file_tree.id = member_groups.main_file_tree)
+          LEFT OUTER JOIN (
+            SELECT id, file_tree_id
+            FROM file_tree_item
+            WHERE file_tree_item.member_file_id is NOT NULL
+          ) as file_tree_item ON (file_tree_item.file_tree_id = file_tree.id)
+          INNER JOIN member ON member_groups.group_leader_id = member.id
+          GROUP BY member_groups.group_id,
+                  member_groups.group_leader_id,
+                  member_groups.group_name,
+                  member_groups.group_exchange_option,
+                  member_groups.group_status,
+                  member_groups.group_role,
+                  member_groups.group_create_date,
+                  member_groups.group_update_date,
+                  member_groups.group_join_date,
+                  member.first_name,
+                  member.last_name,
+                  member.email
+          ORDER BY {sort_columns_string}
         """)
         params = (member_id, member_id)
         cls.source.execute(query, params)
@@ -482,7 +496,7 @@ class GroupMembershipDA(object):
                     member_group_membership.create_date,
                     member_group_membership.update_date,
                     count(DISTINCT group_membership_member.member_id) AS member_count,
-                    count(DISTINCT shared_file.id) AS file_count,
+                    count(DISTINCT file_tree_item.id) AS file_count,
                     json_agg(DISTINCT ( group_member_detail.id,
                                 group_member_detail.first_name,
                                 group_member_detail.last_name,
@@ -493,7 +507,12 @@ class GroupMembershipDA(object):
                 INNER JOIN member_group ON (member_group.id = member_group_membership.group_id)
                 LEFT OUTER JOIN member_group_membership AS group_membership_member ON (group_membership_member.group_id = member_group.id)
                 LEFT OUTER JOIN member AS group_member_detail ON (group_membership_member.member_id = group_member_detail.id)
-                LEFT OUTER JOIN shared_file ON (shared_file.group_id = member_group.id)
+                LEFT OUTER JOIN file_tree ON (file_tree.id = member_group.main_file_tree)
+                LEFT OUTER JOIN (
+                  SELECT id, file_tree_id
+                  FROM file_tree_item
+                  WHERE file_tree_item.member_file_id is NOT NULL
+                ) as file_tree_item ON (file_tree_item.file_tree_id = file_tree.id)
                 INNER JOIN member ON member_group.group_leader_id = member.id
                 WHERE member_group_membership.member_id = %s
                 GROUP BY member_group.id,
@@ -575,6 +594,16 @@ class GroupMembershipDA(object):
                 LEFT JOIN member_profile ON contact.contact_member_id = member_profile.member_id
                 LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
                 WHERE member_group_membership.group_id = %s
+                GROUP BY
+                    member.id,
+                    member.first_name,
+                    member.middle_name,
+                    member.last_name,
+                    member.email,
+                    member_group_membership.create_date,
+                    job_title.name,
+                    member.company_name,
+                    file_storage_engine.storage_engine_id
             """)
             params = (group_id,)
             members = list()
