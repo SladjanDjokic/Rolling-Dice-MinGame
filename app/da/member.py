@@ -715,6 +715,28 @@ class MemberDA(object):
         return None
 
     @classmethod
+    def get_timezones(cls,):
+        query = (""" 
+                SELECT * FROM timezone
+            """)
+        params = ()
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            entry = list()
+            for entry_da in cls.source.cursor.fetchall():
+                entry_element = {
+                    "tz_id": entry_da[0],
+                    # because timedelta is not JSON-serializable
+                    "utc_offset": str(entry_da[1]),
+                    "gmt_offset": str(entry_da[2]),
+                    "zone_name": entry_da[3],
+                    "country_code_id": entry_da[4]
+                }
+                entry.append(entry_element)
+            return entry
+        return None
+
+    @classmethod
     def assign_tree(cls, tree_type, member_id, tree_id):
         ''' 
             This is used to assign a tree id to an existing members for migration purposes

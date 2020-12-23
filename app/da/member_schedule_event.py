@@ -23,7 +23,7 @@ class MemberScheduleEventDA(object):
         events = cls.__get_data('id', id)
         if len(events) == 0:
             return False
-        
+
         return True
 
     @classmethod
@@ -77,17 +77,16 @@ class MemberScheduleEventDA(object):
 
         return events
 
-
     @classmethod
     def __get_data_full(cls, key, value, search_time_start=None, search_time_end=None):
 
         query_date = ""
-        if search_time_start  and search_time_end:
-            query_date =  ("""
+        if search_time_start and search_time_end:
+            query_date = ("""
                 ((event_datetime_start between '{str_time_start}' and '{str_time_end}') 
                 OR 
                 (event_datetime_end between '{str_time_start}' and '{str_time_end}')) 
-                AND """.format(str_time_start = search_time_start, str_time_end = search_time_end))            
+                AND """.format(str_time_start=search_time_start, str_time_end=search_time_end))
 
         query = ("""
             select b.*, file_storage_engine.storage_engine_id from (
@@ -114,8 +113,8 @@ class MemberScheduleEventDA(object):
                 on b.member_file_id = file_storage_engine.id
             )
             """.format(query_date, key))
-        
-        params = (value,)        
+
+        params = (value,)
         cls.source.execute(query, params)
 
         events = []
@@ -162,9 +161,9 @@ class MemberScheduleEventDA(object):
 
     @classmethod
     def add(cls, event_name, event_host_member_id, event_type, event_datetime_start, event_datetime_end,
-                event_recurrence, event_invite_to_list=None, event_location_address=None,
-                event_location_postal=None, event_image=None, event_duration_all_day=False,
-                commit=True):
+            event_recurrence, event_invite_to_list=None, event_location_address=None,
+            event_location_postal=None, event_image=None, event_duration_all_day=False,
+            commit=True):
         try:
             query = ("""
                 INSERT INTO schedule_event (event_name, event_host_member_id, event_type,
@@ -172,7 +171,7 @@ class MemberScheduleEventDA(object):
                     event_recurrence, event_invite_to_list, event_image, event_duration_all_day) VALUES (%s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
                 """)
-            
+
             # store info
             params_value = (event_name, event_host_member_id, event_type, event_datetime_start,
                             event_datetime_end, event_location_address, event_location_postal,
@@ -192,3 +191,17 @@ class MemberScheduleEventDA(object):
 
         except Exception as e:
             return None
+
+    @classmethod
+    def get_colors(cls,):
+        query = ("""SELECT * FROM event_color""")
+        cls.source.execute(query, None)
+        colors = []
+        if cls.source.has_results():
+            for (id, color) in cls.source.cursor:
+                color = {
+                    "id": id,
+                    "color": color
+                }
+                colors.append((color))
+        return colors

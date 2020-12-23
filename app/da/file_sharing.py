@@ -188,6 +188,7 @@ class FileStorageDA(object):
     def get_member_file(cls, member, file_id):
         query = ("""
             SELECT
+                member_file.id as member_file_id,
                 member_file.file_id as file_id,
                 member_file.file_name as file_name,
                 member_file.categories as categories,
@@ -211,6 +212,7 @@ class FileStorageDA(object):
         cls.source.execute(query, params)
         if cls.source.has_results():
             for (
+                id,
                 file_id,
                 file_name,
                 categories,
@@ -224,12 +226,13 @@ class FileStorageDA(object):
                 file_status,
             ) in cls.source.cursor:
                 member_file = {
+                    "member_file_id": id,
                     "file_id": file_id,
                     "file_name": file_name,
                     "categories": categories,
                     "file_size_bytes": file_size_bytes,
                     "file_ivalue": file_ivalue,
-                    "file_url": file_link,
+                    "file_url": amerize_url(file_link),
                     "storage_engine": storage_engine,
                     "status": status,
                     "member": member["first_name"],

@@ -11,7 +11,7 @@ from app.middleware import CrossDomain  # , JSONTranslator
 from app.resources.member import MemberRegisterResource, MemberResource, MemberSearchResource, \
     MemberGroupSearchResource, MemberContactResource, ContactMembersResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms, MemberDepartments, MemberContactsRoles, \
-    MemberContactsCompanies, MemberContactsCountries, MemberInfoByIdResource
+    MemberContactsCompanies, MemberContactsCountries, MemberTimezones, MemberInfoByIdResource
 from app.resources.verification import Verification
 from app.resources.verifycell import VerifyCell
 from app.resources.promo_codes import PromoCodes
@@ -35,7 +35,7 @@ from app.resources.system import SystemActivitySessionResource, SystemActivityIn
 from app.resources.language import LanguageResource
 from app.resources.static import StaticResource
 from app.resources.member_scheduler_setting import MemberSchedulerSettingResource
-from app.resources.member_schedule_event import MemberScheduleEventResource
+from app.resources.member_schedule_event import MemberScheduleEventResource, MemberScheduleEventColors, EventAttachmentResorce
 from app.resources.member_schedule_holiday import MemberScheduleHolidayResource
 from app.resources.member_schedule_event_invite import MemberScheduleEventInviteResource, \
     MemberScheduleEventInviteAddSingleResource, MemberScheduleEventInviteSetStatusResource
@@ -44,7 +44,7 @@ from app.resources.mail import MailDraftComposeResource, MailAttachmentResource,
     MailTrashResource, MailArchiveResource, MailSettingsResource, MailSentResource
 from app.resources.role import RolesResource
 from app.resources.avatar import AvatarResource
-# from app.resources.memberfile import MemberFile
+# from app.resources.memberfile import
 # from app.resources.keygen import KeyGenResource, KeyGenFileUpload
 
 from app.da.__init__ import check_trees
@@ -122,6 +122,7 @@ def _setup_routes(app):
     app.add_route("/member/register/job-title", MemberJobTitles())
     app.add_route("/member/register/departments", MemberDepartments())
     app.add_route("/member/register/terms", MemberTerms())
+    app.add_route("/member/register/tzlist", MemberTimezones())
     # 2FA of cell during registration
     app.add_route("/member/register/verification", Verification())
     app.add_route("/member/register/verify-cell", VerifyCell())
@@ -173,6 +174,8 @@ def _setup_routes(app):
     app.add_route("/member/scheduler/setting",
                   MemberSchedulerSettingResource())
     app.add_route("/member/schedule/event", MemberScheduleEventResource())
+    app.add_route("/member/schedule/colors", MemberScheduleEventColors())
+    app.add_route("/member/schedule/attach", EventAttachmentResorce())
     app.add_route("/member/schedule/holiday", MemberScheduleHolidayResource())
 
     # app.add_route("/member/schedule/event-invite/add-single", MemberScheduleEventInviteAddSingleResource())
@@ -189,14 +192,17 @@ def _setup_routes(app):
     draft_resource = MailDraftComposeResource()
     app.add_route("/mail/draft", draft_resource)    # POST
     app.add_route("/mail/draft/list", draft_resource, suffix="list")     # GET
-    app.add_route("/mail/draft/{mail_id}", draft_resource, suffix="draft")  # DELETE
-    app.add_route("/mail/draft/get/{mail_id}", draft_resource, suffix="detail")  # GET
+    app.add_route("/mail/draft/{mail_id}",
+                  draft_resource, suffix="draft")  # DELETE
+    app.add_route("/mail/draft/get/{mail_id}",
+                  draft_resource, suffix="detail")  # GET
     app.add_route("/mail/draft/send", draft_resource, suffix="send")    # POST
 
     # Attachment
     attach_resource = MailAttachmentResource()
     app.add_route("/mail/attach", attach_resource)
-    app.add_route("/mail/attach/{mail_id}/{attachment_id}", attach_resource, suffix="attachment")
+    app.add_route("/mail/attach/{mail_id}/{attachment_id}",
+                  attach_resource, suffix="attachment")
 
     # Inbox
     mail_inbox_resource = MailInboxResource()
@@ -213,20 +219,31 @@ def _setup_routes(app):
     # Trash
     mail_trash_resource = MailTrashResource()
     app.add_route("/mail/trash", mail_trash_resource)  # POST - Add to trash
-    app.add_route("/mail/trash/list", mail_trash_resource, suffix="list")  # GET - Trash list
-    app.add_route("/mail/trash/{mail_id}", mail_trash_resource, suffix="detail")    # GET - Trash mail detail
+    app.add_route("/mail/trash/list", mail_trash_resource,
+                  suffix="list")  # GET - Trash list
+    # GET - Trash mail detail
+    app.add_route("/mail/trash/{mail_id}",
+                  mail_trash_resource, suffix="detail")
     #                                                                                 DELETE - delete email for ever
-    app.add_route("/mail/trash/mv/origin", mail_trash_resource, suffix="remove")    # POST - move mail to origin
-    app.add_route("/mail/trash/mv/archive", mail_trash_resource, suffix="archive")  # POST - Add to archive
+    app.add_route("/mail/trash/mv/origin", mail_trash_resource,
+                  suffix="remove")    # POST - move mail to origin
+    app.add_route("/mail/trash/mv/archive", mail_trash_resource,
+                  suffix="archive")  # POST - Add to archive
 
     # Archive
     mail_archive_resource = MailArchiveResource()
-    app.add_route("/mail/archive", mail_archive_resource)  # POST - Add to trash
-    app.add_route("/mail/archive/list", mail_archive_resource, suffix="list")  # GET - Trash list
-    app.add_route("/mail/archive/{mail_id}", mail_archive_resource, suffix="detail")    # GET - Trash mail detail
+    # POST - Add to trash
+    app.add_route("/mail/archive", mail_archive_resource)
+    app.add_route("/mail/archive/list", mail_archive_resource,
+                  suffix="list")  # GET - Trash list
+    # GET - Trash mail detail
+    app.add_route("/mail/archive/{mail_id}",
+                  mail_archive_resource, suffix="detail")
     #                                                                                 DELETE - delete email for ever
-    app.add_route("/mail/archive/mv/origin", mail_archive_resource, suffix="remove")    # POST - move mail to origin
-    app.add_route("/mail/archive/mv/trash", mail_archive_resource, suffix="trash")  # POST - Add to archive
+    app.add_route("/mail/archive/mv/origin", mail_archive_resource,
+                  suffix="remove")    # POST - move mail to origin
+    app.add_route("/mail/archive/mv/trash", mail_archive_resource,
+                  suffix="trash")  # POST - Add to archive
 
     # Sent
     mail_sent_resource = MailSentResource()

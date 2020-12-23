@@ -189,6 +189,9 @@ services:
       - ../web-api/datasource/postgresql/schema-updates-2020-12-04.sql:/docker-entrypoint-initdb.d/f-5-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-12-17.sql:/docker-entrypoint-initdb.d/f-6-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-12-18_invites.sql:/docker-entrypoint-initdb.d/f-7-schema-updates.sql
+      - ../web-api/datasource/postgresql/timezone.sql:/docker-entrypoint-initdb.d/g-1-timezone.sql
+      - ../web-api/datasource/postgresql/event_color.sql:/docker-entrypoint-initdb.d/g-2-event-color.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-12-21_event_2.sql:/docker-entrypoint-initdb.d/g-3-event-2.sql
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/z-3-test-schedule.sql

@@ -11,15 +11,31 @@ class MemberScheduleEventInviteDA(object):
     source = source
 
     @classmethod
+    def create_invite(cls, invitee_id, event_id):
+        query = ("""
+            INSERT INTO event_invite_2 (invite_member_id, event_id)
+            VALUES (%s, %s)
+            RETURNING id
+        """)
+        params = (invitee_id, event_id)
+        cls.source.execute(query, params)
+        id = None
+        if cls.source.has_results():
+            result = cls.source.cursor.fetchone()
+            id = result[0]
+        cls.source.commit()
+        return id
+
+    @classmethod
     def get_event_inviteById(cls, id):
         return cls.__get_data('id', id)
 
     @classmethod
-    def get_event_inviteById_full(cls, id, search_time_start = None, search_time_end = None):
+    def get_event_inviteById_full(cls, id, search_time_start=None, search_time_end=None):
         return cls.__get_data_full('id', id, event_invite_to, search_time_start, search_time_end)
 
     @classmethod
-    def get_event_invites_full(cls, event_invite_to, search_time_start = None, search_time_end = None):
+    def get_event_invites_full(cls, event_invite_to, search_time_start=None, search_time_end=None):
         return cls.__get_data_full('event_invite_to', event_invite_to, search_time_start, search_time_end)
 
     @classmethod
@@ -52,21 +68,20 @@ class MemberScheduleEventInviteDA(object):
                 }
                 invites.append(invite)
 
-        return invites    
-
+        return invites
 
     @classmethod
-    def __get_data_full(cls, key, value, search_time_start = None, search_time_end = None):
+    def __get_data_full(cls, key, value, search_time_start=None, search_time_end=None):
 
         query_date = ""
-        if search_time_start  and search_time_end:
-            query_date =  ("""
+        if search_time_start and search_time_end:
+            query_date = ("""
                 where
                     ((event_datetime_start between '{str_time_start}' and '{str_time_end}') 
                     OR 
                     (event_datetime_end between '{str_time_start}' and '{str_time_end}'))
-                """.format(str_time_start = search_time_start, str_time_end = search_time_end))            
-        
+                """.format(str_time_start=search_time_start, str_time_end=search_time_end))
+
         query = ("""
             select b.*, file_storage_engine.storage_engine_id from (
                 (
@@ -95,9 +110,9 @@ class MemberScheduleEventInviteDA(object):
                 left join file_storage_engine
                 on b.member_file_id = file_storage_engine.id
             )
-            """.format(key = key, query_date = query_date))
-        
-        params = (value,)        
+            """.format(key=key, query_date=query_date))
+
+        params = (value,)
         cls.source.execute(query, params)
 
         invites = []
@@ -158,7 +173,7 @@ class MemberScheduleEventInviteDA(object):
                 """)
 
             logger.debug("query: {}".format(query))
-     
+
             # store info
             params_value = (event_id, event_invite_to)
 
@@ -171,48 +186,47 @@ class MemberScheduleEventInviteDA(object):
 
             if commit:
                 cls.source.commit()
-                
+
             return id
 
         except Exception as e:
             return None
 
-
     @classmethod
     def addMultiple(cls, event_id, event_invite_to_list, commit=True):
-        try:            
+        try:
             if (event_invite_to_list is None) or (len(event_invite_to_list) == 0):
                 return list()
-            
+
             query_values = ""
-            
+
             for event_invite_to in event_invite_to_list:
                 if query_values:
                     query_values += ", "
-                query_values += ("""({event_id}, {event_invite_to})""".format(event_id = event_id, event_invite_to = event_invite_to))
-            
+                query_values += ("""({event_id}, {event_invite_to})""".format(
+                    event_id=event_id, event_invite_to=event_invite_to))
+
             query = ("""
                 INSERT INTO schedule_event_invite (event_id, event_invite_to) 
                 VALUES {} RETURNING id
                 """.format(query_values))
-            
+
             # store info
             params_value = ()
             res = cls.source.execute(query, params_value)
-            
+
             entry = list()
-            if cls.source.has_results():                
-                for entry_da in cls.source.cursor.fetchall():                    
+            if cls.source.has_results():
+                for entry_da in cls.source.cursor.fetchall():
                     entry.append(entry_da[0])
-            
+
             if commit:
                 cls.source.commit()
-                
+
             return entry
 
         except Exception as e:
             return None
-
 
     @classmethod
     def setStatus(cls, event_invite_id, event_invite_status, commit=True):
@@ -222,7 +236,7 @@ class MemberScheduleEventInviteDA(object):
                 event_invite_status = %s WHERE id = %s   
                 RETURNING id
                 """)
-            
+
             # store info
             params_value = (event_invite_status, event_invite_id)
 
@@ -235,7 +249,7 @@ class MemberScheduleEventInviteDA(object):
 
             if commit:
                 cls.source.commit()
-                
+
             return id
 
         except Exception as e:

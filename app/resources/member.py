@@ -640,6 +640,26 @@ class MemberTerms(object):
             }, default_parser=json.parser)
 
 
+class MemberTimezones(object):
+    auth = {
+        'exempt_methods': ['GET']
+    }
+
+    def on_get(self, req, resp):
+        timezones = MemberDA().get_timezones()
+
+        if timezones:
+            resp.body = json.dumps({
+                "data": timezones,
+                "success": True
+            }, default_parser=json.parser)
+        else:
+            resp.body = json.dumps({
+                "description": "Could not get the terms and conditions",
+                "success": False
+            }, default_parser=json.parser)
+
+
 class MemberContactsCountries(object):
     def on_get(self, req, resp):
         try:
