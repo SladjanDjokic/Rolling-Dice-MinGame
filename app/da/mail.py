@@ -9,6 +9,7 @@ from falcon import HTTPInternalServerError
 
 from app.da.file_sharing import FileStorageDA
 from app.da.mail_folder import MailFolderDA
+from app.da.member import MemberInfoDA
 from app.exceptions.data import DataMissingError, HTTPBadRequest, HTTPNotFound
 from app.util.db import source
 from app.util.filestorage import amerize_url
@@ -63,6 +64,8 @@ class BaseMailDA(BaseDA):
                 head.subject,
                 body.message,
                 head.message_ts,
+                head.number_attachments,
+                m.id,
                 m.email,
                 m.first_name,
                 m.last_name,
@@ -70,7 +73,10 @@ class BaseMailDA(BaseDA):
                 xref.new_mail,
                 prof_image_engine.storage_engine_id,
                 starred,
-                COUNT(head.id) OVER() AS full_count
+                COUNT(head.id) OVER() AS full_count,
+                head.message_to,
+                head.message_cc,
+                head.message_bcc
             FROM mail_header as head
             INNER JOIN mail_xref xref on head.id = xref.mail_header_id
             INNER JOIN mail_body body on head.id = body.mail_header_id
@@ -100,6 +106,7 @@ class BaseMailDA(BaseDA):
                 head.subject,
                 body.message,
                 head.message_ts,
+                head.number_attachments,
                 m.id,
                 m.email,
                 m.first_name,
@@ -120,7 +127,10 @@ class BaseMailDA(BaseDA):
                         reply_body.message
                     ELSE ''
                 END,
-                starred
+                starred,
+                head.message_to,
+                head.message_cc,
+                head.message_bcc
             FROM mail_header as head
             INNER JOIN mail_xref xref on head.id = xref.mail_header_id
             INNER JOIN mail_body body on head.id = body.mail_header_id
@@ -196,6 +206,8 @@ class BaseMailDA(BaseDA):
                     subject,
                     body,
                     time,
+                    attachments_count,
+                    sender_id,
                     sender_mail,
                     first_name,
                     last_name,
@@ -203,21 +215,70 @@ class BaseMailDA(BaseDA):
                     new_mail,
                     prof_id,
                     is_star,
-                    full_count
+                    full_count,
+                    receivers,
+                    cc,
+                    bcc
             ) in cls.source.cursor.fetchall():
                 all_count = full_count
+                if receivers and not type(receivers) == dict:
+                    try:
+                        receivers = json.loads(str(receivers))
+                    except json.decoder.JSONDecodeError:
+                        receivers = receivers
+                if bcc and not type(bcc) == dict:
+                    try:
+                        bcc = json.loads(str(bcc))
+                    except json.decoder.JSONDecodeError:
+                        bcc = bcc
+                if cc and not type(cc) == dict:
+                    try:
+                        cc = json.loads(str(cc))
+                    except json.decoder.JSONDecodeError:
+                        cc = cc
+                member_infos = {}
+                confirmed_bcc = None
+                if (sender_id and sender_id == member_id) or \
+                        (receivers and "amera" in receivers and member_id in receivers["amera"]):
+                    confirmed_bcc = bcc
+                if receivers and "amera" in receivers:
+                    for eachReceiver in receivers["amera"]:
+                        try:
+                            member_info = MemberInfoDA().get_member_info(eachReceiver)
+                        except Exception:
+                            member_info = None
+                        member_infos[eachReceiver] = member_info
+                if cc and "amera" in cc:
+                    for eachCC in cc["amera"]:
+                        try:
+                            member_info = MemberInfoDA().get_member_info(eachCC)
+                        except Exception:
+                            member_info = None
+                        member_infos[eachCC] = member_info
+                if confirmed_bcc and "amera" in confirmed_bcc:
+                    for eachBCC in confirmed_bcc["amera"]:
+                        try:
+                            member_info = MemberInfoDA().get_member_info(eachBCC)
+                        except Exception:
+                            member_info = None
+                        member_infos[eachBCC] = member_info
                 data.append({
                     "mail_id": header_id,
                     "subject": subject,
                     "body": body,
                     "time": time,
+                    "attachments_count": attachments_count,
                     "sender_mail": sender_mail,
                     "first_name": first_name,
                     "last_name": last_name,
                     "read": read,
+                    "receivers": receivers,
+                    "cc": cc,
+                    "bcc": confirmed_bcc,
                     "new_mail": new_mail,
                     "profile_url": amerize_url(prof_id),
-                    "is_stared": is_star
+                    "is_stared": is_star,
+                    "member_details": member_infos
                 })
                 if new_mail:
                     new_mails.append(header_id)
@@ -262,6 +323,7 @@ class BaseMailDA(BaseDA):
                 subject,
                 body,
                 time,
+                attachments_count,
                 sender_member_id,
                 sender_mail,
                 first_name,
@@ -274,18 +336,65 @@ class BaseMailDA(BaseDA):
                 reply_time,
                 reply_subject,
                 reply_body,
-                is_starred
+                is_starred,
+                receivers,
+                cc,
+                bcc
             ) = cls.source.cursor.fetchone()
-
+            if receivers and not type(receivers) == dict:
+                try:
+                    receivers = json.loads(str(receivers))
+                except json.decoder.JSONDecodeError:
+                    receivers = receivers
+            if bcc and not type(bcc) == dict:
+                try:
+                    bcc = json.loads(str(bcc))
+                except json.decoder.JSONDecodeError:
+                    bcc = bcc
+            if cc and not type(cc) == dict:
+                try:
+                    cc = json.loads(str(cc))
+                except json.decoder.JSONDecodeError:
+                    cc = cc
+            member_infos = {}
+            confirmed_bcc = None
+            if (sender_member_id and sender_member_id == member_id) or \
+                    (receivers and "amera" in receivers and member_id in receivers["amera"]):
+                confirmed_bcc = bcc
+            if receivers and "amera" in receivers:
+                for eachReceiver in receivers["amera"]:
+                    try:
+                        member_info = MemberInfoDA().get_member_info(eachReceiver)
+                    except Exception:
+                        member_info = None
+                    member_infos[eachReceiver] = member_info
+            if cc and "amera" in cc:
+                for eachCC in cc["amera"]:
+                    try:
+                        member_info = MemberInfoDA().get_member_info(eachCC)
+                    except Exception:
+                        member_info = None
+                    member_infos[eachCC] = member_info
+            if confirmed_bcc and "amera" in confirmed_bcc:
+                for eachBCC in confirmed_bcc["amera"]:
+                    try:
+                        member_info = MemberInfoDA().get_member_info(eachBCC)
+                    except Exception:
+                        member_info = None
+                    member_infos[eachBCC] = member_info
             data = {
                 "subject": subject,
                 "body": body,
                 "time": time,
+                "attachments_count": attachments_count,
                 "sender_member_id": sender_member_id,
                 "sender_mail": sender_mail,
                 "first_name": first_name,
                 "last_name": last_name,
                 "profile_url": amerize_url(prof_id),
+                "receivers": receivers,
+                "cc": cc,
+                "bcc": confirmed_bcc,
                 "reply": {
                     "id": reply_id,
                     "subject": reply_subject,
@@ -294,6 +403,7 @@ class BaseMailDA(BaseDA):
                 },
                 "attachments": [],
                 "is_stared": is_starred,
+                "member_details": member_infos
             }
 
             cls.source.execute(attach_query, (mail_id,))
@@ -467,351 +577,6 @@ class InboxMailDa(BaseMailDA):
 class DraftMailDA(BaseMailDA):
     folder_name = "draft"
     message_locked = False
-
-    @classmethod
-    def folder_query(cls, member_id):
-        folder_id = MailFolderDA.get_folder_id_for_member(cls.folder_name, member_id)
-        return (f"""AND mfx.mail_folder_id = {folder_id}
-                AND xref.deleted = FALSE
-                AND xref.archived = FALSE
-                """,
-                """INNER JOIN mail_folder_xref mfx on xref.id = mfx.mail_xref_id""")
-
-    @classmethod
-    def list_after_update_query(cls, member_id):
-        folder_query, folder_join = cls.folder_query(member_id)
-        return f"""
-            UPDATE mail_xref 
-            SET new_mail = FALSE
-            FROM mail_xref xref
-            {folder_join}
-            WHERE (
-                mail_xref.mail_header_id IN %s
-                AND mail_xref.member_id = %s
-                {folder_query}
-                AND xref.deleted = FALSE
-            );
-        """
-
-    @classmethod
-    def list_get_query(cls, start, search_query, order_query, member_id):
-        folder_query, folder_join = cls.folder_query(member_id)
-        return f"""
-            SELECT
-                head.id,
-                head.subject,
-                body.message,
-                head.message_ts,
-                head.number_attachments,
-                head.message_to,
-                head.message_cc,
-                head.message_bcc,
-                m.email,
-                m.first_name,
-                m.last_name,
-                xref.read,
-                xref.new_mail,
-                prof_image_engine.storage_engine_id,
-                starred,
-                COUNT(head.id) OVER() AS full_count
-            FROM mail_header as head
-            INNER JOIN mail_xref xref on head.id = xref.mail_header_id
-            INNER JOIN mail_body body on head.id = body.mail_header_id
-            INNER JOIN member m on m.id = xref.owner_member_id
-            LEFT OUTER JOIN member_profile profile on m.id = profile.member_id 
-            LEFT OUTER JOIN file_storage_engine prof_image_engine on
-                                                            prof_image_engine.id = profile.profile_picture_storage_id 
-            {folder_join} 
-            WHERE (
-                {'head.id < %s' if start > 0 else 'head.id > %s'}
-                AND xref.member_id = %s
-                AND head.message_locked = %s
-                {folder_query}
-                AND (
-                    {search_query}
-                )
-            )
-            {order_query}
-            LIMIT %s;
-        """
-
-    @classmethod
-    def detail_get_query(cls, member_id):
-        folder_query, folder_join = cls.folder_query(member_id)
-        return f"""
-            SELECT
-                head.subject,
-                body.message,
-                head.message_ts,
-                head.number_attachments,
-                head.message_to,
-                head.message_cc,
-                head.message_bcc,
-                m.id,
-                m.email,
-                m.first_name,
-                m.last_name,
-                prof_image_engine.storage_engine_id,
-                folder.name,
-                folder.id,
-                xref.read,
-                xref.replied_id,
-                xref.replied_ts,
-                CASE
-                    WHEN xref.replied_id IS NOT NULL THEN
-                        reply.subject
-                    ELSE ''
-                END,
-                CASE
-                    WHEN xref.replied_id IS NOT NULL THEN
-                        reply_body.message
-                    ELSE ''
-                END,
-                starred
-            FROM mail_header as head
-            INNER JOIN mail_xref xref on head.id = xref.mail_header_id
-            INNER JOIN mail_body body on head.id = body.mail_header_id
-            INNER JOIN member m on m.id = xref.owner_member_id
-            LEFT OUTER JOIN member_profile profile on m.id = profile.member_id 
-            LEFT OUTER JOIN file_storage_engine prof_image_engine on
-                                                            prof_image_engine.id = profile.profile_picture_storage_id 
-            INNER JOIN mail_folder_xref mfx on xref.id = mfx.mail_xref_id
-            INNER JOIN mail_folder folder on mfx.mail_folder_id = folder.id
-            INNER JOIN mail_header reply on (
-                CASE 
-                    WHEN xref.replied_id IS NOT NULL THEN 
-                        reply.id = xref.replied_id
-                    ELSE TRUE
-                END
-            )
-            INNER JOIN mail_body reply_body on (
-                CASE
-                    WHEN xref.replied_id IS NOT NULL THEN 
-                        reply_body.mail_header_id = xref.replied_id
-                    ELSE TRUE
-                END
-            )
-            WHERE (
-                head.id = %s
-                AND xref.member_id = %s
-                AND head.message_locked = %s
-                {folder_query}
-            )
-            LIMIT 1;
-        """
-
-    @classmethod
-    def list_folder(cls, member_id, start=-1, size=20, search=None, sort=None, order=1):
-        search_query = "TRUE"
-        search_params = []
-        order_query = ""
-        if search:
-            search_query = """
-                    (
-                        UPPER(m.last_name) LIKE UPPER(%s)
-                        OR UPPER(m.first_name) LIKE UPPER(%s)
-                        OR UPPER(m.email) LIKE UPPER(%s)
-                        OR UPPER(head.subject) LIKE UPPER(%s)
-                        OR UPPER(body.message) LIKE UPPER(%s)
-                    )
-            """
-            search_params = [search, search, search, search, search]
-        if sort and not sort == 'read':
-            if sort == 'rec_date':
-                sort_param = 'head.message_ts'
-            else:
-                raise HTTPBadRequest("Sort type is not supported")
-            order_query = f"""
-                ORDER BY {sort_param}{' DESC' if order == -1 else ''}
-            """
-
-        if sort and sort == 'read':
-            search_query += f"""
-                AND xref.read = {'TRUE' if order == 1 else 'FALSE'}
-            """
-        header_query = cls.list_get_query(start, search_query, order_query, member_id)
-        header_update = cls.list_after_update_query(member_id)
-        # # Get mail header
-        cls.source.execute(header_query, (start, member_id, cls.message_locked,
-                                          *search_params, size))
-        if cls.source.has_results():
-            data = []
-            new_mails = []
-            all_count = 0
-            for (
-                    header_id,
-                    subject,
-                    body,
-                    time,
-                    attachments_count,
-                    message_to,
-                    message_cc,
-                    message_bcc,
-                    sender_mail,
-                    first_name,
-                    last_name,
-                    read,
-                    new_mail,
-                    prof_id,
-                    is_star,
-                    full_count
-            ) in cls.source.cursor.fetchall():
-                all_count = full_count
-                if message_to and not type(message_to) == dict:
-                    try:
-                        message_to = json.loads(str(message_to))
-                    except json.decoder.JSONDecodeError:
-                        message_to = message_to
-                if message_bcc and not type(message_bcc) == dict:
-                    try:
-                        message_bcc = json.loads(str(message_bcc))
-                    except json.decoder.JSONDecodeError:
-                        message_bcc = message_bcc
-                if message_cc and not type(message_cc) == dict:
-                    try:
-                        message_cc = json.loads(str(message_cc))
-                    except json.decoder.JSONDecodeError:
-                        message_cc = message_cc
-                data.append({
-                    "mail_id": header_id,
-                    "subject": subject,
-                    "body": body,
-                    "time": time,
-                    "attachments_count": attachments_count,
-                    "receivers": message_to,
-                    "cc": message_cc,
-                    "bcc": message_bcc,
-                    "sender_mail": sender_mail,
-                    "first_name": first_name,
-                    "last_name": last_name,
-                    "read": read,
-                    "new_mail": new_mail,
-                    "profile_url": amerize_url(prof_id),
-                    "is_stared": is_star
-                })
-                if new_mail:
-                    new_mails.append(header_id)
-            if len(new_mails) > 0:
-                cls.source.execute(header_update, (tuple(new_mails), member_id))
-                cls.source.commit()
-            return data, all_count
-        return [], 0
-
-    @classmethod
-    def get_mail_detail(cls, mail_id, member_id):
-        folder_query, folder_join = cls.folder_query(member_id)
-        header_query = cls.detail_get_query(member_id)
-        attach_query = """
-            SELECT
-                attach.file_id,
-                attach.filename,
-                attach.filetype,
-                attach.filesize,
-                attach_storage.storage_engine_id
-            FROM mail_attachment as attach
-            INNER JOIN file_storage_engine attach_storage on attach.file_id = attach_storage.id
-            WHERE (
-                attach.mail_header_id = %s
-            );
-        """
-        header_update = f"""
-            UPDATE mail_xref 
-            SET new_mail = FALSE, read = TRUE, read_ts=CURRENT_TIMESTAMP
-            FROM mail_xref xref
-            {folder_join}
-            WHERE (
-                mail_xref.mail_header_id = %s
-                AND mail_xref.member_id = %s
-                {folder_query}
-                AND mail_xref.deleted = FALSE
-            );
-        """
-
-        cls.source.execute(header_query, (mail_id, member_id, cls.message_locked))
-        if cls.source.has_results():
-            (
-                subject,
-                body,
-                time,
-                attachments_count,
-                message_to,
-                message_cc,
-                message_bcc,
-                sender_member_id,
-                sender_mail,
-                first_name,
-                last_name,
-                prof_id,
-                folder_name,
-                folder_id,
-                read,
-                reply_id,
-                reply_time,
-                reply_subject,
-                reply_body,
-                is_starred
-            ) = cls.source.cursor.fetchone()
-            if message_to and not type(message_to) == dict:
-                try:
-                    message_to = json.loads(str(message_to))
-                except json.decoder.JSONDecodeError:
-                    message_to = message_to
-            if message_bcc and not type(message_bcc) == dict:
-                try:
-                    message_bcc = json.loads(str(message_bcc))
-                except json.decoder.JSONDecodeError:
-                    message_bcc = message_bcc
-            if message_cc and not type(message_cc) == dict:
-                try:
-                    message_cc = json.loads(str(message_cc))
-                except json.decoder.JSONDecodeError:
-                    message_cc = message_cc
-            data = {
-                "subject": subject,
-                "body": body,
-                "time": time,
-                "attachments_count": attachments_count,
-                "receivers": message_to,
-                "cc": message_cc,
-                "bcc": message_bcc,
-                "sender_member_id": sender_member_id,
-                "sender_mail": sender_mail,
-                "first_name": first_name,
-                "last_name": last_name,
-                "profile_url": amerize_url(prof_id),
-                "reply": {
-                    "id": reply_id,
-                    "subject": reply_subject,
-                    "body": reply_body,
-                    "time": reply_time
-                },
-                "attachments": [],
-                "is_stared": is_starred,
-            }
-
-            cls.source.execute(attach_query, (mail_id,))
-            if cls.source.has_results():
-                for (
-                        file_id,
-                        filename,
-                        filetype,
-                        filesize,
-                        attach_engine_id
-                ) in cls.source.cursor.fetchall():
-                    data["attachments"].append({
-                        "file_id": file_id,
-                        "name": filename,
-                        "type": filetype,
-                        "size": filesize,
-                        "url": amerize_url(attach_engine_id),
-                    })
-            elif mail_id:
-                pass
-            if not read:
-                cls.source.execute(header_update, (mail_id, member_id))
-            cls.source.commit()
-            return data
-        return {}
 
     @classmethod
     def can_reply_to(cls, member_id, reply_id):
@@ -1754,6 +1519,8 @@ class SentMailDA(BaseMailDA):
                 head.subject,
                 body.message,
                 head.message_ts,
+                head.number_attachments,
+                m.id,
                 (
                     SELECT
                         string_agg(rec_memb.email , ' , ') AS email
@@ -1779,10 +1546,14 @@ class SentMailDA(BaseMailDA):
                 xref.new_mail,
                 '',
                 starred,
-                COUNT(head.id) OVER() AS full_count
+                COUNT(head.id) OVER() AS full_count,
+                head.message_to,
+                head.message_cc,
+                head.message_bcc
             FROM mail_header as head
             INNER JOIN mail_xref xref on head.id = xref.mail_header_id
             INNER JOIN mail_body body on head.id = body.mail_header_id
+            INNER JOIN member m on m.id = xref.owner_member_id
             {folder_join} 
             WHERE (
                 {'head.id < %s' if start > 0 else 'head.id > %s'}
@@ -1805,7 +1576,8 @@ class SentMailDA(BaseMailDA):
                 head.subject,
                 body.message,
                 head.message_ts,
-                '' as m_id,
+                head.number_attachments,
+                m.id,
                 (
                     SELECT
                         string_agg(rec_memb.email , ' , ') AS email
@@ -1843,12 +1615,16 @@ class SentMailDA(BaseMailDA):
                         reply_body.message
                     ELSE ''
                 END,
-                starred
+                starred,
+                head.message_to,
+                head.message_cc,
+                head.message_bcc
             FROM mail_header as head
             INNER JOIN mail_xref xref on head.id = xref.mail_header_id
             INNER JOIN mail_body body on head.id = body.mail_header_id
             INNER JOIN mail_folder_xref mfx on xref.id = mfx.mail_xref_id
             INNER JOIN mail_folder folder on mfx.mail_folder_id = folder.id
+            INNER JOIN member m on m.id = xref.owner_member_id
             INNER JOIN mail_header reply on (
                 CASE 
                     WHEN xref.replied_id IS NOT NULL THEN 
