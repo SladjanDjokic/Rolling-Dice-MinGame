@@ -1096,7 +1096,7 @@ class FileTreeDA(object):
             elif target_type == 'group':
                 node_name = 'Group Files'
         elif tree_type == 'bin':
-            node_name = 'Bin'
+            node_name = 'Trash'
         params = (tree_type, node_name)
         cls.source.execute(query, params)
         (tree_id,) = cls.source.cursor.fetchone()
