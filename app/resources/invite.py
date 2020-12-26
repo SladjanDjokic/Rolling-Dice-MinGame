@@ -12,20 +12,38 @@ import app.util.email as sendmail
 from app.config import settings
 from app.da.member import MemberDA
 from app.da.invite import InviteDA
-from app.exceptions.group import InviteExistsError, InviteDataMissingError,\
-    InviteKeyMissing, InviteNotFound, InviteExists,\
-    InviteExpired, InviteDataMissing, InviteInvalidInviterError,\
+from app.exceptions.group import InviteExistsError, InviteDataMissingError, \
+    InviteKeyMissing, InviteNotFound, InviteExists, \
+    InviteExpired, InviteDataMissing, InviteInvalidInviterError, \
     InviteInvalidInviter, InviteEmailSystemFailure
 from app.exceptions.member import MemberExists
-
 
 logger = logging.getLogger(__name__)
 
 
 class MemberInviteResource(object):
+    def on_put(self, req, resp):
+        (id, first_name, invite_key, email) = request.get_json_or_form("id", "first_name", "invite_key", "email", req=req)
+        try:
+            InviteDA.change_invite(id)
+            register_domain = req.env.get('HTTP_ORIGIN', req.forwarded_host)
+            register_url = f"/registration/{invite_key}"
+            register_url = urljoin(register_domain, register_url)
+
+            sendmail.send_mail(
+                to_email=email,
+                subject="Welcome to AMERA Share",
+                template="welcome",
+                data={
+                    "first_name": first_name,
+                    "invite_key": invite_key,
+                    "register_url": register_url
+                })
+        except:
+            logger.exception('Change invite due to unable \
+                             to auth to email system')
 
     def on_post(self, req, resp):
-
         logger.debug("Content-Type: {}".format(req.content_type))
         logger.debug("Accepts: {}".format(req.accept))
 

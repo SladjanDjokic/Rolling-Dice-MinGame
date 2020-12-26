@@ -1,11 +1,12 @@
 import logging
-import datetime
+from datetime import datetime
 
 from app.util.db import source
 from app.exceptions.data import DuplicateKeyError, DataMissingError, \
     RelationshipReferenceError
 from app.exceptions.invite import InviteExistsError, InviteDataMissingError, \
     InviteInvalidInviterError
+from dateutil.relativedelta import relativedelta
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +153,17 @@ class InviteDA(object):
         return res
 
     @classmethod
-    def get_invites(cls, search_key, page_size=None, page_number=None, sort_params=''):
+    def change_invite(cls, id):
+        query = (f""" 
+        UPDATE invite SET expiration = '{datetime.now() + relativedelta(months=+1)}' 
+        WHERE invite.id = %s;
+        """)
+        params = (id)
+        cls.source.execute(query, params)
+        cls.source.commit()
+
+    @classmethod
+    def get_invites(cls, search_key, page_size=None, page_number=None, sort_params='', get_all=False, member_id=None):
         sort_columns_string = 'invite.first_name ASC, invite.last_name ASC'
         if sort_params:
             invite_dict = {
@@ -208,10 +219,12 @@ class InviteDA(object):
             OR member.email LIKE %s
 
             OR member_group.group_name LIKE %s
+            
+            {f"AND inviter_member_id = {member_id}" if not get_all else ""}
         ORDER BY {sort_columns_string}
         """)
 
-        countQuery = ("""
+        countQuery = (f"""
         SELECT
             COUNT(*)
         FROM invite
@@ -227,6 +240,7 @@ class InviteDA(object):
             OR member.email LIKE %s
 
             OR member_group.group_name LIKE %s
+            {f"AND inviter_member_id = {member_id}" if not get_all else ""}
         """)
 
         like_search_key = """%{}%""".format(search_key)

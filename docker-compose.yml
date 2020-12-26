@@ -200,6 +200,7 @@ services:
       - ../web-api/datasource/postgresql/test-achievements.dev.sql:/docker-entrypoint-initdb.d/z-6-test-achievements.dev.sql
       - ../web-api/datasource/postgresql/test-fileshare.sql:/docker-entrypoint-initdb.d/z-7-test-fileshare.dev.sql
       - ../web-api/datasource/postgresql/test-event.dev.sql:/docker-entrypoint-initdb.d/z-8-test-event.dev.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-12-21_role.sql:/docker-entrypoint-initdb.d/d-10-schema-updates.sql
     environment:
       POSTGRES_DB: ameraiot
       POSTGRES_USER: amera

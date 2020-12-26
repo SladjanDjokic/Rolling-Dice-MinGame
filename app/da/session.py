@@ -10,8 +10,7 @@ from app.util.filestorage import amerize_url
 logger = logging.getLogger(__name__)
 
 
-class SessionDA (object):
-
+class SessionDA(object):
     source = source
 
     @classmethod
@@ -132,7 +131,8 @@ class SessionDA (object):
             member_location.province as province,
             member_location.postal as postal,
             member_location.country as country,
-            file_storage_engine.storage_engine_id as s3_avatar_url
+            file_storage_engine.storage_engine_id as s3_avatar_url,
+            member.user_type as user_type     
 
         FROM member_session
         LEFT JOIN member ON member_session.member_id = member.id
@@ -168,7 +168,8 @@ class SessionDA (object):
                 province,
                 postal,
                 country,
-                s3_avatar_url
+                s3_avatar_url,
+                user_type
             ) = cls.source.cursor.fetchone()
 
             session = {
@@ -192,7 +193,8 @@ class SessionDA (object):
                 "province": province,
                 "postal": postal,
                 "country": country,
-                "amera_avatar_url": amerize_url(s3_avatar_url)
+                "amera_avatar_url": amerize_url(s3_avatar_url),
+                "user_type": user_type
             }
 
             return session
@@ -207,7 +209,7 @@ class SessionDA (object):
         WHERE session_id = %s
         """)
 
-        params = (session_id, )
+        params = (session_id,)
         cls.source.execute(query, params)
         cls.source.commit()
 
@@ -233,16 +235,16 @@ class SessionDA (object):
         cls.source.execute(query, [])
         if cls.source.has_results():
             for (
-                session_id,
-                member_id,
-                email,
-                create_date,
-                update_date,
-                expiration_date,
-                username,
-                status,
-                first_name,
-                last_name,
+                    session_id,
+                    member_id,
+                    email,
+                    create_date,
+                    update_date,
+                    expiration_date,
+                    username,
+                    status,
+                    first_name,
+                    last_name,
             ) in cls.source.cursor:
                 session = {
                     "session_id": session_id,
@@ -262,7 +264,7 @@ class SessionDA (object):
         return None
 
     @classmethod
-    def get_sessions(cls, search_key, page_size=None, page_number=None, sort_params=''):
+    def get_sessions(cls, search_key, page_size=None, page_number=None, sort_params='', get_all=False, member_id=None):
         sort_columns_string = 'first_name ASC, last_name ASC'
         if sort_params:
             session_dict = {
@@ -295,10 +297,11 @@ class SessionDA (object):
                 OR first_name LIKE %s
                 OR last_name LIKE %s
                 OR email LIKE %s
+                {f"AND member_id = {member_id}" if not get_all else ""}
             ORDER BY {sort_columns_string}
             """)
 
-        countQuery = """
+        countQuery = f"""
             SELECT
                 COUNT(*)
             FROM member_session
@@ -307,6 +310,7 @@ class SessionDA (object):
                 OR first_name LIKE %s
                 OR last_name LIKE %s
                 OR email LIKE %s
+                {f"AND member_id = {member_id}" if not get_all else ""}
             """
 
         like_search_key = """%{}%""".format(search_key)
@@ -315,7 +319,7 @@ class SessionDA (object):
 
         count = 0
         if cls.source.has_results():
-            (count, ) = cls.source.cursor.fetchone()
+            (count,) = cls.source.cursor.fetchone()
 
         if page_size and page_number:
             query += """LIMIT %s OFFSET %s"""
@@ -329,15 +333,15 @@ class SessionDA (object):
         cls.source.execute(query, params)
         if cls.source.has_results():
             for (
-                session_id,
-                email,
-                username,
-                first_name,
-                last_name,
-                status,
-                create_date,
-                update_date,
-                expiration_date
+                    session_id,
+                    email,
+                    username,
+                    first_name,
+                    last_name,
+                    status,
+                    create_date,
+                    update_date,
+                    expiration_date
             ) in cls.source.cursor:
                 session = {
                     "session_id": session_id,
