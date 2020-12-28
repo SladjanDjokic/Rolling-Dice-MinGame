@@ -21,7 +21,8 @@ class ChatView(object):
         try:
             message = data.get('message')
             p = ChatProducer()
-            p.produce([message], p.topic)
+            p.topic = 'chat'
+            p.produce([message])
             resp.body = json.dumps(
                 {"message": message,
                  "first_name": data.get('first_name')

@@ -1,6 +1,7 @@
 import logging
 import traceback
 import datetime
+import app.util.json as json
 
 from app.util.db import source
 from app.exceptions.data import DuplicateKeyError
@@ -17,12 +18,12 @@ class SessionDA(object):
     def auth(cls, username, password):
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query = ("""
-        SELECT 
-            id, 
-            email, 
-            first_name, 
-            last_name, 
-            username, 
+        SELECT
+            id,
+            email,
+            first_name,
+            last_name,
+            username,
             status,
             main_file_tree,
             bin_file_tree
@@ -58,7 +59,10 @@ class SessionDA(object):
         return None
 
     @classmethod
-    def create_session(cls, member, session_id, expiration_date, commit=True):
+    def create_session(cls, member, session_id, expiration_date,
+                       remote_ip_address, gateway_ip_address, original_url,
+                       original_arguments, remote_ip_name, gateway_ip_name,
+                       server_name, server_ip, ip_info, commit=True):
 
         # try:
         #     query = ("""
@@ -80,9 +84,70 @@ class SessionDA(object):
         query = ("""
         INSERT INTO
             member_session
-        (session_id, member_id, email, first_name, last_name,
-            username, expiration_date)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        (
+            -- Required
+            session_id,
+            member_id,
+            email,
+            first_name,
+            last_name,
+            username,
+            expiration_date,
+            remote_ip_address,
+            gateway_ip_address,
+            original_url,
+            original_arguments,
+            -- Not Required
+            remote_name,
+            remote_continent_code,
+            gateway_name,
+            gateway_country_code_id,
+            remote_country_name,
+            remote_country_code_2,
+            remote_country_code_3,
+            remote_country_code_id,
+            remote_country_phone,
+            remote_region_name,
+            remote_region_code,
+            remote_city_name,
+            remote_postal_code,
+            remote_latitude,
+            remote_longitude,
+            remote_timezone_name,
+            remote_timezone_utc_offset,
+            remote_language_id,
+            server_ip_address,
+            server_name,
+            server_country_code_id,
+            organization_name,
+            organization_domain,
+            organization_asn,
+            organization_type,
+            organization_route,
+            carrier_name,
+            carrier_mcc,
+            carrier_mnc,
+            user_agent,
+            user_device,
+            user_device_type,
+            user_device_name,
+            user_os,
+            user_os_type,
+            user_os_version,
+            user_browser,
+            user_browser_type,
+            user_browser_version,
+            ipregistry_response
+        )
+        VALUES (
+            -- Required
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+            -- Not Required
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+            %s, %s, %s, %s, %s, %s, %s
+        )
         """)
 
         # AES_ENCRYPT(%s, UNHEX(SHA2(%s)))
@@ -95,6 +160,50 @@ class SessionDA(object):
             member.get("last_name"),
             member.get("username"),
             expiration_date,
+            ip_info.get('ip', remote_ip_address),
+            gateway_ip_address,
+            original_url,
+            original_arguments,
+            ip_info.get('hostname', remote_ip_name),
+            ip_info.get('location').get("remote_continent_code"),
+            gateway_ip_name,
+            ip_info.get("gateway_country_code_id"),
+            ip_info.get('location').get('country').get('name'),  # remote_country_name
+            ip_info.get('location').get('country').get('code'),  # remote_country_code_2,
+            None,  # remote_country_code_3,
+            ip_info.get('location').get('country').get('area'),  # remote_country_code_id,
+            ip_info.get('location').get('country').get('calling_code'),  # remote_country_phone,
+            ip_info.get('location').get('region').get('name'),  # remote_region_name,
+            ip_info.get('location').get('region').get('code'),  # remote_region_code,
+            ip_info.get('location').get('city'),  # remote_city_name,
+            ip_info.get('location').get('postal'),  # remote_postal_code,
+            ip_info.get('location').get('latitude'),  # remote_latitude,
+            ip_info.get('location').get('longitude'),  # remote_longitude,
+            ip_info.get('time_zone').get('name'),  # remote_timezone_name,
+            ip_info.get('time_zone').get('offset'),  # remote_timezone_utc_offset,
+            None,  # ip_info.get('location').get('language').get('code'),  # remote_language_id,
+            server_ip,  # server_ip_address,
+            server_name,  # server_name,
+            None,  # server_country_code_id,
+            ip_info.get('connection').get('organization'),  # organization_name
+            ip_info.get('connection').get('domain'),  # organization_domain,
+            ip_info.get('connection').get('asn'),  # organization_asn,
+            ip_info.get('connection').get('type'),  # organization_type,
+            ip_info.get('connection').get('route'),  # organization_route,
+            ip_info.get('carrier').get('name'),  # carrier_name,
+            ip_info.get('carrier').get('mcc'),  # carrier_mcc,
+            ip_info.get('carrier').get('mnc'),  # carrier_mnc,
+            ip_info.get('user_agent').get('header'),  # user_agent,
+            ip_info.get('user_agent').get('device').get('brand'),  # user_device,
+            ip_info.get('user_agent').get('device').get('type'),  # user_device_type,
+            ip_info.get('user_agent').get('device').get('name'),  # user_device_name,
+            ip_info.get('user_agent').get('os').get('name'),  # user_os,
+            ip_info.get('user_agent').get('os').get('type'),  # user_os_type,
+            ip_info.get('user_agent').get('os').get('version'),  # user_os_version,
+            ip_info.get('user_agent').get('engine').get('name'),  # user_browser,
+            ip_info.get('user_agent').get('engine').get('type'),  # user_browser_type,
+            ip_info.get('user_agent').get('engine').get('version'),  # user_browser_version,
+            json.dumps(ip_info)  # ipregistry_response
         )
 
         try:
@@ -132,7 +241,7 @@ class SessionDA(object):
             member_location.postal as postal,
             member_location.country as country,
             file_storage_engine.storage_engine_id as s3_avatar_url,
-            member.user_type as user_type     
+            member.user_type as user_type
 
         FROM member_session
         LEFT JOIN member ON member_session.member_id = member.id
@@ -195,6 +304,280 @@ class SessionDA(object):
                 "country": country,
                 "amera_avatar_url": amerize_url(s3_avatar_url),
                 "user_type": user_type
+            }
+
+            return session
+
+        return None
+
+    @classmethod
+    def get_full_session(cls, session_id):
+        query = ("""
+        SELECT
+            member_session.session_id as session_id,
+            member_session.member_id as member_id,
+            member_session.email as email,
+            member_session.create_date as create_date,
+            member_session.update_date as update_date,
+            member_session.expiration_date as expiration_date,
+            member_session.username as username,
+            member_session.status as status,
+            member_session.first_name as first_name,
+            member_session.last_name as last_name,
+            member.middle_name as middle_name,
+            member.company_name as company,
+            job_title.name as title,
+            json_agg(DISTINCT member_location.*) AS location_information,
+            json_agg(DISTINCT member_contact_2.*) AS contact_information,
+            json_agg(DISTINCT country_code.*) AS country_code,
+            file_storage_engine.storage_engine_id as s3_avatar_url,
+            member.user_type as user_type,
+            member_session.remote_ip_address,
+            member_session.gateway_ip_address,
+            member_session.original_url,
+            member_session.original_arguments,
+            member_session.remote_name,
+            member_session.remote_continent_code,
+            member_session.gateway_name,
+            member_session.gateway_country_code_id,
+            member_session.remote_country_name,
+            member_session.remote_country_code_2,
+            member_session.remote_country_code_3,
+            member_session.remote_country_code_id,
+            member_session.remote_country_phone,
+            member_session.remote_region_name,
+            member_session.remote_region_code,
+            member_session.remote_city_name,
+            member_session.remote_postal_code,
+            member_session.remote_latitude,
+            member_session.remote_longitude,
+            member_session.remote_timezone_name,
+            member_session.remote_timezone_utc_offset,
+            member_session.remote_language_id,
+            member_session.server_ip_address,
+            member_session.server_name,
+            member_session.server_country_code_id,
+            member_session.organization_name,
+            member_session.organization_domain,
+            member_session.organization_asn,
+            member_session.organization_type,
+            member_session.organization_route,
+            member_session.carrier_name,
+            member_session.carrier_mcc,
+            member_session.carrier_mnc,
+            member_session.user_agent,
+            member_session.user_device,
+            member_session.user_device_type,
+            member_session.user_device_name,
+            member_session.user_os,
+            member_session.user_os_type,
+            member_session.user_os_version,
+            member_session.user_browser,
+            member_session.user_browser_type,
+            member_session.user_browser_version,
+            member_session.ipregistry_response
+        FROM member_session
+        LEFT JOIN member ON member_session.member_id = member.id
+        LEFT OUTER JOIN member_location ON member_location.member_id = member.id
+        LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = member.id
+        LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
+        LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
+        LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id
+        LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+        WHERE member_session.session_id = %s AND member_session.expiration_date >= current_timestamp
+        GROUP BY 
+            member_session.session_id,
+            member_session.member_id,
+            member_session.email,
+            member_session.create_date,
+            member_session.update_date,
+            member_session.expiration_date,
+            member_session.username,
+            member_session.status,
+            member_session.first_name,
+            member_session.last_name,
+            member.middle_name,
+            member.company_name,
+            job_title.name,
+            file_storage_engine.storage_engine_id,
+            member.user_type,
+            member_session.remote_ip_address,
+            member_session.gateway_ip_address,
+            member_session.original_url,
+            member_session.original_arguments,
+            member_session.remote_name,
+            member_session.remote_continent_code,
+            member_session.gateway_name,
+            member_session.gateway_country_code_id,
+            member_session.remote_country_name,
+            member_session.remote_country_code_2,
+            member_session.remote_country_code_3,
+            member_session.remote_country_code_id,
+            member_session.remote_country_phone,
+            member_session.remote_region_name,
+            member_session.remote_region_code,
+            member_session.remote_city_name,
+            member_session.remote_postal_code,
+            member_session.remote_latitude,
+            member_session.remote_longitude,
+            member_session.remote_timezone_name,
+            member_session.remote_timezone_utc_offset,
+            member_session.remote_language_id,
+            member_session.server_ip_address,
+            member_session.server_name,
+            member_session.server_country_code_id,
+            member_session.organization_name,
+            member_session.organization_domain,
+            member_session.organization_asn,
+            member_session.organization_type,
+            member_session.organization_route,
+            member_session.carrier_name,
+            member_session.carrier_mcc,
+            member_session.carrier_mnc,
+            member_session.user_agent,
+            member_session.user_device,
+            member_session.user_device_type,
+            member_session.user_device_name,
+            member_session.user_os,
+            member_session.user_os_type,
+            member_session.user_os_version,
+            member_session.user_browser,
+            member_session.user_browser_type,
+            member_session.user_browser_version,
+            member_session.ipregistry_response
+        """)
+
+        params = (session_id,)
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            (
+                session_id,
+                member_id,
+                email,
+                create_date,
+                update_date,
+                expiration_date,
+                username,
+                status,
+                first_name,
+                last_name,
+                middle_name,
+                company,
+                title,
+                location_information,
+                contact_information,
+                country_code,                
+                s3_avatar_url,
+                user_type,
+                remote_ip_address,
+                gateway_ip_address,
+                original_url,
+                original_arguments,
+                remote_name,
+                remote_continent_code,
+                gateway_name,
+                gateway_country_code_id,
+                remote_country_name,
+                remote_country_code_2,
+                remote_country_code_3,
+                remote_country_code_id,
+                remote_country_phone,
+                remote_region_name,
+                remote_region_code,
+                remote_city_name,
+                remote_postal_code,
+                remote_latitude,
+                remote_longitude,
+                remote_timezone_name,
+                remote_timezone_utc_offset,
+                remote_language_id,
+                server_ip_address,
+                server_name,
+                server_country_code_id,
+                organization_name,
+                organization_domain,
+                organization_asn,
+                organization_type,
+                organization_route,
+                carrier_name,
+                carrier_mcc,
+                carrier_mnc,
+                user_agent,
+                user_device,
+                user_device_type,
+                user_device_name,
+                user_os,
+                user_os_type,
+                user_os_version,
+                user_browser,
+                user_browser_type,
+                user_browser_version,
+                ipregistry_response
+            ) = cls.source.cursor.fetchone()
+
+            session = {
+                "session_id": session_id,
+                "member_id": member_id,
+                "email": email,
+                "create_date": create_date,
+                "update_date": update_date,
+                "expiration_date": expiration_date,
+                "username": username,
+                "status": status,
+                "first_name": first_name,
+                "last_name": last_name,
+                "middle_name": middle_name,
+                "company": company,
+                "title": title,
+                "location_information": location_information,
+                "contact_information": contact_information,
+                "country_code": country_code,
+                "amera_avatar_url": amerize_url(s3_avatar_url),
+                "user_type": user_type,
+                "remote_ip_address": remote_ip_address,
+                "gateway_ip_address": gateway_ip_address,
+                "original_url": original_url,
+                "original_arguments": original_arguments,
+                "remote_name": remote_name,
+                "remote_continent_code": remote_continent_code,
+                "gateway_name": gateway_name,
+                "gateway_country_code_id": gateway_country_code_id,
+                "remote_country_name": remote_country_name,
+                "remote_country_code_2": remote_country_code_2,
+                "remote_country_code_3": remote_country_code_3,
+                "remote_country_code_id": remote_country_code_id,
+                "remote_country_phone": remote_country_phone,
+                "remote_region_name": remote_region_name,
+                "remote_region_code": remote_region_code,
+                "remote_city_name": remote_city_name,
+                "remote_postal_code": remote_postal_code,
+                "remote_latitude": remote_latitude,
+                "remote_longitude": remote_longitude,
+                "remote_timezone_name": remote_timezone_name,
+                "remote_timezone_utc_offset": remote_timezone_utc_offset,
+                "remote_language_id": remote_language_id,
+                "server_ip_address": server_ip_address,
+                "server_name": server_name,
+                "server_country_code_id": server_country_code_id,
+                "organization_name": organization_name,
+                "organization_domain": organization_domain,
+                "organization_asn": organization_asn,
+                "organization_type": organization_type,
+                "organization_route": organization_route,
+                "carrier_name": carrier_name,
+                "carrier_mcc": carrier_mcc,
+                "carrier_mnc": carrier_mnc,
+                "user_agent": user_agent,
+                "user_device": user_device,
+                "user_device_type": user_device_type,
+                "user_device_name": user_device_name,
+                "user_os": user_os,
+                "user_os_type": user_os_type,
+                "user_os_version": user_os_version,
+                "user_browser": user_browser,
+                "user_browser_type": user_browser_type,
+                "user_browser_version": user_browser_version,
+                "ipregistry_response": ipregistry_response
             }
 
             return session
@@ -305,7 +688,7 @@ class SessionDA(object):
             SELECT
                 COUNT(*)
             FROM member_session
-            WHERE 
+            WHERE
                 username LIKE %s
                 OR first_name LIKE %s
                 OR last_name LIKE %s

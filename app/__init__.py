@@ -7,7 +7,7 @@ from falcon_multipart.middleware import MultipartMiddleware
 from app.calls.views import IncomingCallView
 from app.chat.views import ChatView
 from app.config import parser, settings
-from app.middleware import CrossDomain  # , JSONTranslator
+from app.middleware import CrossDomain, KafkaProducerMiddleware  # , JSONTranslator
 from app.resources.member import MemberRegisterResource, MemberResource, MemberSearchResource, \
     MemberGroupSearchResource, MemberContactResource, ContactMembersResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms, MemberDepartments, MemberContactsRoles, \
@@ -85,6 +85,7 @@ def create_app():
             CrossDomain(),
             # FalconAuthMiddleware(auth_backend),
             MultipartMiddleware(),
+            KafkaProducerMiddleware(),
             # JSONTranslator()
         ],
     )

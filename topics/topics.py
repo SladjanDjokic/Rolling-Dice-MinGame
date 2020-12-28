@@ -29,5 +29,5 @@ class BaseTopic:
 
 # TODO This needs to be run probably in a kafka script rather than through python when running docker
 # client_config = {'bootstrap.servers': 'localhost:29092'}
-# topics = ["calls", "email", "chat", "sms"]
+# topics = ["calls", "email", "chat", "sms", "calendar", "errors", "forgot_password"]
 # BaseTopic().create_topics(client_config, topics)

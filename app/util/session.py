@@ -71,12 +71,15 @@ def get_session_cookie(req):
     return cookies.get(settings.get("web.cookie_name"))
 
 
-def validate_session(session_id):
+def validate_session(session_id, full=False):
 
     if not session_id:
         raise InvalidSessionError()
 
-    session = SessionDA.get_session(session_id)
+    if full:
+        session = SessionDA.get_full_session(session_id)
+    else:
+        session = SessionDA.get_session(session_id)
     if not session:
         raise InvalidSessionError()
 

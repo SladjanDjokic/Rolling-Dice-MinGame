@@ -28,12 +28,18 @@ services:
     restart: always
     logging:
       options:
-        max-size: "500k"
+        max-size: "10m"
         max-file: "1"
+    deploy:
+      resources:
+        limits:
+          memory: 48M
+        reservations:
+          memory: 8M
     ports:
       - 9000:9000
       - 9443:443
-#    command: [nginx-debug, "-g", "daemon off;"] # Uncomment if want to enable debug mode
+    # command: [nginx-debug, "-g", "daemon off;"] # Uncomment if want to enable debug mode
     networks:
       amera-net:
         aliases:
@@ -58,8 +64,14 @@ services:
     restart: always
     logging:
       options:
-        max-size: "500k"
+        max-size: "10m"
         max-file: "1"
+    deploy:
+      resources:
+        limits:
+          memory: 48M
+        reservations:
+          memory: 12M
     build:
       context: ../web
       dockerfile: Dockerfile.dev
@@ -77,8 +89,14 @@ services:
     restart: always
     logging:
       options:
-        max-size: "500k"
+        max-size: "10m"
         max-file: "1"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 1G
     user: node
     build:
       context: ../web-share
@@ -121,11 +139,17 @@ services:
     restart: always
     logging:
       options:
-        max-size: "500k"
+        max-size: "10m"
         max-file: "1"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 96M
     build:
       context: ../web-api
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     depends_on:
       - amera-web-db
     networks:
@@ -134,6 +158,8 @@ services:
       - 5000
     ports:
       - 5000:5000
+    environment: 
+      - AMERA_API_KAFKA.BOOTSTRAP_SERVERS=kafka:9092
     volumes:
       - ../web-api:/app
       - web-api-python-packages:/root/.local/share
@@ -145,8 +171,14 @@ services:
     restart: always
     logging:
       options:
-        max-size: "500k"
+        max-size: "10m"
         max-file: "1"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 96M
     volumes:
       - ../web-api/datasource/postgresql/members.sql:/docker-entrypoint-initdb.d/1-members.sql
       - ../web-api/datasource/postgresql/group.sql:/docker-entrypoint-initdb.d/2-group.sql
@@ -192,6 +224,9 @@ services:
       - ../web-api/datasource/postgresql/timezone.sql:/docker-entrypoint-initdb.d/g-1-timezone.sql
       - ../web-api/datasource/postgresql/event_color.sql:/docker-entrypoint-initdb.d/g-2-event-color.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-12-21_event_2.sql:/docker-entrypoint-initdb.d/g-3-event-2.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-12-21_role.sql:/docker-entrypoint-initdb.d/g-4-schema-updates.sql
+      - ../web-api/datasource/postgresql/activity_trace.sql:/docker-entrypoint-initdb.d/h-1-activity_trace.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-12-22_member_session.sql:/docker-entrypoint-initdb.d/h-2-schema-updates.sql
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/z-3-test-schedule.sql
@@ -200,7 +235,6 @@ services:
       - ../web-api/datasource/postgresql/test-achievements.dev.sql:/docker-entrypoint-initdb.d/z-6-test-achievements.dev.sql
       - ../web-api/datasource/postgresql/test-fileshare.sql:/docker-entrypoint-initdb.d/z-7-test-fileshare.dev.sql
       - ../web-api/datasource/postgresql/test-event.dev.sql:/docker-entrypoint-initdb.d/z-8-test-event.dev.sql
-      - ../web-api/datasource/postgresql/schema-updates-2020-12-21_role.sql:/docker-entrypoint-initdb.d/d-10-schema-updates.sql
     environment:
       POSTGRES_DB: ameraiot
       POSTGRES_USER: amera
@@ -220,6 +254,16 @@ services:
       - ALLOW_ANONYMOUS_LOGIN=yes
     networks:
       - amera-net
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "1"
+    deploy:
+      resources:
+        limits:
+          memory: 96M
+        reservations:
+          memory: 50M
   kafka:
     image: 'bitnami/kafka:latest'
     container_name: kafka
@@ -236,6 +280,16 @@ services:
       - zookeeper
     networks:
       - amera-net
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "1"
+    deploy:
+      resources:
+        limits:
+          memory: 224M
+        reservations:
+          memory: 192M
 
   amera-eventserver:
     container_name: amera-eventserver
@@ -243,8 +297,20 @@ services:
     restart: always
     build:
       context: ../web-api
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "1"
+    deploy:
+      resources:
+        limits:
+          memory: 48M
+        reservations:
+          memory: 12M
     depends_on:
+      - kafka
+      - zookeeper
       - amera-web-api
     networks:
       - amera-net
@@ -254,8 +320,8 @@ services:
       - 4000:4000
     volumes:
       - ../web-api:/app
-      - web-eventserver-python-packages:/root/.local/share
-#    command: [ "uvicorn", "--app-dir=./eventserver", "test-star:app", "--host", "0.0.0.0", "--port", "4000", "--reload" ]
+      - web-api-python-packages:/root/.local/share
+    # command: [ "uvicorn", "--app-dir=./eventserver", "test-star:app", "--host", "0.0.0.0", "--port", "4000", "--reload" ]
     command: ["gunicorn", "--chdir", "eventserver", "sse:app", "--reload", "--bind=0.0.0.0:4000", "-k", "uvicorn.workers.UvicornWorker", "--log-level=DEBUG"]
 
   amera-call-consumer:
@@ -264,19 +330,29 @@ services:
     restart: always
     build:
       context: ../web-api
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "1"
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+        reservations:
+          memory: 48M
     networks:
       - amera-net
     volumes:
       - ../web-api:/app
-      - web-consumer-call-python-packages:/root/.local/share
+      - web-api-python-packages:/root/.local/share
     environment:
       - AMERA_API_KAFKA.SERVER=kafka:9092
     depends_on:
       - kafka
       - zookeeper
       - amera-eventserver
-#    command: [ "pipenv", "run", "calls"]
+    # command: [ "pipenv", "run", "calls"]
     command: [ "pipenv", "run", "dev-calls" ]
 
 
@@ -286,19 +362,29 @@ services:
     restart: always
     build:
       context: ../web-api
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "1"
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+        reservations:
+          memory: 48M
     networks:
       - amera-net
     volumes:
       - ../web-api:/app
-      - web-consumer-email-python-packages:/root/.local/share
+      - web-api-python-packages:/root/.local/share
     environment:
       - AMERA_API_KAFKA.SERVER=kafka:9092
     depends_on:
       - kafka
       - zookeeper
       - amera-eventserver
-#    command: [ "pipenv", "run", "emails" ]
+    # command: [ "pipenv", "run", "emails" ]
     command: ["pipenv", "run", "dev-email"]
 
   amera-sms-consumer:
@@ -307,21 +393,30 @@ services:
     restart: always
     build:
       context: ../web-api
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "1"
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+        reservations:
+          memory: 48M
     networks:
       - amera-net
     volumes:
       - ../web-api:/app
-      - web-consumer-sms-python-packages:/root/.local/share
+      - web-api-python-packages:/root/.local/share
     environment:
       - AMERA_API_KAFKA.SERVER=kafka:9092
     depends_on:
       - kafka
       - zookeeper
       - amera-eventserver
-#    command: [ "pipenv", "run", "sms" ]
+    # command: [ "pipenv", "run", "sms" ]
     command: [ "pipenv", "run", "dev-sms" ]
-
 
 
 volumes:
@@ -329,14 +424,14 @@ volumes:
     name: amera-web-api-python-packages
   web-main-python-packages:
     name: amera-web-main-python-packages
-  web-eventserver-python-packages:
-    name: amera-web-eventserver-python-packages
-  web-consumer-call-python-packages:
-    name: amera-consumer-call-python-packages
-  web-consumer-email-python-packages:
-    name: amera-consumer-email-python-packages
-  web-consumer-sms-python-packages:
-    name: amera-consumer-sms-python-packages
+  # web-eventserver-python-packages:
+  #   name: amera-web-eventserver-python-packages
+  # web-consumer-call-python-packages:
+  #   name: amera-consumer-call-python-packages
+  # web-consumer-email-python-packages:
+  #   name: amera-consumer-email-python-packages
+  # web-consumer-sms-python-packages:
+  #   name: amera-consumer-sms-python-packages
 networks:
   amera-net:
     name: amera-net

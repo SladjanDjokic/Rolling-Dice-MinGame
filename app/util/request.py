@@ -1,4 +1,6 @@
 import logging
+import socket
+from pprint import pformat
 from falcon import uri
 
 logger = logging.getLogger(__name__)
@@ -42,3 +44,75 @@ def get_url_base(req):
 
     host = req.host
     return '{}://{}'.format(scheme, host)
+
+
+def get_request_client_data(req):
+    # https://falcon.readthedocs.io/en/stable/api/request_and_response.html#falcon.Request.access_route
+    # access_route gives us a list of values based on the number
+    # of hops the request took to get to our application
+    # This is done by analyzing:
+    # - Forwarded
+    # - X-Forwarded-For
+    # - X-Real-IP
+    logger.debug(f"Access Route: {req.access_route}")
+    logger.debug(f"Remote Addr: {req.remote_addr}")
+
+    access_route = iter(req.access_route)
+
+    # https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For
+    # We know that the very first value of access_route is the actual client IP
+    # any further IP are proxies, we only care about the outer most proxy
+    client_ip = next(access_route, None)
+    gateway_ip = next(access_route, None)
+
+    # If we do not have a Client IP, we have no access routes
+    # Therefore, access_route should default to `remote_addr`
+    # in the event that it doesn't, we will force it here to both the client and gateway
+    if not client_ip:
+        client_ip = req.remote_addr
+        gateway_ip = req.remote_addr
+
+    # Let's get DNS information
+    client_name = None
+    try:
+        client_name = next(iter(socket.gethostbyaddr(client_ip)))
+    except socket.herror:
+        pass
+    except TypeError:
+        pass
+    except Exception:
+        pass
+
+    gateway_name = None
+    try:
+        gateway_name = next(iter(socket.gethostbyaddr(gateway_ip)))
+    except socket.herror:
+        pass
+    except TypeError:
+        pass
+    except Exception:
+        pass
+
+    # Let's get server information
+    server_name1 = socket.gethostname()
+    server_ip1 = socket.gethostbyname(server_name1)
+    server_name2 = socket.getfqdn()
+    server_ip2 = socket.gethostbyname(server_name2)
+
+    # https://falcon.readthedocs.io/en/stable/api/request_and_response.html#falcon.Request.forwarded_uri
+    # We are going to use a variety of mechanisms to retrieve the original
+    # requested URL
+    logger.debug(f'Request: {pformat(req.env)}')
+    logger.debug(f"URI: {req.uri}")
+    logger.debug(f"URL: {req.url}")
+    logger.debug(f"Forwarded: {req.forwarded_uri}")
+    logger.debug(f"Relative: {req.relative_uri}")
+    logger.debug(f"Prefix: {req.prefix}")
+    logger.debug(f"Forwarded Prefix: {req.forwarded_prefix}")
+
+    original_url = req.forwarded_uri or req.url
+    query_string = req.query_string
+
+    return client_ip, gateway_ip, original_url, query_string,\
+        client_name, gateway_name, server_name1, server_ip1,\
+        server_name2, server_ip2

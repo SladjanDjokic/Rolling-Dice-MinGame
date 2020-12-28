@@ -1,18 +1,44 @@
-import os
-
-from confluent_kafka import Producer
 from app.config import settings
 import logging
+from confluent_kafka import Producer
+from app.events.conf_admin import create_topic
+
 logger = logging.getLogger(__name__)
+
+# Key for calendar topic
 
 
 class BaseProducer:
 
     def __init__(self, config=None):
+        kafka_conf = {
+            'bootstrap.servers': settings.get('kafka.bootstrap_servers')
+        }
+
+        if settings.get('kafka.sasl.username'):
+            kafka_conf.update({
+                'sasl.mechanisms': settings.get('kafka.sasl.mechanisms'),
+                'security.protocol': settings.get('kafka.security.protocol'),
+                'sasl.username': settings.get('kafka.sasl.username'),
+                'sasl.password': settings.get('kafka.sasl.password'),
+            })
+
         if config:
             self.p = Producer(config)
         else:
-            self.p = Producer({'bootstrap.servers': 'kafka:9092'})
+            # TODO Setup local setup only need bootstrap
+            self.p = Producer({
+                'bootstrap.servers': settings.get('kafka.bootstrap_servers'),
+                'sasl.mechanisms': settings.get('kafka.sasl.mechanisms'),
+                'security.protocol': settings.get('kafka.security.protocol'),
+                'sasl.username': settings.get('kafka.sasl.username'),
+                'sasl.password': settings.get('kafka.sasl.password'),
+            })
+            # self.p = Producer({'bootstrap.servers': 'kafka:9092'})
+            kafka_conf = config
+
+        self.p = Producer(kafka_conf)
+        if not config:
             self.topic = ''
 
     @staticmethod
@@ -22,12 +48,13 @@ class BaseProducer:
         if err is not None:
             logger.debug('Message delivery failed: {}'.format(err))
         else:
-            logger.debug('Message delivered to {} [{}]'.format(msg.topic(), msg.partition()))
+            logger.debug('Message delivered to {} [{}] {}'.format(msg.topic(), msg.partition(), msg.value()))
 
     def produce(self, data_source):
+        # create_topic(self.topic)
         for data in data_source:
             # Poll will trigger the callback self.deliver_report which indicates if the message has
-            # successfully been delivered. Not sure if this means a consumer has read it or its been succesfully
+            # successfully been delivered. Not sure if this means a consumer has read it or its been successfully
             # been delivered to a client
             self.p.poll(0)
 
@@ -68,5 +95,3 @@ class CallingProducer(BaseProducer):
         super().__init__()
         print("TOPIC ###")
         self.topic = settings.get('kafka.calls_topic')
-
-
