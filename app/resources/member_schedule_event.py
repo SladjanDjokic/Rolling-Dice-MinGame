@@ -70,7 +70,7 @@ class MemberScheduleEventResource(object):
             end_condition,  # eunm
             repeat_weekdays,  # [int ids of weekdays fro date-fns]
             end_date_datetime,
-            repeats_condition,  # int
+            repeat_times,  # int
             location_mode,  # enum
             location_data,  # is either and id of memeber location or a string
             attachments,  # [member_file ids]
@@ -99,7 +99,7 @@ class MemberScheduleEventResource(object):
         sequence_id = MemberEventDA().add_sequence(sequence_name=event_name)
 
         location_id = location_data if (
-            location_mode == 'my_locations' and event_type == 'Meeting') else None
+            location_mode == 'my_locations' and location_data != '' and (event_type == 'Meeting' or event_type == 'Personal')) else None
         location_address = location_data if (
             location_mode == 'lookup' or location_mode == 'url') else None
 
@@ -122,12 +122,13 @@ class MemberScheduleEventResource(object):
             location_mode=location_mode,
             location_id=location_id,
             location_address=location_address,
+            repeat_times=repeat_times
         )
 
-        ''' 
+        '''
             If we have attachments, bind them only to the first instance
-            TODO: We can change this logic based on the desired UX. 
-            Like we can have some of the files marked to be available on all instances of the 
+            TODO: We can change this logic based on the desired UX.
+            Like we can have some of the files marked to be available on all instances of the
             recurring event
         '''
         if len(attachments) > 0:
@@ -158,6 +159,7 @@ class MemberScheduleEventResource(object):
                         location_mode=location_mode,
                         location_id=location_id,
                         location_address=location_address,
+                        repeat_times=repeat_times
                     )
                     all_event_ids.append(recurring_id)
 
@@ -192,6 +194,61 @@ class MemberScheduleEventResource(object):
         else:
             resp.body = json.dumps({
                 "description": "Creating event sequence went wrong",
+                "success": False
+            }, default_parser=json.parser)
+
+    @inject_member
+    def on_put(self, req, resp, member):
+        host_member_id = member["member_id"]
+        (event_id, start, end) = request.get_json_or_form(
+            'event_id', 'start', 'end', req=req)
+        result = None
+        success = MemberEventDA().change_event_date(event_id, start, end)
+        if success:
+            result = MemberEventDA().get_event_by_id(event_id)
+        if result:
+            resp.body = json.dumps({
+                "data": result,
+                "description": "Event has been modified succsessfully",
+                "success": True
+            }, default_parser=json.parser)
+        else:
+            resp.body = json.dumps({
+                "description": "Creating modification went wrong",
+                "success": False
+            }, default_parser=json.parser)
+
+    @inject_member
+    def on_delete(self, req, resp, member):
+        host_member_id = member["member_id"]
+        (option, event) = request.get_json_or_form('option', 'event', req=req)
+        event_id = event['event_id']
+        sequence_id = event['sequence_id']
+        start_datetime = event['start']
+        success = None
+        if (option == 'onlyThis'):
+            success = MemberEventDA.cancel_single_event(event_id)
+        elif (option == 'allUpcoming'):
+            success = MemberEventDA.cancel_events_after(
+                sequence_id, start_datetime)
+
+        if success:
+            result = MemberEventDA.get_event_sequence_by_id(sequence_id)
+            if result:
+                resp.body = json.dumps({
+                    "data": result,
+                    "sequence_id": sequence_id,
+                    "description": "Event cancelled succsessfully",
+                    "success": True
+                }, default_parser=json.parser)
+            else:
+                resp.body = json.dumps({
+                    "description": "Cancelling events went wrong",
+                    "success": False
+                }, default_parser=json.parser)
+        else:
+            resp.body = json.dumps({
+                "description": "Cancelling events went wrong",
                 "success": False
             }, default_parser=json.parser)
 

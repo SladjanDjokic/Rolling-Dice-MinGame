@@ -258,20 +258,20 @@ class MemberEventDA(object):
     @classmethod
     def add_2(cls, sequence_id, event_color_id, event_name, event_description, host_member_id,
               is_full_day, event_tz, start_datetime, end_datetime, event_type, event_recurrence_freq,
-              end_condition, repeat_weekdays, end_date_datetime, location_mode, location_id, location_address):
+              end_condition, repeat_weekdays, end_date_datetime, location_mode, location_id, location_address, repeat_times):
         try:
             query = (
                 """ INSERT INTO event_2
                     (sequence_id, event_color_id, event_name, event_description, host_member_id,
-                    is_full_day, event_tz, start_datetime, end_datetime, event_type, 
-                    event_recurrence_freq, end_condition, repeat_weekdays, end_date_datetime, location_mode, 
-                    location_id, location_address)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    is_full_day, event_tz, start_datetime, end_datetime, event_type,
+                    event_recurrence_freq, end_condition, repeat_weekdays, end_date_datetime, location_mode,
+                    location_id, location_address, repeat_times)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 """)
             params = (sequence_id, event_color_id, event_name, event_description, host_member_id,
                       is_full_day, event_tz, start_datetime, end_datetime, event_type, event_recurrence_freq,
-                      end_condition, json.dumps(repeat_weekdays), end_date_datetime, location_mode, location_id, location_address)
+                      end_condition, json.dumps(repeat_weekdays), end_date_datetime, location_mode, location_id, location_address, repeat_times)
             cls.source.execute(query, params)
             id = None
             if cls.source.has_results():
@@ -286,7 +286,7 @@ class MemberEventDA(object):
     @classmethod
     def bind_attachment(cls, event_id, attachment_file_id):
         try:
-            query = (""" 
+            query = ("""
                 INSERT INTO event_media (event_id, member_file_id) VALUES (%s, %s)
             """)
             params = (event_id, attachment_file_id)
@@ -294,6 +294,134 @@ class MemberEventDA(object):
             cls.source.commit()
         except Exception as e:
             raise e
+
+    # Cancel one event by id, return sequence id
+    @classmethod
+    def cancel_single_event(cls, event_id):
+        try:
+            query = ("""
+                UPDATE event_2
+	                SET event_status = 'Cancel'
+	                WHERE event_2.id = %s
+	                RETURNING event_2.sequence_id
+                """)
+            params = (event_id,)
+            cls.source.execute(query, params)
+            sequence_id = None
+            if cls.source.has_results():
+                result = cls.source.cursor.fetchone()
+                sequence_id = result[0]
+            cls.source.commit()
+            return sequence_id
+        except Exception as e:
+            raise e
+
+    # Cancel events in sequence starting from selected date
+    @classmethod
+    def cancel_events_after(cls, sequence_id, start_datetime):
+        try:
+            query = ("""
+                UPDATE event_2
+	                SET event_status = 'Cancel'
+	                WHERE sequence_id = %s AND start_datetime >= %s
+	                RETURNING TRUE
+                """)
+            params = (sequence_id, start_datetime)
+            cls.source.execute(query, params)
+            success = None
+            if cls.source.has_results():
+                result = cls.source.cursor.fetchone()
+                success = result[0]
+            cls.source.commit()
+            return success
+        except Exception as e:
+            raise e
+
+    @classmethod
+    def change_event_date(cls, event_id, start, end):
+        try:
+            query = ("""
+                UPDATE event_2
+                SET start_datetime = %s, end_datetime = %s
+                    WHERE event_2.id = %s 
+                    RETURNING id
+            """)
+            params = (start, end, event_id)
+            cls.source.execute(query, params)
+            id = None
+            if cls.source.has_results():
+                result = cls.source.cursor.fetchone()
+                id = result[0]
+            cls.source.commit()
+            return id
+        except Exception as e:
+            raise e
+
+    @classmethod
+    def get_event_by_id(cls, event_id):
+        query = ("""
+            SELECT row_to_json(row)
+            FROM (
+                    SELECT 
+                        id as event_id, 
+                        sequence_id,
+                        event_color_id,
+                        event_name,
+                        event_type,
+                        event_description,
+                        host_member_id,
+                        is_full_day,
+                        event_status,
+                        event_tz,
+                        start_datetime as start,
+                        end_datetime as end,
+                        event_recurrence_freq,
+                        end_condition,
+                        repeat_times,
+                        repeat_weekdays,
+                        end_date_datetime,
+                        location_mode,
+                        location_id,
+                        location_address,
+                        (
+                            SELECT json_agg(files) as attachments
+                            FROM (
+                                SELECT 
+                                    event_media.id as attachment_id,
+                                    member_file_id,
+                                    file_id,
+                                    member_file.file_name as file_name,
+                                    member_file.file_size_bytes as file_size_bytes,
+                                    file_storage_engine.storage_engine_id as file_link
+                                FROM event_media
+                                LEFT JOIN member_file ON member_file.id = member_file_id
+                                LEFT JOIN file_storage_engine ON file_storage_engine.id = member_file.file_id
+                                WHERE event_media.event_id = event_2.id
+                            ) as files
+                        ),
+                        (
+                            SELECT json_agg(invitees) as invitations
+                            FROM (
+                                SELECT 
+                                    id as invite_id,
+                                    invite_member_id,
+                                    invite_status,
+                                    create_date,
+                                    update_date
+                                FROM event_invite_2
+                                WHERE event_invite_2.event_id = event_2.id
+                            ) AS invitees
+                        )
+                    FROM event_2
+                    WHERE event_2.id = %s AND event_status != 'Cancel'
+                ) AS row
+        """)
+        params = (event_id,)
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        else:
+            return None
 
     @classmethod
     def get_event_sequence_by_id(cls, sequence_id):
@@ -309,11 +437,13 @@ class MemberEventDA(object):
                             event_description,
                             host_member_id,
                             is_full_day,
+                            event_status,
                             event_tz,
                             start_datetime as start,
                             end_datetime as end,
                             event_recurrence_freq,
                             end_condition,
+                            repeat_times,
                             repeat_weekdays,
                             end_date_datetime,
                             location_mode,
@@ -349,7 +479,7 @@ class MemberEventDA(object):
                                 ) AS invitees
                             )
                         FROM event_2
-                        WHERE sequence_id = %s
+                        WHERE sequence_id = %s AND event_status != 'Cancel'
                     ) AS sequence
                 """)
         params = (sequence_id,)
@@ -383,11 +513,13 @@ class MemberEventDA(object):
                             event_description,
                             host_member_id,
                             is_full_day,
+                            event_status,
                             event_tz,
                             start_datetime as start,
                             end_datetime as end,
                             event_recurrence_freq,
                             end_condition,
+                            repeat_times,
                             repeat_weekdays,
                             end_date_datetime,
                             location_mode,
@@ -423,7 +555,7 @@ class MemberEventDA(object):
                                 ) AS invitees
                             )
                         FROM event_2
-                        WHERE {} host_member_id = %s
+                        WHERE {} host_member_id = %s AND event_status != 'Cancel'
                     ) AS sequence
         """.format(query_date))
         params = (event_host_member_id,)

@@ -228,6 +228,7 @@ services:
       - ../web-api/datasource/postgresql/activity_trace.sql:/docker-entrypoint-initdb.d/h-1-activity_trace.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-12-22_member_session.sql:/docker-entrypoint-initdb.d/h-2-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-12-23-contact-update.sql:/docker-entrypoint-initdb.d/h-3-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-12-25_event_2.sql:/docker-entrypoint-initdb.d/h-4-schema-updates.event-2.sql
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/z-3-test-schedule.sql
@@ -277,12 +278,12 @@ services:
   #   depends_on:
   #     - amera-web-db
 
-# Kafka and Zookeeper Single Deploy
+  # Kafka and Zookeeper Single Deploy
   zookeeper:
-    image: 'bitnami/zookeeper:latest'
+    image: "bitnami/zookeeper:latest"
     container_name: zookeeper
     ports:
-      - '2181:2181'
+      - "2181:2181"
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
     networks:
@@ -298,10 +299,10 @@ services:
         reservations:
           memory: 50M
   kafka:
-    image: 'bitnami/kafka:latest'
+    image: "bitnami/kafka:latest"
     container_name: kafka
     ports:
-      - '29092:29092'
+      - "29092:29092"
     environment:
       - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
       - ALLOW_PLAINTEXT_LISTENER=yes

@@ -1,4 +1,3 @@
-
 CREATE TYPE event_freq  AS ENUM ('Daily', 'Weekly', 'Specific days', 'Monthly', 'Bi-monthly', 'Quarterly', 'Yearly', 'No recurrence');
 CREATE TYPE end_condition AS ENUM ('End date', 'times');
 CREATE TYPE event_2_types AS ENUM ('Meeting', 'Chat', 'Audio', 'Video');
@@ -69,6 +68,7 @@ CREATE TABLE event_invite_2 (
   update_date           TIMESTAMP       WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 
 );
+
 
 
 
