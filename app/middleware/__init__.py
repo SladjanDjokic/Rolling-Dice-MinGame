@@ -183,9 +183,25 @@ class KafkaProducerMiddleware(object):
     def process_resource(self, req, resp, resource, params):
         # Topics determined by resource as http method
         r = topic_routes.get(resource.__class__.__name__)
-        if r:
+        logger.debug(f"Route Topics: {r}")
+        try:
+            logger.debug(f"Attempt to get route method: {req.method}")
             self.topic = r.get(req.method).get('topic')
             self.topic_data.event_type = r.get(req.method).get('event_type')
+        except Exception as e:
+            self.topic = None
+            logger.debug(f'''
+                Failed to retrieve topic from: {resource.__class__.__name__}
+                Topic Routes are: {topic_routes}
+                Route Metadata is: {r}
+                Request Method: {req.method}
+            ''')
+            logger.exception(
+                f'Failed to retrieve topic from: {resource.__class__.__name__}')
+            logger.error(e)
+
+            pass
+
         if not self.topic:
             # If no specific topic necessary. Send all other data to activity topic for monitoring purposes
             self.topic = "activity"

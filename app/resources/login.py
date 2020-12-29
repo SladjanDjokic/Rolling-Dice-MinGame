@@ -66,9 +66,6 @@ class MemberLoginResource(object):
          client_name, gateway_name, server_name1, server_ip1,
          server_name2, server_ip2) = request.get_request_client_data(req)
 
-        client = IpregistryClient(settings.get(
-            'services.ipregistry.api_key'), cache=DefaultCache(maxsize=2048, ttl=600))
-
         if client_ip == '127.0.0.1':
             client_ip = '23.113.176.107'
         if not client_ip:
@@ -91,40 +88,59 @@ class MemberLoginResource(object):
             }
         }
         try:
-            ip_info = client.lookup(client_ip)
-            ip_info = vars(ip_info)
-        except ApiError as e:
-            logger.debug(f'error looking up IP: {client_ip}')
+            api_key = settings.get('services.ipregistry.api_key')
+            if not api_key:
+                raise Exception('Unable to load a proper key')
+            client = IpregistryClient(api_key,
+                cache=DefaultCache(maxsize=2048, ttl=600))
+            try:
+                ip_info = client.lookup(client_ip)
+                ip_info = vars(ip_info)
+            except ApiError as e:
+                logger.error(f'''
+                    Error looking up IP: {client_ip} from IP Registry
+                    Is key empty?: {(not settings.get('services.ipregistry.api_key'))}
+                ''')
+                logger.exception(e)
+
+            # curl --data '["Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.120 Safari/537.36"]' \
+            # --header "Content-Type: application/json" \
+            # --request POST "https://api.ipregistry.co/user_agent?key=YOUR_API_KEY"
+
+            try:
+                url = client._requestHandler._buildApiUrl('user_agent', {})
+                r = requests.post(url, data=json.dumps(
+                    [req.env['HTTP_USER_AGENT']]),
+                    headers=client._requestHandler._headers(),
+                    timeout=client._config.timeout)
+                r.raise_for_status()
+                data = r.json()['results']
+                data = next(iter(data))
+                logger.debug(f'Map: {data}')
+                ip_info['_json'].update({
+                    'user_agent': data
+                })
+            except requests.HTTPError as e:
+                logger.error(f'''
+                    Error getting browser data from ip registry
+                    Is key empty?: {(not settings.get('services.ipregistry.api_key'))}
+                ''')
+                logger.exception(e)
+                ip_info.update({
+                    'user_agent': {
+                        'header': {},
+                        'device': {},
+                        'os': {},
+                        'engine': {},
+                    }
+                })
+                pass
+        except Exception as e:
+            logger.error(f'''
+                Error creating an instance of ip registry
+                Is key empty?: {(not settings.get('services.ipregistry.api_key'))}
+            ''')
             logger.exception(e)
-
-        # curl --data '["Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.120 Safari/537.36"]' \
-        # --header "Content-Type: application/json" \
-        # --request POST "https://api.ipregistry.co/user_agent?key=YOUR_API_KEY"
-
-        try:
-            url = client._requestHandler._buildApiUrl('user_agent', {})
-            r = requests.post(url, data=json.dumps(
-                [req.env['HTTP_USER_AGENT']]),
-                headers=client._requestHandler._headers(),
-                timeout=client._config.timeout)
-            r.raise_for_status()
-            data = r.json()['results']
-            data = next(iter(data))
-            logger.debug(f'Map: {data}')
-            ip_info['_json'].update({
-                'user_agent': data
-            })
-        except requests.HTTPError:
-            ip_info.update({
-                'user_agent': {
-                    'header': {},
-                    'device': {},
-                    'os': {},
-                    'engine': {},
-                }
-            })
-            pass
-
 
         logger.debug(f'IP Info: {pformat(ip_info)}')
         # TODO: Refactor with a better pattern (one or the other):
