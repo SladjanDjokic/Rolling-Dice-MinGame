@@ -11,7 +11,7 @@ from app.middleware import CrossDomain, KafkaProducerMiddleware  # , JSONTransla
 from app.resources.member import MemberRegisterResource, MemberResource, MemberSearchResource, \
     MemberGroupSearchResource, MemberContactResource, ContactMembersResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms, MemberDepartments, MemberContactsRoles, \
-    MemberContactsCompanies, MemberContactsCountries, MemberTimezones, MemberInfoByIdResource
+    MemberContactsCompanies, MemberContactsCountries, MemberTimezones, MemberInfoByIdResource, MemberContactSecurity
 from app.resources.verification import Verification
 from app.resources.verifycell import VerifyCell
 from app.resources.promo_codes import PromoCodes
@@ -27,7 +27,7 @@ from app.resources.file_sharing import FileStorage, FileStorageDetail, ShareFile
     DownloadStorageFile, DownloadSharedFile, MemberFileCloud, MemberFileBin, MemberShareFile, GroupFileCloud, \
     GroupFileBin
 from app.resources.group import MemberGroupResource, GroupMembershipResource, GroupDetailResource, \
-    GroupMemberInviteResource, GroupMembersResource
+    GroupMemberInviteResource, GroupMembersResource, MemberGroupSecurity
 from app.resources.file_sharing import FileStorage, FileStorageDetail, \
     ShareFile, ShareFileDetail, DownloadStorageFile, DownloadSharedFile, \
     FileGroupResource
@@ -137,6 +137,7 @@ def _setup_routes(app):
     member_resource = MemberResource()
     app.add_route("/member/{username}", member_resource)
 
+    app.add_route("/member/contact/security/{contact_member_id}", MemberContactSecurity())
     app.add_route("/member/contact", MemberContactResource())
     app.add_route("/member/contacts/roles", MemberContactsRoles())
     app.add_route("/member/contacts/companies", MemberContactsCompanies())
@@ -166,7 +167,7 @@ def _setup_routes(app):
     app.add_route("/groups/membership", GroupMembershipResource())
     app.add_route("/member/group/invite", GroupMemberInviteResource())
     app.add_route("/member/group-members", GroupMembersResource())
-
+    app.add_route("/member/group/security/{group_id}", MemberGroupSecurity())
     app.add_route("/system/activity/invite", SystemActivityResource("invites"))
     app.add_route("/system/activity/session", SystemActivityResource("sessions"))
 

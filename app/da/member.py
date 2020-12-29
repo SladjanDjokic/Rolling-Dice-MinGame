@@ -1219,6 +1219,7 @@ class MemberContactDA(object):
         get_contact_query = ("""
             SELECT contact.id as id,
                 contact.contact_member_id as contact_member_id,
+                contact.status as status,
                 contact.first_name as first_name,
                 member.middle_name as middle_name,
                 contact.last_name as last_name,
@@ -1282,6 +1283,7 @@ class MemberContactDA(object):
             for (
                     id,
                     contact_member_id,
+                    status,
                     first_name,
                     middle_name,
                     last_name,
@@ -1308,6 +1310,7 @@ class MemberContactDA(object):
                 contact = {
                     "id": id,
                     "contact_member_id": contact_member_id,
+                    "status": status,
                     "first_name": first_name,
                     "middle_name": middle_name,
                     "last_name": last_name,
@@ -1337,25 +1340,25 @@ class MemberContactDA(object):
         return None
 
     @classmethod
-    def create_member_contact(cls, member_id, contact_member_id, first_name,
+    def create_member_contact(cls, member_id, contact_member_id, status, first_name,
                               last_name, country, cell_phone, office_phone,
                               home_phone, email, personal_email, company_name,
                               company_phone, company_web_site, company_email,
                               company_bio, contact_role, role_id, commit=True):
         create_member_contact_query = ("""
                     INSERT INTO contact
-                        (member_id, contact_member_id, first_name, last_name,
+                        (member_id, contact_member_id, status, first_name, last_name,
                         country, cell_phone, office_phone, home_phone,
                         email, personal_email, company_name, company_phone,
                         company_web_site, company_email, company_bio,
                         contact_role, role_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                             %s, %s, %s, %s, %s, %s)
                     RETURNING id
                     """)
 
         create_member_contact_params = (
-            member_id, contact_member_id, first_name, last_name, country, cell_phone, office_phone,
+            member_id, contact_member_id, status, first_name, last_name, country, cell_phone, office_phone,
             home_phone, email, personal_email, company_name, company_phone,
             company_web_site, company_email, company_bio, contact_role, role_id
         )
@@ -1400,6 +1403,71 @@ class MemberContactDA(object):
         try:
             cls.source.execute(query, params)
 
+            if commit:
+                cls.source.commit()
+        except Exception as err:
+            raise err
+
+    @classmethod
+    def get_security(cls, member_id, contact_member_id):
+        query = """
+            SELECT contact.security_pin, contact.security_exchange_status,
+                contact.security_exchange_option,
+                contact.security_picture_storage_id,
+                file_storage_engine.storage_engine_id as security_picture
+            FROM contact
+                LEFT OUTER JOIN file_storage_engine ON contact.security_picture_storage_id = file_storage_engine.id
+            WHERE
+            member_id = %s AND contact_member_id = %s;
+        """
+        params = (member_id, contact_member_id)
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            (
+                security_pin,
+                security_exchange_status,
+                security_exchange_option,
+                security_picture_storage_id,
+                security_picture,
+            ) = cls.source.cursor.fetchone()
+            return {
+                "security_exchange_status": security_exchange_status,
+                "security_picture_storage_id": security_picture_storage_id,
+                "pin": security_pin,
+                "exchange_option": security_exchange_option,
+                "security_picture": amerize_url(security_picture)
+            }
+        return None
+
+    @classmethod
+    def update_security(cls, member_id, contact_member_id, 
+                        security_picture_storage_id, security_pin, exchangeOption, commit=True):
+        query = """
+            UPDATE contact SET
+                security_exchange_status = %s,
+                security_exchange_option = %s,
+                security_pin = %s,
+                security_picture_storage_id = %s
+                WHERE
+                member_id = %s AND contact_member_id = %s;
+        """
+        params = ('requested', exchangeOption,
+            security_pin, security_picture_storage_id, member_id, contact_member_id)
+
+        try:
+            cls.source.execute(query, params)
+            
+            if commit:
+                cls.source.commit()
+        except Exception as err:
+            raise err
+
+        params = ('pending', exchangeOption,
+            security_pin, security_picture_storage_id,
+            contact_member_id, member_id)
+
+        try:
+            cls.source.execute(query, params)            
             if commit:
                 cls.source.commit()
         except Exception as err:

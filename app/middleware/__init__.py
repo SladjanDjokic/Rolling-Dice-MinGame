@@ -221,8 +221,8 @@ class KafkaProducerMiddleware(object):
 
             # Gevent to not block request. Create dict from topic_data model for kafka
             topic_data_dict = vars(self.topic_data)
-            gevent.spawn(self.producer_async(self.topic,
-                                             [json.dumps(topic_data_dict, default_parser=json.parser)]))
+            #gevent.spawn(self.producer_async(self.topic,
+            #                                 [json.dumps(topic_data_dict, default_parser=json.parser)]))
 
             logger.debug(f"### After kafka {type(self.topic_data.headers)}")
             # Write activity to db - copy topic data to preserve json
@@ -275,8 +275,8 @@ class KafkaProducerMiddleware(object):
             # Gevent kafka producer
             logger.debug("### Kafka")
             logger.debug(vars(self.topic_data))
-            gevent.spawn(self.producer_async(self.topic, [json.dumps(vars(self.topic_data),
-                                                                     default_parser=json.parser)]))
+            #gevent.spawn(self.producer_async(self.topic, [json.dumps(vars(self.topic_data),
+            #                                                         default_parser=json.parser)]))
 
             # convert dicts to json for db query
             self.db_query_data['resp_data'] = json.dumps(self.topic_data.resp_data,

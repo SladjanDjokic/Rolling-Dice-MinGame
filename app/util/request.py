@@ -13,13 +13,13 @@ def get_json_or_form(*params, req):
     results = []
 
     logger.debug("Comparing Content-Type: {}".format(req.content_type))
-
-    if "form-data" in req.content_type:
+    func = lambda x: x
+    if req.content_type and "form-data" in req.content_type:
         # This will parse the content-type of multipart/form-data
         # but it will not parse application/x-www-form-urlencoded
         logger.debug("Using Request.get_param for form-data")
         func = req.get_param
-    elif "x-www-form-urlencoded" in req.content_type:
+    elif req.content_type and "x-www-form-urlencoded" in req.content_type:
         # This will parse the content-type of application/x-www-form-urlencoded
         # but it will not parse form-data or any other content-type
         # this has to be done manually as is until version 3 of Falcon
@@ -27,7 +27,7 @@ def get_json_or_form(*params, req):
         data = req.stream.read(req.content_length or 0)
         data = uri.parse_query_string(uri.decode(data.decode("utf-8")))
         func = data.get
-    else:
+    elif req.media and req.media.get:
         logger.debug("Using Request.media.get")
         func = req.media.get
 

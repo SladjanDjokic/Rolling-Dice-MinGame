@@ -298,6 +298,7 @@ class ContactMembersResource(object):
             contact_member_params = {
                 "member_id": member_id,
                 "contact_member_id": contact_member_id,
+                "status": "requested",
                 "first_name": contact_member['first_name'],
                 "last_name": contact_member['last_name'],
                 "country": contact_member['country'],
@@ -321,6 +322,32 @@ class ContactMembersResource(object):
             if contact_id:
                 contact = MemberContactDA().get_member_contact(contact_id)
             contacts.append(contact)
+
+            contact_member = MemberDA().get_contact_member(member_id)
+
+            contact_member_params = {
+                "member_id": contact_member_id,
+                "contact_member_id": member_id,
+                "status": "pending",
+                "first_name": contact_member['first_name'],
+                "last_name": contact_member['last_name'],
+                "country": contact_member['country'],
+                "cell_phone": contact_member['cell_phone'],
+                "office_phone": '',
+                "home_phone": '',
+                "email": contact_member['email'],
+                "personal_email": '',
+                "company_name": '',
+                "company_phone": '',
+                "company_web_site": '',
+                "company_email": '',
+                "company_bio": '',
+                "contact_role": '',
+                "role_id": None
+            }
+
+            contact_id = MemberContactDA().create_member_contact(**contact_member_params)
+            logger.debug("New created contact_id: {}".format(contact_id))
 
         resp.body = json.dumps({
             "contacts": contacts,
@@ -364,7 +391,6 @@ class ContactMembersResource(object):
 
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
-
 
 class MemberContactResource(object):
     auth = {
@@ -473,6 +499,67 @@ class MemberContactResource(object):
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
 
+class MemberContactSecurity(object):
+    def on_get(self, req, resp, contact_member_id=None):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+        
+        try:
+            security_info = MemberContactDA.get_security(member_id, contact_member_id)
+            resp.body = json.dumps({
+                "data": security_info,
+                "success": True
+            }, default_parser=json.parser)
+        except expression as e:
+            resp.body = json.dumps({
+                "description": "Something went wrong",
+                "success": False
+            }, default_parser=json.parser)
+
+    def on_post(self, req, resp, contact_member_id=None):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+
+        try:
+
+            (pin, picture, exchangeOption) = request.get_json_or_form(
+                "pin", "picture", "exchangeOption", req=req)
+
+            # Upload image to aws and create an entry in db
+
+            security = MemberContactDA.get_security(member_id, contact_member_id)
+            security_picture_storage_id = security["security_picture_storage_id"]
+            logger.debug("pin: {}".format(pin))
+            if picture is not None:
+                security_picture_storage_id = FileStorageDA().put_file_to_storage(picture)
+            
+            security_params = {
+                "member_id": member_id,
+                "contact_member_id": contact_member_id,
+                "security_picture_storage_id": security_picture_storage_id,
+                "security_pin": pin,
+                "exchangeOption": exchangeOption
+            }
+            
+            MemberContactDA.update_security(**security_params)
+            
+            resp.body = json.dumps({
+                "description": "Stored Successfully!",
+                "success": True
+            }, default_parser=json.parser)
+        except expression as e:
+            resp.body = json.dumps({
+                "description": "Something went wrong",
+                "success": False
+            }, default_parser=json.parser)
 
 class MemberContactsRoles(object):
     def on_get(self, req, resp):

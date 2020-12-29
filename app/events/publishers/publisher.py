@@ -24,16 +24,6 @@ class BaseProducer:
             })
 
         if config:
-            self.p = Producer(config)
-        else:
-            # TODO Setup local setup only need bootstrap
-            self.p = Producer({
-                'bootstrap.servers': settings.get('kafka.bootstrap_servers'),
-                'sasl.mechanisms': settings.get('kafka.sasl.mechanisms'),
-                'security.protocol': settings.get('kafka.security.protocol'),
-                'sasl.username': settings.get('kafka.sasl.username'),
-                'sasl.password': settings.get('kafka.sasl.password'),
-            })
             # self.p = Producer({'bootstrap.servers': 'kafka:9092'})
             kafka_conf = config
 

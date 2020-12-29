@@ -11,13 +11,13 @@ def create_topic(topic):
         https://github.com/confluentinc/confluent-kafka-python/blob/master/examples/adminapi.py
     """
     print("### Admin")
-    a = AdminClient({
-        'bootstrap.servers': settings.get('kafka.bootstrap_servers'),
-        'sasl.mechanisms': settings.get('kafka.sasl.mechanisms'),
-        'security.protocol': settings.get('kafka.security.protocol'),
-        'sasl.username': settings.get('kafka.sasl.username'),
-        'sasl.password': settings.get('kafka.sasl.password'),
-    })
+    # a = AdminClient({
+    #     'bootstrap.servers': settings.get('kafka.bootstrap_servers'),
+    #     'sasl.mechanisms': settings.get('kafka.sasl.mechanisms'),
+    #     'security.protocol': settings.get('kafka.security.protocol'),
+    #     'sasl.username': settings.get('kafka.sasl.username'),
+    #     'sasl.password': settings.get('kafka.sasl.password'),
+    # })
     kafka_conf = {
         'bootstrap.servers': settings.get('kafka.bootstrap_servers')
     }

@@ -1,5 +1,5 @@
 ALTER TABLE member_session
-   ADD COLUMN  remote_ip_address           VARCHAR(64)     NOT NULL,
+   ADD COLUMN  remote_ip_address           VARCHAR(64)     ,
    ADD COLUMN  remote_name                 VARCHAR(128),
    ADD COLUMN  remote_continent_code       VARCHAR(2),
    ADD COLUMN  remote_country_name         VARCHAR(128),
@@ -22,8 +22,8 @@ ALTER TABLE member_session
    ADD COLUMN  gateway_ip_address          VARCHAR(64),
    ADD COLUMN  gateway_name                VARCHAR(128),
    ADD COLUMN  gateway_country_code_id     INTEGER,
-   ADD COLUMN  original_url                VARCHAR(100)     NOT NULL,
-   ADD COLUMN  original_arguments          VARCHAR(2000)    NOT NULL,
+   ADD COLUMN  original_url                VARCHAR(100)     ,
+   ADD COLUMN  original_arguments          VARCHAR(2000)    ,
    ADD COLUMN  organization_name           VARCHAR(255),
    ADD COLUMN  organization_domain         VARCHAR(255),
    ADD COLUMN  organization_asn            VARCHAR(255),

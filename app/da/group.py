@@ -408,6 +408,51 @@ class GroupDA(object):
         cls.source.commit()
         return True
 
+    @classmethod
+    def get_security(cls, group_id):
+        query = """
+            SELECT member_group.picture_file_id, member_group.pin, member_group.exchange_option,
+                file_storage_engine.storage_engine_id as security_picture
+            FROM member_group
+                LEFT JOIN file_storage_engine ON file_storage_engine.id = member_group.picture_file_id
+            WHERE member_group.id = %s
+        """
+        params = (group_id, )
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            (
+                picture_file_id,
+                pin,
+                exchange_option,
+                security_picture,
+            ) = cls.source.cursor.fetchone()
+            return {
+                "picture_file_id": picture_file_id,
+                "pin": pin,
+                "exchange_option": exchange_option,
+                "security_picture": amerize_url(security_picture)
+            }
+        return None
+    
+    @classmethod
+    def update_security(cls, group_id, picture_file_id, pin, exchange_option, commit=True):
+        query = """
+            UPDATE member_group SET
+                picture_file_id = %s,
+                pin = %s,
+                exchange_option = %s
+                WHERE
+                id = %s;
+        """
+        params = (picture_file_id, pin, exchange_option, group_id)
+
+        try:
+            cls.source.execute(query, params)
+            
+            if commit:
+                cls.source.commit()
+        except Exception as err:
+            raise err
 
 class GroupMembershipDA(object):
     source = source

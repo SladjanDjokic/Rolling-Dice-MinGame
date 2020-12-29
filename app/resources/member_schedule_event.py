@@ -202,74 +202,12 @@ class MemberScheduleEventColors(object):
         """
         Create an event for a user
         """
-    def on_get(req, resp):
+    def on_get(self, req, resp):
         try:
 
             session_id = get_session_cookie(req)
             session = validate_session(session_id)
-            host_member_id = session["member_id"]
-            (name, description, event_type, duration_all_day, start_datetime,end_datetime,location_address,location_postal,
-             recurrence) = request.get_json_or_form(
-                "name", "description", "event_type",
-              "duration_all_day", "start_datetime","end_datetime","location_address","location_postal",
-             "recurrence", req=req)
-
-            member = MemberDA().get_member(host_member_id)
-
-            if not member:
-                raise MemberNotFound(member)
-
-            file = req.get_param('event_image')
-            # logger.debug("event_image: {}".format(file))
-
-            event_image = None
-            if (file is not None) and hasattr(file, 'filename'):
-                file_id = FileStorageDA().put_file_to_storage(file)
-                # file_id = FileStorageDA().store_file_to_storage(file)
-                status = 'available'
-                event_image = FileStorageDA().create_member_file_entry(
-                    file_id, file.filename, host_member_id, status, 'EventImage')
-
-            set_params = {
-                "name": name,
-                "description": description,
-                "host_member_id": host_member_id,
-                "event_type": event_type,
-                "event_status": 'Active',
-                "duration_all_day": duration_all_day,
-                "start_datetime": start_datetime,
-                "end_datetime": end_datetime,
-                "location_address": location_address,
-                "location_postal": location_postal,
-                "event_image": event_image,
-                "recurrence": recurrence,
-            }
-
-            event_id = MemberEventDA().add(**set_params)
-
-            if not event_id:
-                raise ScheduleEventAddingFailed()
-
-            event_invite_to_list = None
-            available_member_list = None
-            event_invite_ids = None
-
-            # if event_invite_to_list_str:
-            #     event_invite_to_list = json.loads(event_invite_to_list_str)
-            #     # logger.debug("event_invite_to_list: {}".format(event_invite_to_list))
-
-            #     available_member_list = MemberDA().extractAvailableMembers(event_invite_to_list)
-            #     # logger.debug("set_params: {}".format(available_member_list))
-
-            #     set_params = {
-            #         "event_id": event_id,
-            #         "event_invite_to_list": available_member_list
-            #     }
-
-            #     event_invite_ids = MemberScheduleEventInviteDA().addMultiple(**set_params)
-
-            event = MemberEventDA().get_event_by_id(event_id)
-
+            
             colors = MemberScheduleEventDA().get_colors()
 
             if colors:

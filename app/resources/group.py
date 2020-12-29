@@ -406,3 +406,58 @@ class GroupMembersResource(object):
 
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
+
+class MemberGroupSecurity(object):
+    def on_get(self, req, resp, group_id=None):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            # groupMemberGroupSecurity_leader_id = session["member_id"]
+            member_id = session["member_id"]
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+
+        try:
+            security = GroupDA().get_security(group_id)
+            resp.body = json.dumps({
+                "data": security,
+                "success": True
+            }, default_parser=json.parser)
+        except expression as e:
+            resp.body = json.dumps({
+                "description": "Something went wrong",
+                "success": False
+            }, default_parser=json.parser)
+
+    def on_post(self, req, resp, group_id=None):
+        (picture, pin, exchange_option) = request.get_json_or_form(
+            "picture", "pin", "exchange_option", req=req)
+
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+
+        security = GroupDA().get_security(group_id)
+
+        picture_file_id = security["picture_file_id"]
+        if picture is not None:
+            picture_file_id = FileStorageDA().put_file_to_storage(picture)
+        security_params = {
+            "group_id": group_id,
+            "picture_file_id": picture_file_id,
+            "pin": pin,
+            "exchange_option": exchange_option
+        }
+        try:
+            GroupDA().update_security(**security_params)
+            resp.body = json.dumps({
+                "description": "Successfully saved",
+                "success": True
+            }, default_parser=json.parser)
+        except expression as e:
+            resp.body = json.dumps({
+                "description": "Something went wrong",
+                "success": False
+            }, default_parser=json.parser)

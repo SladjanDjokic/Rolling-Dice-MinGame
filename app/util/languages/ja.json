@@ -1,5 +1,5 @@
 {
-    "app.calendar.title": "Calendar and Scheduling",
+    "app.calendar.title": "Calendar",
     "app.calls.title": "Calls",
     "app.chat.title": "Chat",
     "app.communication.title": "IoT Device Control",
@@ -70,7 +70,8 @@
     "app.login.rememberMe": "Remember me",
     "app.login.signin": "SIGN IN",
     "app.login.welcome": "Welcome to secure collaboration with",
-    "app.mail.title": "Secure Mail",
+    "app.mail.title": "Mail",
+    "app.projects.title": "Projects",
     "app.mediaStreaming.title": "Media Streaming",
     "app.regigration.submit": "Submit",
     "app.registration.checkip": "CHECK IP",
