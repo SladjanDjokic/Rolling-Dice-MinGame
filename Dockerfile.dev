@@ -13,6 +13,7 @@ RUN apt-get update && \
     inotify-tools \
     libpq-dev \
     wget \
+    curl \
     gcc \
     python3-dev \
     musl-dev \

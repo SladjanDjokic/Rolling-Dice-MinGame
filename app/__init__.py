@@ -44,6 +44,7 @@ from app.resources.mail import MailDraftComposeResource, MailAttachmentResource,
     MailTrashResource, MailArchiveResource, MailSettingsResource, MailSentResource
 from app.resources.role import RolesResource
 from app.resources.avatar import AvatarResource
+from app.resources.activity import ActivitiesResource
 # from app.resources.memberfile import
 # from app.resources.keygen import KeyGenResource, KeyGenFileUpload
 
@@ -99,11 +100,18 @@ def create_app():
     return app
 
 
+class HealthResource:
+    def on_get(self, req, resp):
+        resp.media = {'status': 'OK', 'health': 1.0}
+
+
 def start():
     logger.info("Environment: {}".format(settings.get("ENV_NAME")))
 
 
 def _setup_routes(app):
+    app.add_route('/healthz', HealthResource())
+
     # app.add_route('/demo/image-upload', KeyGenFileUpload())
     # app.add_route("/demo/keygen", KeyGenResource())
     app.add_route("/member/login", MemberLoginResource())
@@ -170,6 +178,8 @@ def _setup_routes(app):
     app.add_route("/member/group/security/{group_id}", MemberGroupSecurity())
     app.add_route("/system/activity/invite", SystemActivityResource("invites"))
     app.add_route("/system/activity/session", SystemActivityResource("sessions"))
+
+    app.add_route("/member/activity", ActivitiesResource())
 
     app.add_route("/languages", LanguageResource())
 

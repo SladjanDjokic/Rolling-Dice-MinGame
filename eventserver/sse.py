@@ -2,7 +2,7 @@ import json
 from loguru import logger
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from sse_starlette.sse import EventSourceResponse
 
 from starlette.routing import Route
@@ -30,6 +30,11 @@ async def calls_sse(request: Request):
     # TODO Throttle status checks so its not 10000 a second
     call_data_gen = status_event_generator(request, int(member_id))
     return EventSourceResponse(call_data_gen)
+
+
+async def check_health(request: Request):
+    response = {'status': 'OK', 'health': 1.0}
+    return JSONResponse(response, status_code=204)
 
 
 async def status_event_generator(request, member_id):
@@ -72,6 +77,7 @@ async def status_event_generator(request, member_id):
 
 routes = [
     Route("/consumer/call-notifications", consumer_call_event, methods=["POST"]),
+    Route('/healthz', check_health, methods=["GET"]),
     Route('/subscribe/{member_id}', calls_sse, methods=["GET"])
 ]
 

@@ -149,6 +149,7 @@ class TopicData(object):
 
 
 class KafkaProducerMiddleware(object):
+    ignore_routes = ['/healthz']
 
     def __init__(self):
 
@@ -177,8 +178,8 @@ class KafkaProducerMiddleware(object):
         # })
 
     def process_request(self, req, resp):
-
-        return
+        if req.path in self.ignore_routes:
+            resp.complete = True
 
     def process_resource(self, req, resp, resource, params):
         # Topics determined by resource as http method
