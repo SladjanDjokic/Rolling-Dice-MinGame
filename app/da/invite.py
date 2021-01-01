@@ -145,7 +145,7 @@ class InviteDA(object):
         DELETE FROM invite WHERE invite_key = %s
         """)
 
-        params = (invite_key,)
+        params = (invite_key)
         res = cls.source.execute(query, params)
         if commit:
             cls.source.commit()
@@ -174,15 +174,20 @@ class InviteDA(object):
                 'first_name': 'invite.first_name',
                 'last_name': 'invite.last_name',
                 'inviter_member_id': 'invite.inviter_member_id',
-                'registered_member_id': 'invite.registered_member_id',
-                'create_date': 'invite.create_date',
+                'status': 'invite.registered_member_id',
+                'date_invited': 'invite.create_date',
                 'update_date': 'invite.update_date',
                 'inviter_first_name': 'member.first_name',
                 'inviter_last_name': 'member.last_name',
                 'inviter_email': 'member.email',
+                'company_name': 'registered_member.company_name',
                 'group_id': 'member_group.id',
                 'group_name': 'member_group.group_name',
-                'registered_date': 'registered_member.create_date'
+                'date_registered': 'registered_member.create_date',
+                'city': 'remote_city_name',
+                'ip_address': 'remote_ip_address',
+                'region': 'remote_region_name',
+                'country': ' remote_country_name'
             }
             sort_columns_string = formatSortingParams(
                 sort_params, invite_dict) or sort_columns_string
@@ -202,25 +207,27 @@ class InviteDA(object):
             member.first_name,
             member.last_name,
             member.email,
+            registered_member.company_name,
             member_group.id,
             member_group.group_name,
-            registered_member.create_date as registered_date
+            registered_member.create_date as registered_date,
+            member_location.city AS remote_city_name,
+            CASE WHEN member_location.province IS NOT NULL THEN member_location.province ELSE member_location.state END as remote_region_name,
+            member_location.country AS remote_country_name
         FROM invite
             LEFT JOIN member on invite.inviter_member_id = member.id
-            LEFT JOIN member_group on invite.group_id = member_group.id
+            LEFT OUTER JOIN member_group on invite.group_id = member_group.id
             LEFT OUTER JOIN member AS registered_member on invite.registered_member_id = registered_member.id
+            LEFT OUTER JOIN member_location on member_location.member_id = registered_member.id AND member_location.location_type = 'home'
         WHERE 
-            invite.email LIKE %s
+            {f'inviter_member_id = {member_id} AND' if not get_all else ''}
+            ( invite.email LIKE %s
             OR invite.first_name LIKE %s
             OR invite.last_name LIKE %s
-
             OR member.first_name LIKE %s
             OR member.last_name LIKE %s
             OR member.email LIKE %s
-
-            OR member_group.group_name LIKE %s
-            
-            {f"AND inviter_member_id = {member_id}" if not get_all else ""}
+            OR member_group.group_name LIKE %s )
         ORDER BY {sort_columns_string}
         """)
 
@@ -229,18 +236,16 @@ class InviteDA(object):
             COUNT(*)
         FROM invite
         LEFT JOIN member on invite.inviter_member_id = member.id
-        LEFT JOIN member_group on invite.group_id = member_group.id
+        LEFT OUTER JOIN member_group on invite.group_id = member_group.id
         WHERE 
-            invite.email LIKE %s
+            {f'inviter_member_id = {member_id} AND' if not get_all else ''}
+            ( invite.email LIKE %s
             OR invite.first_name LIKE %s
             OR invite.last_name LIKE %s
-
             OR member.first_name LIKE %s
             OR member.last_name LIKE %s
             OR member.email LIKE %s
-
-            OR member_group.group_name LIKE %s
-            {f"AND inviter_member_id = {member_id}" if not get_all else ""}
+            OR member_group.group_name LIKE %s )
         """)
 
         like_search_key = """%{}%""".format(search_key)
@@ -277,10 +282,13 @@ class InviteDA(object):
                     inviter_first_name,
                     inviter_last_name,
                     inviter_email,
+                    company_name,
                     group_id,
                     group_name,
-                    registered_date
-
+                    registered_date,
+                    remote_city_name,
+                    remote_region_name,
+                    remote_country_name
             ) in cls.source.cursor:
                 invite = {
                     "id": id,
@@ -299,7 +307,11 @@ class InviteDA(object):
                     "inviter_email": inviter_email,
                     "group_id": group_id,
                     "group_name": group_name,
-                    "registered_date": registered_date
+                    "registered_date": registered_date,
+                    "city":  remote_city_name,
+                    "company_name": company_name,
+                    "region": remote_region_name,
+                    "country": remote_country_name
                 }
                 invites.append(invite)
 

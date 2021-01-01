@@ -23,7 +23,8 @@ logger = logging.getLogger(__name__)
 
 class MemberInviteResource(object):
     def on_put(self, req, resp):
-        (id, first_name, invite_key, email) = request.get_json_or_form("id", "first_name", "invite_key", "email", req=req)
+        (id, first_name, invite_key, email) = request.get_json_or_form("id", "first_name", "invite_key", "email",
+                                                                       req=req)
         try:
             InviteDA.change_invite(id)
             register_domain = req.env.get('HTTP_ORIGIN', req.forwarded_host)
@@ -42,6 +43,14 @@ class MemberInviteResource(object):
         except:
             logger.exception('Change invite due to unable \
                              to auth to email system')
+
+    def on_delete(self, req, resp):
+        invite_key = request.get_json_or_form("invite_key", req=req)
+        try:
+            InviteDA.delete_invite(invite_key)
+        except:
+            logger.exception('Change invite due to unable \
+                                         to auth to email system')
 
     def on_post(self, req, resp):
         logger.debug("Content-Type: {}".format(req.content_type))

@@ -487,7 +487,6 @@ services:
     # command: [ "pipenv", "run", "sms" ]
     command: [ "pipenv", "run", "dev-sms" ]
 
-
 volumes:
   web-api-python-packages:
     name: amera-web-api-python-packages

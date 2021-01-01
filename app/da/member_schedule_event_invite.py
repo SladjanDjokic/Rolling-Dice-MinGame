@@ -27,6 +27,26 @@ class MemberScheduleEventInviteDA(object):
         return id
 
     @classmethod
+    def delete_invites_by_exception(cls, event_id, invite_ids_to_stay):
+        query = ("""
+            DELETE FROM event_invite_2
+            WHERE event_id = %s AND event_invite_2.id != ALL(%s)
+        """)
+        params = (event_id, invite_ids_to_stay)
+        cls.source.execute(query, params)
+        cls.source.commit()
+
+    @classmethod
+    def delete_invites_by_event(cls, event_id):
+        query = ("""
+                DELETE FROM event_invite_2
+                WHERE event_id = %s
+            """)
+        params = (event_id,)
+        cls.source.execute(query, params)
+        cls.source.commit()
+
+    @classmethod
     def get_event_inviteById(cls, id):
         return cls.__get_data('id', id)
 

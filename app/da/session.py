@@ -466,7 +466,7 @@ class SessionDA(object):
                 title,
                 location_information,
                 contact_information,
-                country_code,                
+                country_code,
                 s3_avatar_url,
                 user_type,
                 remote_ip_address,
@@ -651,36 +651,51 @@ class SessionDA(object):
         sort_columns_string = 'first_name ASC, last_name ASC'
         if sort_params:
             session_dict = {
-                'session_id': 'session_id',
-                'email': 'email',
-                'username': 'username',
-                'first_name': 'first_name',
-                'last_name': 'last_name',
+                'session_id': 'member_session.session_id',
+                'email': 'member_session.email',
+                'username': 'member_session.username',
+                'first_name': 'member_session.first_name',
+                'last_name': 'member_session.last_name',
                 'status': 'status',
-                'create_date': 'create_date',
-                'update_date': 'update_date',
-                'expiration_date': 'expiration_date'
+                'create_date': 'member_session.create_date',
+                'update_date': 'member_session.update_date',
+                'expiration_date': 'member_session.expiration_date',
+                'company_name': 'member.company_name',
+                'ip_address': ' member_session.remote_ip_address',
+                'city': 'member_session.remote_city_name',
+                'device': 'member_session.user_device',
+                'region': 'member_session.remote_region_name',
+                'country': 'member_session.remote_country_name'
             }
             sort_columns_string = formatSortingParams(
                 sort_params, session_dict) or sort_columns_string
+
         query = (f"""
             SELECT
                 session_id,
-                email,
-                username,
-                first_name,
-                last_name,
-                status,
-                create_date,
-                update_date,
-                expiration_date
+                member_session.email,
+                member_session.username,
+                member_session.first_name,
+                member_session.last_name,
+                member_session.status,
+                member_session.create_date,
+                member_session.update_date,
+                member_session.expiration_date,
+                member_session.member_id,
+                member_session.remote_ip_address,
+                member_session.user_device,
+                member_session.remote_city_name,
+                member.company_name,
+                member_session.remote_region_name,
+                member_session.remote_country_name
             FROM member_session
+                LEFT JOIN member on member_session.member_id = member.id
             WHERE
-                username LIKE %s
-                OR first_name LIKE %s
-                OR last_name LIKE %s
-                OR email LIKE %s
-                {f"AND member_id = {member_id}" if not get_all else ""}
+                {f"member_session.member_id = {member_id} AND " if not get_all else ""}
+                ( member.username LIKE %s
+                OR member.first_name LIKE %s
+                OR member.last_name LIKE %s
+                OR member.email LIKE %s )
             ORDER BY {sort_columns_string}
             """)
 
@@ -689,11 +704,11 @@ class SessionDA(object):
                 COUNT(*)
             FROM member_session
             WHERE
-                username LIKE %s
+                {f"member_id = {member_id} AND" if not get_all else ""}
+                ( username LIKE %s
                 OR first_name LIKE %s
                 OR last_name LIKE %s
-                OR email LIKE %s
-                {f"AND member_id = {member_id}" if not get_all else ""}
+                OR email LIKE %s )
             """
 
         like_search_key = """%{}%""".format(search_key)
@@ -724,7 +739,14 @@ class SessionDA(object):
                     status,
                     create_date,
                     update_date,
-                    expiration_date
+                    expiration_date,
+                    member_id,
+                    remote_ip_address,
+                    user_device,
+                    remote_city_name,
+                    company_name,
+                    remote_region_name,
+                    remote_country_name
             ) in cls.source.cursor:
                 session = {
                     "session_id": session_id,
@@ -735,7 +757,14 @@ class SessionDA(object):
                     "status": status,
                     "create_date": create_date,
                     "update_date": update_date,
-                    "expiration_date": expiration_date
+                    "expiration_date": expiration_date,
+                    "member_id": member_id,
+                    'ip_address': remote_ip_address,
+                    'device': user_device,
+                    'city': remote_city_name,
+                    "company_name": company_name,
+                    "region": remote_region_name,
+                    "country": remote_country_name
                 }
 
                 sessions.append(session)

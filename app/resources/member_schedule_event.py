@@ -200,12 +200,96 @@ class MemberScheduleEventResource(object):
     @inject_member
     def on_put(self, req, resp, member):
         host_member_id = member["member_id"]
-        (event_id, start, end) = request.get_json_or_form(
-            'event_id', 'start', 'end', req=req)
-        result = None
-        success = MemberEventDA().change_event_date(event_id, start, end)
-        if success:
-            result = MemberEventDA().get_event_by_id(event_id)
+        (event_data, mode) = request.get_json_or_form(
+            "event_data", "mode", req=req)
+
+        contents = json.loads(event_data)
+
+        updated_event_id = None
+
+        if mode == 'date':
+            event_id = contents['event_id']
+            event_start_utc = contents['start']
+            event_end_utc = contents['end']
+
+            updated_event_id = MemberEventDA().change_event_date(
+                event_id=event_id, start=event_start_utc, end=event_end_utc)
+
+        elif mode == 'full':
+            event_id = contents['event_id']
+            event_name = contents['name']
+            color_id = contents['colorId']
+            event_start_utc = contents['start']
+            event_end_utc = contents['end']
+            isFullDay = contents['isFullDay']
+            event_type = contents['type']
+            event_tz = contents['eventTimeZone']
+            location_mode = contents['locationMode']
+            location_data = contents['locationData']
+            event_description = contents['description'] if 'description' in contents.keys(
+            ) else None
+            invitations = contents['invitations'] if 'invitations' in contents.keys(
+            ) else None
+            attachments = contents['attachments'] if 'attachments' in contents.keys(
+            ) else None
+
+            location_id = location_data if (
+                location_mode == 'my_locations' and location_data != '' and (event_type == 'Meeting' or event_type == 'Personal')) else None
+            location_address = location_data if (
+                location_mode == 'lookup' or location_mode == 'url') else None
+
+            # Update the event 2 table
+            updates = dict(event_name=event_name,
+                           event_color_id=color_id,
+                           event_description=event_description,
+                           event_tz=event_tz,
+                           start_datetime=event_start_utc,
+                           end_datetime=event_end_utc,
+                           is_full_day=isFullDay,
+                           event_type=event_type,
+                           location_mode=location_mode,
+                           location_id=location_id,
+                           location_address=location_address)
+
+            updated_event_id = MemberEventDA().update_event_by_id(event_id, updates)
+
+            # Update the invites
+            if invitations and len(invitations) > 0:
+                # First we delete all invitations that were there, but are no longer required
+                # Existing invites have numberic ids, new ones - strings
+
+                invite_ids_to_stay = [
+                    invite['invite_id'] for invite in invitations if type(invite['invite_id']) == int]
+                MemberScheduleEventInviteDA().delete_invites_by_exception(
+                    event_id=event_id, invite_ids_to_stay=invite_ids_to_stay)
+
+                # Then add all new invites
+                for item in invitations:
+                    if type(item['invite_id']) == str:
+                        MemberScheduleEventInviteDA().create_invite(
+                            invitee_id=item['invite_member_id'], event_id=event_id)
+            else:
+                # delete all invites
+                MemberScheduleEventInviteDA().delete_invites_by_event(event_id=event_id)
+
+            # Update attached files
+            if attachments and len(attachments) > 0:
+
+                attachment_ids_to_stay = [attachment['attachment_id'] for attachment in attachments if type(
+                    attachment['attachment_id']) == int]
+                MemberEventDA().unbind_attachments_by_exception(
+                    attachment_ids_to_stay=attachment_ids_to_stay, event_id=event_id)
+
+                for item in attachments:
+                    if type(item['attachment_id']) == str:
+                        MemberEventDA.bind_attachment(
+                            event_id=event_id, attachment_file_id=item['member_file_id'])
+            else:
+                MemberEventDA().unbind_all_attachments(event_id=event_id)
+
+        if updated_event_id:
+            logger.debug('updating success', updated_event_id)
+            result = MemberEventDA().get_event_by_id(updated_event_id)
         if result:
             resp.body = json.dumps({
                 "data": result,

@@ -295,6 +295,29 @@ class MemberEventDA(object):
         except Exception as e:
             raise e
 
+    # Unbind all attachments except list(ids)
+    @classmethod
+    def unbind_attachments_by_exception(cls, attachment_ids_to_stay, event_id):
+        query = ("""
+            DELETE FROM event_media
+            WHERE event_id=%s AND event_media.id != ALL(%s)
+        """)
+        params = (event_id, attachment_ids_to_stay)
+        cls.source.execute(query, params)
+        cls.source.commit()
+
+    # Unbind all attachments from evnet
+    classmethod
+
+    def unbind_all_attachments(cls, event_id):
+        query = ("""
+            DELETE FROM event_media
+            WHERE event_id=%s
+        """)
+        params = (event_id,)
+        cls.source.execute(query, params)
+        cls.source.commit()
+
     # Cancel one event by id, return sequence id
     @classmethod
     def cancel_single_event(cls, event_id):
@@ -343,7 +366,7 @@ class MemberEventDA(object):
             query = ("""
                 UPDATE event_2
                 SET start_datetime = %s, end_datetime = %s
-                    WHERE event_2.id = %s 
+                    WHERE event_2.id = %s
                     RETURNING id
             """)
             params = (start, end, event_id)
@@ -362,8 +385,8 @@ class MemberEventDA(object):
         query = ("""
             SELECT row_to_json(row)
             FROM (
-                    SELECT 
-                        id as event_id, 
+                    SELECT
+                        id as event_id,
                         sequence_id,
                         event_color_id,
                         event_name,
@@ -386,7 +409,7 @@ class MemberEventDA(object):
                         (
                             SELECT json_agg(files) as attachments
                             FROM (
-                                SELECT 
+                                SELECT
                                     event_media.id as attachment_id,
                                     member_file_id,
                                     file_id,
@@ -402,7 +425,7 @@ class MemberEventDA(object):
                         (
                             SELECT json_agg(invitees) as invitations
                             FROM (
-                                SELECT 
+                                SELECT
                                     id as invite_id,
                                     invite_member_id,
                                     invite_status,
@@ -428,8 +451,8 @@ class MemberEventDA(object):
         query = ("""
                 SELECT json_agg(sequence) as sequence
                     FROM (
-                        SELECT 
-                            id as event_id, 
+                        SELECT
+                            id as event_id,
                             sequence_id,
                             event_color_id,
                             event_name,
@@ -452,7 +475,7 @@ class MemberEventDA(object):
                             (
                                 SELECT json_agg(files) as attachments
                                 FROM (
-                                    SELECT 
+                                    SELECT
                                         event_media.id as attachment_id,
                                         member_file_id,
                                         file_id,
@@ -468,7 +491,7 @@ class MemberEventDA(object):
                             (
                                 SELECT json_agg(invitees) as invitations
                                 FROM (
-                                    SELECT 
+                                    SELECT
                                         id as invite_id,
                                         invite_member_id,
                                         invite_status,
@@ -504,8 +527,8 @@ class MemberEventDA(object):
         query = ("""
              SELECT json_agg(sequence) as data
                     FROM (
-                        SELECT 
-                            id as event_id, 
+                        SELECT
+                            id as event_id,
                             sequence_id,
                             event_color_id,
                             event_name,
@@ -528,7 +551,7 @@ class MemberEventDA(object):
                             (
                                 SELECT json_agg(files) as attachments
                                 FROM (
-                                    SELECT 
+                                    SELECT
                                         event_media.id as attachment_id,
                                         member_file_id,
                                         file_id,
@@ -544,7 +567,7 @@ class MemberEventDA(object):
                             (
                                 SELECT json_agg(invitees) as invitations
                                 FROM (
-                                    SELECT 
+                                    SELECT
                                         id as invite_id,
                                         invite_member_id,
                                         invite_status,
@@ -577,22 +600,39 @@ class MemberEventDA(object):
             return False
 
     @classmethod
-    def update_event_by_id(cls, key, value, id):
+    def update_event_by_id(cls, event_id, updates):
         try:
-            query = ("""
-                UPDATE event SET {}={} WHERE id = %s RETURNING id;
-            """.format(key, value))
-            params = (id,)
-            cls.source.execute(query, params)
+            sql_template = "UPDATE event_2 SET ({}) = %s WHERE id = {} RETURNING id"
+            query = sql_template.format(', '.join(updates.keys()), event_id)
+            params = (tuple(updates.values()),)
 
+            cls.source.execute(query, params)
             id = None
             if cls.source.has_results():
                 result = cls.source.cursor.fetchone()
                 id = result[0]
-
-            if commit:
-                cls.source.commit()
-
+            cls.source.commit()
             return id
         except Exception as e:
-            return None
+            raise e
+
+    # @classmethod
+    # def update_event_by_id(cls, key, value, id):
+    #     try:
+    #         query = ("""
+    #             UPDATE event SET {}={} WHERE id = %s RETURNING id;
+    #         """.format(key, value))
+    #         params = (id,)
+    #         cls.source.execute(query, params)
+
+    #         id = None
+    #         if cls.source.has_results():
+    #             result = cls.source.cursor.fetchone()
+    #             id = result[0]
+
+    #         if commit:
+    #             cls.source.commit()
+
+    #         return id
+    #     except Exception as e:
+    #         return None
