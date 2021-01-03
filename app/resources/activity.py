@@ -6,7 +6,6 @@ from app.util.session import get_session_cookie, validate_session
 
 logger = logging.getLogger(__name__)
 
-
 class ActivitiesResource(object):
     @staticmethod
     def on_get(req, resp):
@@ -14,10 +13,11 @@ class ActivitiesResource(object):
             session_id = get_session_cookie(req)
             session = validate_session(session_id)
             member_id = session["member_id"]
+            member_email = session["email"]
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
         if member_id:
-            result = ActivityDA().get_recent_acticities(member_id)
+            result = ActivityDA().get_recent_acticities(member_id, member_email)
             if result: 
                 resp.body = json.dumps({
                     "activities": result,

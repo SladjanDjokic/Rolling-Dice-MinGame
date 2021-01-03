@@ -200,9 +200,9 @@ class SessionDA(object):
             ip_info.get('user_agent').get('os').get('name'),  # user_os,
             ip_info.get('user_agent').get('os').get('type'),  # user_os_type,
             ip_info.get('user_agent').get('os').get('version'),  # user_os_version,
-            ip_info.get('user_agent').get('engine').get('name'),  # user_browser,
-            ip_info.get('user_agent').get('engine').get('type'),  # user_browser_type,
-            ip_info.get('user_agent').get('engine').get('version'),  # user_browser_version,
+            ip_info.get('user_agent').get('name'),  # user_browser,
+            ip_info.get('user_agent').get('type'),  # user_browser_type,
+            ip_info.get('user_agent').get('version'),  # user_browser_version,
             json.dumps(ip_info)  # ipregistry_response
         )
 
@@ -663,9 +663,14 @@ class SessionDA(object):
                 'company_name': 'member.company_name',
                 'ip_address': ' member_session.remote_ip_address',
                 'city': 'member_session.remote_city_name',
-                'device': 'member_session.user_device',
+                'device': 'member_session.user_device_name',
                 'region': 'member_session.remote_region_name',
-                'country': 'member_session.remote_country_name'
+                'country': 'member_session.remote_country_name',
+                'user_os': 'member_session.user_os',
+                'carrier_name': 'member_session.carrier_name',
+                'user_browser': 'member_session.user_browser',
+                'remote_postal_code': 'member_session.remote_postal_code',
+                'remote_timezone_name': 'member_session.remote_timezone_name'
             }
             sort_columns_string = formatSortingParams(
                 sort_params, session_dict) or sort_columns_string
@@ -683,11 +688,16 @@ class SessionDA(object):
                 member_session.expiration_date,
                 member_session.member_id,
                 member_session.remote_ip_address,
-                member_session.user_device,
+                member_session.user_device_name,
                 member_session.remote_city_name,
                 member.company_name,
                 member_session.remote_region_name,
-                member_session.remote_country_name
+                member_session.remote_country_name,
+                member_session.user_os,
+                member_session.carrier_name,
+                CONCAT(member_session.user_browser, ' ', member_session.user_browser_version) AS user_browser,
+                member_session.remote_postal_code,
+                member_session.remote_timezone_name
             FROM member_session
                 LEFT JOIN member on member_session.member_id = member.id
             WHERE
@@ -746,7 +756,12 @@ class SessionDA(object):
                     remote_city_name,
                     company_name,
                     remote_region_name,
-                    remote_country_name
+                    remote_country_name,
+                    user_os,
+                    carrier_name,
+                    user_agent,
+                    remote_postal_code,
+                    remote_timezone_name
             ) in cls.source.cursor:
                 session = {
                     "session_id": session_id,
@@ -764,7 +779,12 @@ class SessionDA(object):
                     'city': remote_city_name,
                     "company_name": company_name,
                     "region": remote_region_name,
-                    "country": remote_country_name
+                    "country": remote_country_name,
+                    "user_os": user_os,
+                    "carrier_name": carrier_name,
+                    "user_agent": user_agent,
+                    "remote_postal_code": remote_postal_code,
+                    "remote_timezone_name": remote_timezone_name
                 }
 
                 sessions.append(session)

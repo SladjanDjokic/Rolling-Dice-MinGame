@@ -53,10 +53,11 @@ class ActivityDA(object):
     #         logger.error(e, exc_info=True)
 
     @classmethod
-    def get_recent_acticities(cls, member_id):
+    def get_recent_acticities(cls, member_id, member_email):
         mails = list()
+        invitations = list()
         try:
-            mails_query = """
+            query_mails = """
                 SELECT 
                     activity_trace.id,
                     activity_trace.event_key,
@@ -93,8 +94,59 @@ class ActivityDA(object):
                     ORDER BY activity_trace.create_date DESC
                     LIMIT 10
             """
-            mails_param = (str(member_id), )
-            cls.source.execute(mails_query, mails_param)
+            query_invitations = """
+                SELECT 
+                    activity_trace.id,
+                    activity_trace.event_key,
+                    activity_trace.request_params,
+                    activity_trace.request_params->>'type' as invitation_type,
+                    activity_trace.member_id,
+                    activity_trace.event_type,
+                    activity_trace.status,
+                    activity_trace.http_status,
+                    activity_trace.create_date,
+                    member.first_name as inviter_first_name,
+                    member.last_name as last_name,
+                    job_title.name as job_title,
+                    file_storage_engine.storage_engine_id as s3_avatar_url
+                FROM activity_trace
+                LEFT OUTER JOIN member ON member.id = activity_trace.member_id
+                LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
+                LEFT OUTER JOIN member_profile ON activity_trace.member_id = member_profile.member_id
+                LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+                WHERE 
+                    activity_trace.event_type='activity' 
+                    AND
+                    (activity_trace.request_params::text <> '{}'::text AND activity_trace.response::text <> 'null') 
+                    AND
+                    (
+                        (
+                            request_params->>'type' = 'add-contact'
+                            AND 
+                            %s = ANY (CONCAT('{', activity_trace.request_params->>'member_id_list', '}')::int[])
+                        )  
+                        OR
+                        (
+                            request_params->>'type' = 'add-group-member' 
+                            AND 
+                            %s = activity_trace.request_params->>'groupMemberEmail')
+                        OR
+                        (
+                            request_params->>'type' = 'create-group' 
+                            AND 
+                            EXISTS (
+                                SELECT FROM jsonb_array_elements((request_params->>'members')::jsonb) pil   
+                                WHERE (pil)::text = %s
+                            )
+						)                    
+                    )
+                    ORDER BY activity_trace.create_date DESC
+                    LIMIT 10
+            """
+            param_mails = (str(member_id), )
+            param_invitations = (str(member_id), member_email, str(member_id), )
+            
+            cls.source.execute(query_mails, param_mails)
             if cls.source.has_results():
                 for (
                         id,
@@ -133,12 +185,52 @@ class ActivityDA(object):
                         "amera_avatar_url": amerize_url(s3_avatar_url)
                     }
                     mails.append(mail)
+            
+            cls.source.execute(query_invitations, param_invitations)
+            if cls.source.has_results():
+                for (
+                        id,
+                        event_key,
+                        request_params,
+                        invitation_type,
+                        member_id,
+                        event_type,
+                        status,
+                        http_status,
+                        create_date,
+                        first_name,
+                        last_name,
+                        job_title,
+                        s3_avatar_url
+                ) in cls.source.cursor:
+                    contact_invitaiton = {
+                        "id": id,
+                        "event_key": event_key,
+                        "request_params": request_params,
+                        "invitation_type": invitation_type,
+                        "member_id": member_id,
+                        "event_type": event_type,
+                        "status": status,
+                        "http_status": http_status,
+                        "create_date": create_date,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "job_title": job_title,
+                        "amera_avatar_url": amerize_url(s3_avatar_url)
+                    }
+                    invitations.append(contact_invitaiton)
+            
             return {
+                "invitations": {
+                    "id"   : 2,
+                    "type" : 'invitations',
+                    "data" : invitations
+                },
                 "mails": {
                     "id"   : 3,
                     "type" : 'mails',
                     "data" : mails
-                }
+                },
             }
         except Exception as e:
             logger.error(e, exc_info=True)
