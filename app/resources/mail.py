@@ -2,6 +2,7 @@ import logging
 
 from app.da.file_sharing import FileStorageDA
 from app.da.mail import DraftMailDA, InboxMailDa, StarMailDa, TrashMailDa, ArchiveMailDa, MailSettingsDA, SentMailDA
+from app.da.mail_folder import MailMemberFolder
 from app.util import request, json
 from app.util.auth import inject_member
 from app.exceptions.data import HTTPBadRequest
@@ -63,8 +64,17 @@ class MailBaseResource(object):
             raise HTTPBadRequest("Only number is acceptable for order")
         if order not in (-1, 1):
             raise HTTPBadRequest("Order is not valid number. order can be -1 or 1")
+        filter_data = {}
+        folder_id = req.params.get('folder_id', None)
+        if folder_id is not None:
+            try:
+                folder_id = int(folder_id)
+            except ValueError:
+                raise HTTPBadRequest("Folder is not valid")
+            filter_data["folder"] = folder_id
         data, total = self.main_da_class.list_folder(member["member_id"], start, size,
-                                                     ("%" + str(search) + "%") if search else None, sort, order)
+                                                     ("%" + str(search) + "%") if search else None, sort, order,
+                                                     filter_data)
         response.body = json.dumps({
             "total": total,
             "data": data
@@ -79,8 +89,8 @@ class MailBaseResource(object):
 
     @inject_member
     def on_post_forward(self, req, response, member):
-        (receiver, mail_id, bcc, cc) = request.get_json_or_form(
-            "receivers", "mail_id", "bcc", "cc", req=req)
+        (receiver, mail_id, bcc, cc, folder_id) = request.get_json_or_form(
+            "receivers", "mail_id", "bcc", "cc", "folder_id", req=req)
         if not mail_id:
             raise HTTPBadRequest("Email is not specified")
         if receiver and not (type(receiver) == dict and ("amera" in receiver and "external" in receiver)):
@@ -105,7 +115,13 @@ class MailBaseResource(object):
         if bcc:
             bcc = receiver_dict_validator(bcc, False)
 
-        return_data = self.main_da_class.forward_mail(member["member_id"], mail_id, receiver, cc, bcc)
+        if folder_id is not None:
+            try:
+                folder_id = int(folder_id)
+            except ValueError:
+                raise HTTPBadRequest("Folder is not valid")
+
+        return_data = self.main_da_class.forward_mail(member["member_id"], mail_id, receiver, cc, bcc, folder_id)
         response.body = json.dumps(return_data, default_parser=json.parser)
 
 
@@ -114,12 +130,17 @@ class MailDraftComposeResource(MailBaseResource):
 
     @inject_member
     def on_post(self, req, response, member):
-        (subject, body, receiver, bcc, cc, mail_id, reply_id) = request.get_json_or_form(
-            "subject", "body", "receivers", "bcc", "cc", "mail_id", "reply_id", req=req)
+        (subject, body, receiver, bcc, cc, mail_id, reply_id, folder_id) = request.get_json_or_form(
+            "subject", "body", "receivers", "bcc", "cc", "mail_id", "reply_id", "folder_id", req=req)
 
         if receiver and not (type(receiver) == dict and ("amera" in receiver and "external" in receiver)):
             raise HTTPBadRequest("Receiver is not a valid object")
 
+        if folder_id is not None:
+            try:
+                folder_id = int(folder_id)
+            except ValueError:
+                raise HTTPBadRequest("Folder is not valid")
         if receiver:
             receiver_mail_list = []
             for eachMail in receiver["external"]:
@@ -141,7 +162,8 @@ class MailDraftComposeResource(MailBaseResource):
             mail_header_id=mail_id,
             reply_id=reply_id,
             cc=cc,
-            bcc=bcc
+            bcc=bcc,
+            user_folder_id=folder_id
         )
 
         response.body = json.dumps({
@@ -318,3 +340,51 @@ class MailSettingsResource(object):
     def on_get_list(self, req, response, member):
         data = MailSettingsDA.setting_signature_list(member["member_id"])
         response.body = json.dumps(data, default_parser=json.parser)
+
+
+class MailMemberFolderResource(object):
+    @inject_member
+    def on_get(self, req, response, member):
+        response.body = json.dumps(MailMemberFolder.get_member_folders(member["member_id"]), default_parser=json.parser)
+
+    @inject_member
+    def on_post(self, req, response, member):
+        (folder_name, folder_id,) = request.get_json_or_form(
+            "folder_name", "folder_id", req=req)
+        if not folder_name:
+            raise HTTPBadRequest("Data missing!")
+        if folder_id is not None:
+            try:
+                folder_id = int(folder_id)
+            except ValueError:
+                raise HTTPBadRequest("Folder is not valid")
+        result = MailMemberFolder.cu_folder_for_member(member["member_id"], folder_name, folder_id)
+        response.body = json.dumps({"id": result}, default_parser=json.parser)
+
+    @inject_member
+    def on_delete(self, req, response, member):
+        (folder_id,) = request.get_json_or_form(
+            "folder_id", req=req)
+        if not folder_id:
+            raise HTTPBadRequest("Data missing!")
+        if folder_id is not None:
+            try:
+                folder_id = int(folder_id)
+            except ValueError:
+                raise HTTPBadRequest("Folder is not valid")
+        result = MailMemberFolder.delete_folder(member["member_id"], folder_id)
+        response.body = json.dumps({"id": result}, default_parser=json.parser)
+
+    @inject_member
+    def on_post_move(self, req, response, member):
+        (folder_id, mail_id,) = request.get_json_or_form(
+            "folder_id", "mail_id", req=req)
+        if not folder_id or not mail_id:
+            raise HTTPBadRequest("Data missing!")
+        if folder_id is not None:
+            try:
+                folder_id = int(folder_id)
+            except ValueError:
+                raise HTTPBadRequest("Folder is not valid")
+        result = MailMemberFolder.move_to_folder(member["member_id"], mail_id, folder_id)
+        response.body = json.dumps({"id": result}, default_parser=json.parser)

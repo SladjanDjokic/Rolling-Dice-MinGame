@@ -41,7 +41,7 @@ from app.resources.member_schedule_event_invite import MemberScheduleEventInvite
     MemberScheduleEventInviteAddSingleResource, MemberScheduleEventInviteSetStatusResource
 from app.resources.country import CountryCodeResource
 from app.resources.mail import MailDraftComposeResource, MailAttachmentResource, MailInboxResource, MailStaredResource, \
-    MailTrashResource, MailArchiveResource, MailSettingsResource, MailSentResource
+    MailTrashResource, MailArchiveResource, MailSettingsResource, MailSentResource, MailMemberFolderResource
 from app.resources.role import RolesResource
 from app.resources.avatar import AvatarResource
 from app.resources.activity import ActivitiesResource
@@ -254,6 +254,10 @@ def _setup_routes(app):
     app.add_route("/mail/settings", mail_sign_resource)  # POST - move mail to origin
     app.add_route("/mail/sign", mail_sign_resource, suffix="sign")  # POST - move mail to origin
     app.add_route("/mail/sign/list", mail_sign_resource, suffix="list")  # POST - Add to archive
+
+    mail_member_folder_resource = MailMemberFolderResource()
+    app.add_route("/mail/folders", mail_member_folder_resource)
+    app.add_route("/mail/folders/mv", mail_member_folder_resource, suffix="move")
 
     # Routes for Chat App
     app.add_route("/chat", ChatView())

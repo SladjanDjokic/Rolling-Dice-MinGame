@@ -54,11 +54,14 @@ services:
       - ../web-share:/app/share:ro
       - ../web-api/config/dev-nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
+      amera-web-api:
+        condition: service_healthy
+      amera-web-db:
+        condition: service_healthy
+      amera-eventserver:
+        condition: service_healthy
       # - amera-dns
-      - amera-web-api
       # - amera-web-auth
-      - amera-web-db
-      - amera-eventserver
   amera-web-main:
     container_name: amera-web-main
     image: amera-web-main:latest
@@ -158,8 +161,8 @@ services:
     depends_on:
       amera-web-db:
         condition: service_healthy
-      kafka:
-        condition: service_started
+      # kafka:
+      #   condition: service_started
     networks:
       - amera-net
     expose:
@@ -234,6 +237,7 @@ services:
       - ../web-api/datasource/postgresql/schema-updates-2020-12-04.sql:/docker-entrypoint-initdb.d/f-5-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-12-17.sql:/docker-entrypoint-initdb.d/f-6-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-12-18_invites.sql:/docker-entrypoint-initdb.d/f-7-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2020-12-31.sql:/docker-entrypoint-initdb.d/f-8-schema-updates.sql
       - ../web-api/datasource/postgresql/timezone.sql:/docker-entrypoint-initdb.d/g-1-timezone.sql
       - ../web-api/datasource/postgresql/event_color.sql:/docker-entrypoint-initdb.d/g-2-event-color.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-12-21_event_2.sql:/docker-entrypoint-initdb.d/g-3-event-2.sql
@@ -363,10 +367,10 @@ services:
         reservations:
           memory: 12M
     depends_on:
-      kafka:
-        condition: service_started
-      zookeeper:
-        condition: service_started
+      # kafka:
+      #   condition: service_started
+      # zookeeper:
+      #   condition: service_started
       amera-web-api:
         condition: service_healthy
     networks:

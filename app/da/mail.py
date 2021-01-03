@@ -9,7 +9,6 @@ from falcon import HTTPInternalServerError
 
 from app.da.file_sharing import FileStorageDA
 from app.da.mail_folder import MailFolderDA
-from app.da.member import MemberInfoDA
 from app.exceptions.data import DataMissingError, HTTPBadRequest, HTTPNotFound
 from app.util.db import source
 from app.util.filestorage import amerize_url
@@ -24,11 +23,12 @@ class BaseDA(object):
 
 class BaseMailDA(BaseDA):
     message_locked = True
-    excluded_folders = ['trash', 'archive']
+    user_folders = False
+    excluded_folders = ['TRASH', 'ARCHIVE']
 
     @classmethod
     def folder_query(cls, member_id):
-        folder_id = MailFolderDA.get_folder_id_for_member(cls.folder_name, member_id)
+        folder_id = MailFolderDA.get_folder_id_for_member(str(cls.folder_name).upper(), member_id)
         return (f"""AND mfx.mail_folder_id = {folder_id}
                 AND xref.deleted = FALSE
                 AND xref.archived = FALSE
@@ -56,8 +56,17 @@ class BaseMailDA(BaseDA):
         """
 
     @classmethod
-    def list_get_query(cls, start, search_query, order_query, member_id):
+    def list_get_query(cls, start, search_query, order_query, has_folder_filter, member_id):
         folder_query, folder_join = cls.folder_query(member_id)
+        user_folders_query = ""
+        if cls.user_folders:
+            user_folders_query = f"""
+                AND (xref.recent_mail_folder_id {('=' if has_folder_filter else '>')
+            if has_folder_filter is not None else 'IS'} %s
+                    {'OR xref.recent_mail_folder_id IS NULL' if not has_folder_filter and has_folder_filter is not None
+            else ''}
+                )
+            """
         return f"""
             SELECT
                 head.id,
@@ -76,7 +85,8 @@ class BaseMailDA(BaseDA):
                 COUNT(head.id) OVER() AS full_count,
                 head.message_to,
                 head.message_cc,
-                head.message_bcc
+                head.message_bcc,
+                xref.recent_mail_folder_id
             FROM mail_header as head
             INNER JOIN mail_xref xref on head.id = xref.mail_header_id
             INNER JOIN mail_body body on head.id = body.mail_header_id
@@ -89,6 +99,7 @@ class BaseMailDA(BaseDA):
                 {'head.id < %s' if start > 0 else 'head.id > %s'}
                 AND xref.member_id = %s
                 AND head.message_locked = %s
+                {user_folders_query}
                 {folder_query}
                 AND (
                     {search_query}
@@ -130,7 +141,8 @@ class BaseMailDA(BaseDA):
                 starred,
                 head.message_to,
                 head.message_cc,
-                head.message_bcc
+                head.message_bcc,
+                xref.recent_mail_folder_id
             FROM mail_header as head
             INNER JOIN mail_xref xref on head.id = xref.mail_header_id
             INNER JOIN mail_body body on head.id = body.mail_header_id
@@ -164,7 +176,52 @@ class BaseMailDA(BaseDA):
         """
 
     @classmethod
-    def list_folder(cls, member_id, start=-1, size=20, search=None, sort=None, order=1):
+    def get_members_info(cls, member_ids=()):
+        get_member_info_query = ("""
+            SELECT
+                member.id as id,
+                member.first_name as first_name,
+                member.middle_name as middle_name,
+                member.last_name as last_name,
+                member.email as email,
+                member.company_name as company,
+                file_storage_engine.storage_engine_id as s3_avatar_url,
+                member_profile.biography as biography
+            FROM member
+            LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id
+            LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+            WHERE member.id IN %s
+            """)
+        get_member_info_params = (tuple(member_ids),)
+        cls.source.execute(get_member_info_query, get_member_info_params)
+        return_data = {}
+        if cls.source.has_results():
+            for (
+                    member_id,
+                    first_name,
+                    middle_name,
+                    last_name,
+                    email,
+                    company,
+                    s3_avatar_url,
+                    biography
+            ) in cls.source.cursor:
+                return_data[member_id] = {
+                    "member_id": member_id,
+                    "first_name": first_name,
+                    "middle_name": middle_name,
+                    "last_name": last_name,
+                    "email": email,
+                    "company_name": company,
+                    "amera_avatar_url": amerize_url(s3_avatar_url),
+                    "biography": biography
+                }
+        return return_data
+
+    @classmethod
+    def list_folder(cls, member_id, start=-1, size=20, search=None, sort=None, order=1, filter_list=None):
+        if filter_list is None:
+            filter_list = {}
         search_query = "TRUE"
         search_params = []
         order_query = ""
@@ -192,15 +249,22 @@ class BaseMailDA(BaseDA):
             search_query += f"""
                 AND xref.read = {'TRUE' if order == 1 else 'FALSE'}
             """
-        header_query = cls.list_get_query(start, search_query, order_query, member_id)
+        header_query = cls.list_get_query(start, search_query, order_query,
+                                          filter_list["folder"] >= 0 if bool(filter_list and ("folder" in filter_list))
+                                          else None,
+                                          member_id)
         header_update = cls.list_after_update_query(member_id)
+        folder_filter_data = []
+        if cls.user_folders:
+            folder_filter_data.append(filter_list["folder"] if filter_list and "folder" in filter_list else None)
         # # Get mail header
-        cls.source.execute(header_query, (start, member_id, cls.message_locked,
-                                          *search_params, size))
+        cls.source.execute(header_query, (start, member_id, cls.message_locked, *folder_filter_data, *search_params,
+                                          size))
         if cls.source.has_results():
             data = []
             new_mails = []
             all_count = 0
+            get_members_id = []
             for (
                     header_id,
                     subject,
@@ -218,7 +282,8 @@ class BaseMailDA(BaseDA):
                     full_count,
                     receivers,
                     cc,
-                    bcc
+                    bcc,
+                    folder_id
             ) in cls.source.cursor.fetchall():
                 all_count = full_count
                 if receivers and not type(receivers) == dict:
@@ -236,32 +301,14 @@ class BaseMailDA(BaseDA):
                         cc = json.loads(str(cc))
                     except json.decoder.JSONDecodeError:
                         cc = cc
-                member_infos = {}
                 confirmed_bcc = None
                 if (sender_id and sender_id == member_id) or \
                         (receivers and "amera" in receivers and member_id in receivers["amera"]):
                     confirmed_bcc = bcc
-                if receivers and "amera" in receivers:
-                    for eachReceiver in receivers["amera"]:
-                        try:
-                            member_info = MemberInfoDA().get_member_info(eachReceiver)
-                        except Exception:
-                            member_info = None
-                        member_infos[eachReceiver] = member_info
-                if cc and "amera" in cc:
-                    for eachCC in cc["amera"]:
-                        try:
-                            member_info = MemberInfoDA().get_member_info(eachCC)
-                        except Exception:
-                            member_info = None
-                        member_infos[eachCC] = member_info
-                if confirmed_bcc and "amera" in confirmed_bcc:
-                    for eachBCC in confirmed_bcc["amera"]:
-                        try:
-                            member_info = MemberInfoDA().get_member_info(eachBCC)
-                        except Exception:
-                            member_info = None
-                        member_infos[eachBCC] = member_info
+                get_members_id += [x for x in receivers["amera"]] if receivers and "amera" in receivers else []
+                get_members_id += [x for x in cc["amera"]] if cc and "amera" in cc else []
+                get_members_id += [x for x in confirmed_bcc["amera"]] \
+                    if confirmed_bcc and "amera" in confirmed_bcc else []
                 data.append({
                     "mail_id": header_id,
                     "subject": subject,
@@ -278,10 +325,13 @@ class BaseMailDA(BaseDA):
                     "new_mail": new_mail,
                     "profile_url": amerize_url(prof_id),
                     "is_stared": is_star,
-                    "member_details": member_infos
+                    "folder_id": folder_id
                 })
                 if new_mail:
                     new_mails.append(header_id)
+            member_infos = cls.get_members_info(tuple(set(get_members_id)))
+            for index in range(len(data)):
+                data[index]["member_details"] = member_infos
             if len(new_mails) > 0:
                 cls.source.execute(header_update, (tuple(new_mails), member_id))
                 cls.source.commit()
@@ -339,7 +389,8 @@ class BaseMailDA(BaseDA):
                 is_starred,
                 receivers,
                 cc,
-                bcc
+                bcc,
+                folder_id
             ) = cls.source.cursor.fetchone()
             if receivers and not type(receivers) == dict:
                 try:
@@ -356,32 +407,15 @@ class BaseMailDA(BaseDA):
                     cc = json.loads(str(cc))
                 except json.decoder.JSONDecodeError:
                     cc = cc
-            member_infos = {}
             confirmed_bcc = None
             if (sender_member_id and sender_member_id == member_id) or \
                     (receivers and "amera" in receivers and member_id in receivers["amera"]):
                 confirmed_bcc = bcc
-            if receivers and "amera" in receivers:
-                for eachReceiver in receivers["amera"]:
-                    try:
-                        member_info = MemberInfoDA().get_member_info(eachReceiver)
-                    except Exception:
-                        member_info = None
-                    member_infos[eachReceiver] = member_info
-            if cc and "amera" in cc:
-                for eachCC in cc["amera"]:
-                    try:
-                        member_info = MemberInfoDA().get_member_info(eachCC)
-                    except Exception:
-                        member_info = None
-                    member_infos[eachCC] = member_info
-            if confirmed_bcc and "amera" in confirmed_bcc:
-                for eachBCC in confirmed_bcc["amera"]:
-                    try:
-                        member_info = MemberInfoDA().get_member_info(eachBCC)
-                    except Exception:
-                        member_info = None
-                    member_infos[eachBCC] = member_info
+            get_members_id = [x for x in receivers["amera"]] if receivers and "amera" in receivers else []
+            get_members_id += [x for x in cc["amera"]] if cc and "amera" in cc else []
+            get_members_id += [x for x in confirmed_bcc["amera"]] \
+                if confirmed_bcc and "amera" in confirmed_bcc else []
+            member_infos = cls.get_members_info(get_members_id)
             data = {
                 "subject": subject,
                 "body": body,
@@ -403,7 +437,8 @@ class BaseMailDA(BaseDA):
                 },
                 "attachments": [],
                 "is_stared": is_starred,
-                "member_details": member_infos
+                "member_details": member_infos,
+                "folder_id": folder_id
             }
 
             cls.source.execute(attach_query, (mail_id,))
@@ -430,8 +465,8 @@ class BaseMailDA(BaseDA):
 
 
 class InboxMailDa(BaseMailDA):
-
     folder_name = "INBOX"
+    user_folders = True
 
     @classmethod
     def can_reply_to(cls, member_id, reply_id):
@@ -444,11 +479,10 @@ class InboxMailDa(BaseMailDA):
         return True
 
     @classmethod
-    def forward_mail(cls, member_id, orig_mail_id, receivers_l, cc, bcc):
+    def forward_mail(cls, member_id, orig_mail_id, receivers_l, cc, bcc, user_folder_id):
         folder_query, folder_join = cls.folder_query(member_id)
         if not cls.can_forward_mail(member_id, orig_mail_id):
             raise HTTPBadRequest("You don't have permission for forwarding this email")
-        failed_receivers = []
         receiver_insert_xref = """
             INSERT INTO mail_xref (member_id, owner_member_id, mail_header_id, recipient_type, message_type,
                                     new_mail, forward, forward_ts, forward_id)
@@ -456,9 +490,9 @@ class InboxMailDa(BaseMailDA):
             RETURNING id;
         """
         sender_insert_xref = """
-            INSERT INTO mail_xref (member_id, owner_member_id, mail_header_id, recipient_type, message_type,
-                                    new_mail, forward, forward_ts, forward_id)
-            VALUES (%s, %s, %s, 'FROM', 'internal', FALSE, TRUE, CURRENT_TIMESTAMP, %s)
+            INSERT INTO mail_xref (recent_mail_folder_id, member_id, owner_member_id, mail_header_id, recipient_type,
+                                    message_type, new_mail, forward, forward_ts, forward_id)
+            VALUES (%s, %s, %s, %s, 'FROM', 'internal', FALSE, TRUE, CURRENT_TIMESTAMP, %s)
             RETURNING id;
         """
 
@@ -472,6 +506,7 @@ class InboxMailDa(BaseMailDA):
             {folder_join}
             WHERE (
                 head.id = %s
+                AND xref.recent_mail_folder_id {'=' if user_folder_id is not None else 'IS'} %s
                 AND xref.member_id = %s
                 AND head.message_locked = TRUE
                 AND xref.deleted = FALSE
@@ -496,7 +531,7 @@ class InboxMailDa(BaseMailDA):
             VALUES (%s, %s, %s, %s, %s);
         """
 
-        cls.source.execute(header_query, (orig_mail_id, member_id))
+        cls.source.execute(header_query, (orig_mail_id, user_folder_id, member_id))
         if cls.source.has_results():
             (
                 subject,
@@ -554,7 +589,7 @@ class InboxMailDa(BaseMailDA):
                                                (each_receive, member_id, created_mail_id, each_key, orig_mail_id))
                             if cls.source.has_results():
                                 xref_id = cls.source.cursor.fetchone()[0]
-                                MailFolderDA.add_folder_to_mail("inbox", xref_id, each_receive, False)
+                                MailFolderDA.add_folder_to_mail("INBOX", xref_id, each_receive, False)
                             else:
                                 failed_receivers.append({
                                     "id": each_receive,
@@ -564,18 +599,18 @@ class InboxMailDa(BaseMailDA):
                         for each_receive in item_key[each_key]["external"]:
                             logger.debug("OPS! EXTERNAL")
                             # EXTERNAL SEND
-                cls.source.execute(sender_insert_xref, (member_id, member_id, created_mail_id,
+                cls.source.execute(sender_insert_xref, (user_folder_id, member_id, member_id, created_mail_id,
                                                         orig_mail_id))
                 if cls.source.has_results():
                     xref_id = cls.source.cursor.fetchone()[0]
-                    MailFolderDA.add_folder_to_mail("sent", xref_id, member_id, False)
+                    MailFolderDA.add_folder_to_mail("SENT", xref_id, member_id, False)
                     cls.source.commit()
                     return failed_receivers
         raise HTTPInternalServerError
 
 
 class DraftMailDA(BaseMailDA):
-    folder_name = "draft"
+    folder_name = "DRAFT"
     message_locked = False
 
     @classmethod
@@ -589,12 +624,32 @@ class DraftMailDA(BaseMailDA):
         return True
 
     @classmethod
+    def folder_id_is_valid(cls, member_id, folder_id):
+        query = f"""
+            SELECT EXISTS(
+                SELECT id
+                FROM mail_folder
+                WHERE
+                    id = %s
+                    AND member_id = %s
+                    AND name NOT IN {MailFolderDA.ORIGINAL_FOLDERS}
+            );
+        """
+        cls.source.execute(query, (folder_id, member_id))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        raise HTTPInternalServerError
+
+    @classmethod
     def cu_draft_mail_for_member(cls, member, subject, body, receiver=None, update=False,
-                                 mail_header_id=None, reply_id=None, cc=None, bcc=None):
+                                 mail_header_id=None, reply_id=None, cc=None, bcc=None, user_folder_id=None):
 
         if receiver is None:
             receiver = []
-
+        if user_folder_id == -1:
+            user_folder_id = None
+        if user_folder_id and not cls.folder_id_is_valid(member["member_id"], user_folder_id):
+            raise HTTPBadRequest("Folder is not valid")
         if reply_id and not cls.can_reply_to(member["member_id"], reply_id):
             raise HTTPBadRequest("You don't have permission to reply this email")
 
@@ -612,8 +667,8 @@ class DraftMailDA(BaseMailDA):
                 WHERE mail_header_id = %s;
             """, f"""
                 UPDATE mail_xref
-                SET replied = %s, replied_id = %s{', replied_ts = CURRENT_TIMESTAMP'
-                                                    if reply_id else ', replied_ts = NULL'}
+                SET recent_mail_folder_id = %s, replied = %s, replied_id = %s{', replied_ts = CURRENT_TIMESTAMP'
+            if reply_id else ', replied_ts = NULL'}
                 FROM mail_xref xref INNER JOIN mail_folder_xref mfx on xref.id = mfx.mail_xref_id
                 WHERE (
                     mail_xref.member_id = %s
@@ -650,9 +705,9 @@ class DraftMailDA(BaseMailDA):
                 INSERT INTO mail_body (member_id, message, mail_header_id)
                 VALUES (%s, %s, %s);
             """, """
-                INSERT INTO mail_xref (member_id, owner_member_id, mail_header_id, recipient_type, message_type,
-                                        new_mail)
-                VALUES (%s, %s, %s, 'FROM', 'internal', FALSE)
+                INSERT INTO mail_xref (recent_mail_folder_id, member_id, owner_member_id, mail_header_id,
+                                        recipient_type, message_type, new_mail)
+                VALUES (%s, %s, %s, %s, 'FROM', 'internal', FALSE)
                 RETURNING id;
             """
             query_data = (
@@ -667,16 +722,18 @@ class DraftMailDA(BaseMailDA):
         cls.source.execute(action_query, query_data)
         if cls.source.has_results():
             created_mail_id = cls.source.cursor.fetchone()[0]
-            folder_id = MailFolderDA.get_folder_id_for_member("draft", member["member_id"])
+            folder_id = MailFolderDA.get_folder_id_for_member("DRAFT", member["member_id"])
             if update:
                 created_mail_id = mail_header_id
-                cls.source.execute(xref_query, (True if reply_id else False, reply_id, member["member_id"],
-                                                member["member_id"], created_mail_id, folder_id,))
+                cls.source.execute(xref_query,
+                                   (user_folder_id, True if reply_id else False, reply_id, member["member_id"],
+                                    member["member_id"], created_mail_id, folder_id,))
             else:
-                cls.source.execute(xref_query, (member["member_id"], member["member_id"], created_mail_id))
+                cls.source.execute(xref_query,
+                                   (user_folder_id, member["member_id"], member["member_id"], created_mail_id))
                 if cls.source.has_results():
                     xref_id = cls.source.cursor.fetchone()[0]
-                    MailFolderDA.add_folder_to_mail("draft", xref_id, member["member_id"], False)
+                    MailFolderDA.add_folder_to_mail("DRAFT", xref_id, member["member_id"], False)
                 else:
                     raise HTTPInternalServerError
             cls.source.execute(body_query, (*bod_query_data, created_mail_id))
@@ -716,7 +773,7 @@ class DraftMailDA(BaseMailDA):
             tmp, filename = os.path.split(file.filename)
             cls.source.execute(insert, (mail_id, file_id, filename, size, file_extension[1:]))
 
-            cls.source.execute(update_query, (number_attachments+1 if number_attachments else 1, mail_id, member_id))
+            cls.source.execute(update_query, (number_attachments + 1 if number_attachments else 1, mail_id, member_id))
             if cls.source.has_results():
                 cls.source.commit()
                 return filename + file_extension, file_extension
@@ -750,7 +807,7 @@ class DraftMailDA(BaseMailDA):
             if head_id:
                 if FileStorageDA.delete_file(file_id):
                     cls.source.execute(update_query,
-                                       (number_attachments-1 if number_attachments else 0, mail_id, member_id)
+                                       (number_attachments - 1 if number_attachments else 0, mail_id, member_id)
                                        )
                     if cls.source.has_results():
                         cls.source.commit()
@@ -804,7 +861,7 @@ class DraftMailDA(BaseMailDA):
                 )
             ) LIMIT 1;
         """
-        folder_id = MailFolderDA.get_folder_id_for_member("draft", member_id)
+        folder_id = MailFolderDA.get_folder_id_for_member("DRAFT", member_id)
         cls.source.execute(delete_attachments_query, (mail_id, member_id))
         if cls.source.has_results():
             failed_ids = []
@@ -819,7 +876,7 @@ class DraftMailDA(BaseMailDA):
             cls.source.execute(select_xref, (member_id, member_id, mail_id, folder_id))
             if cls.source.has_results():
                 xref_id = cls.source.cursor.fetchone()[0]
-                MailFolderDA.remove_folder_from_mail("draft", xref_id, member_id, False)
+                MailFolderDA.remove_folder_from_mail("DRAFT", xref_id, member_id, False)
                 cls.source.execute(delete_xref, (member_id, member_id, mail_id))
                 if cls.source.has_results():
                     cls.source.execute(delete_header_query, (mail_id, member_id))
@@ -897,7 +954,7 @@ class DraftMailDA(BaseMailDA):
                 AND mail_xref.deleted = FALSE
             )
         """
-        draft_folder_id = MailFolderDA.get_folder_id_for_member("draft", member_id)
+        draft_folder_id = MailFolderDA.get_folder_id_for_member("DRAFT", member_id)
 
         # Get mail header
         cls.source.execute(xref_get, (member_id, member_id, mail_id, draft_folder_id))
@@ -910,7 +967,7 @@ class DraftMailDA(BaseMailDA):
                     extra_text = MailSettingsDA.get_compose_signature(member_id)
                 else:
                     extra_text = MailSettingsDA.get_reply_forward_signature(member_id)
-                cls.source.execute(update_body, (str(body)+str(extra_text), mail_id))
+                cls.source.execute(update_body, (str(body) + str(extra_text), mail_id))
                 if cls.source.has_results():
                     failed_receivers = []
                     try:
@@ -935,20 +992,20 @@ class DraftMailDA(BaseMailDA):
                                                                  reply_id, bool(reply_id)))
                                 if cls.source.has_results():
                                     xref_id = cls.source.cursor.fetchone()[0]
-                                    MailFolderDA.add_folder_to_mail("inbox", xref_id, each_receive, False)
+                                    MailFolderDA.add_folder_to_mail("INBOX", xref_id, each_receive, False)
                                 else:
                                     failed_receivers.append({
                                         "id": each_receive,
                                         "email": "-"
                                     })
                         if item_key[each_key] and "external" in item_key[each_key]:
-                            for each_receive in item_key[each_key]["external"]:
+                            for _ in item_key[each_key]["external"]:
                                 # re_member = MemberDA.get_member_by_email(each_receive) if re_member:
                                 # cls.source.execute(insert_xref, (re_member["member_id"], member_id, mail_id,
                                 # None if not reply_id else datetime.datetime.now(), reply_id, bool(reply_id)))
                                 #
                                 # if cls.source.has_results(): xref_id = cls.source.cursor.fetchone()[0]
-                                # MailFolderDA.add_folder_to_mail("Inbox", xref_id, re_member["member_id"],
+                                # MailFolderDA.add_folder_to_mail("INBOX", xref_id, re_member["member_id"],
                                 # False) else: failed_receivers.append({ "id": re_member["member_id"],
                                 # "email": each_receive }) else:
                                 logger.debug("OPS! EXTERNAL")
@@ -959,8 +1016,8 @@ class DraftMailDA(BaseMailDA):
                                                          member_id, member_id, mail_id))
                         if cls.source.has_results():
                             xref_id = cls.source.cursor.fetchone()[0]
-                            MailFolderDA.add_folder_to_mail("sent", xref_id, member_id, False)
-                            MailFolderDA.remove_folder_from_mail("draft", xref_id, member_id, False)
+                            MailFolderDA.add_folder_to_mail("SENT", xref_id, member_id, False)
+                            MailFolderDA.remove_folder_from_mail("DRAFT", xref_id, member_id, False)
                             cls.source.commit()
                             return failed_receivers
             raise HTTPInternalServerError
@@ -968,12 +1025,11 @@ class DraftMailDA(BaseMailDA):
 
 
 class StarMailDa(BaseMailDA):
-
     folder_name = "Starred"
 
     @classmethod
     def folder_query(cls, member_id):
-        folder_id = MailFolderDA.get_folder_id_for_member(cls.folder_name, member_id)
+        folder_id = MailFolderDA.get_folder_id_for_member(str(cls.folder_name).upper(), member_id)
         return (f"""AND mfx.mail_folder_id = {folder_id}
                 AND xref.deleted = FALSE
                 AND xref.archived = FALSE
@@ -1015,9 +1071,9 @@ class StarMailDa(BaseMailDA):
         if cls.source.has_results():
             xref_id = cls.source.cursor.fetchone()[0]
             if add:
-                MailFolderDA.add_folder_to_mail(cls.folder_name, xref_id, member_id, False)
+                MailFolderDA.add_folder_to_mail(cls.folder_name.upper(), xref_id, member_id, False)
             else:
-                MailFolderDA.remove_folder_from_mail(cls.folder_name, xref_id, member_id, False)
+                MailFolderDA.remove_folder_from_mail(cls.folder_name.upper(), xref_id, member_id, False)
             cls.source.execute(xref_update, (member_id, xref_id))
             if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
                 cls.source.commit()
@@ -1027,14 +1083,13 @@ class StarMailDa(BaseMailDA):
 
 
 class TrashMailDa(BaseMailDA):
-
     folder_name = "Trash"
 
     folder_exclude_query = None
 
     @classmethod
     def folder_query(cls, member_id):
-        folder_id = MailFolderDA.get_folder_id_for_member(cls.folder_name, member_id)
+        folder_id = MailFolderDA.get_folder_id_for_member(str(cls.folder_name).upper(), member_id)
         return (f"""AND mfx.mail_folder_id = {folder_id}
                 AND xref.deleted = TRUE
                 AND xref.archived = FALSE
@@ -1070,8 +1125,8 @@ class TrashMailDa(BaseMailDA):
         cls.source.execute(xref_query, (member_id, mail_id))
         if cls.source.has_results():
             xref_id = cls.source.cursor.fetchone()[0]
-            MailFolderDA.remove_all_non_origin_folders_from_mail(xref_id, member_id, False, ["sent"])
-            MailFolderDA.add_folder_to_mail(cls.folder_name, xref_id, member_id, False)
+            MailFolderDA.remove_all_non_origin_folders_from_mail(xref_id, member_id, False, ["SENT"])
+            MailFolderDA.add_folder_to_mail(cls.folder_name.upper(), xref_id, member_id, False)
             cls.source.execute(xref_update, (member_id, xref_id))
             if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
                 cls.source.commit()
@@ -1089,7 +1144,7 @@ class TrashMailDa(BaseMailDA):
             WHERE (
                 mail_xref.member_id = %s
                 AND mail_xref.mail_header_id = %s
-                AND UPPER(mf.name) = '{cls.folder_name.upper()}'
+                AND mf.name = '{cls.folder_name.upper()}'
             )
         """
 
@@ -1109,8 +1164,8 @@ class TrashMailDa(BaseMailDA):
         cls.source.execute(xref_query, (member_id, mail_id))
         if cls.source.has_results():
             xref_id = cls.source.cursor.fetchone()[0]
-            MailFolderDA.remove_folder_from_mail(cls.folder_name, xref_id, member_id, False)    # Remove from trash
-            MailFolderDA.add_folder_to_mail(ArchiveMailDa.folder_name, xref_id, member_id, False)    # Add to Archive
+            MailFolderDA.remove_folder_from_mail(cls.folder_name.upper(), xref_id, member_id, False)  # Remove from trash
+            MailFolderDA.add_folder_to_mail(ArchiveMailDa.folder_name.upper(), xref_id, member_id, False)  # Add to Archive
             cls.source.execute(xref_update, (member_id, xref_id))
             if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
                 cls.source.commit()
@@ -1142,7 +1197,7 @@ class TrashMailDa(BaseMailDA):
         cls.source.execute(xref_query, (member_id, mail_id))
         if cls.source.has_results():
             xref_id = cls.source.cursor.fetchone()[0]
-            MailFolderDA.remove_folder_from_mail(cls.folder_name, xref_id, member_id, False)
+            MailFolderDA.remove_folder_from_mail(cls.folder_name.upper(), xref_id, member_id, False)
             cls.source.execute(xref_update, (member_id, xref_id))
             if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
                 cls.source.commit()
@@ -1168,14 +1223,13 @@ class TrashMailDa(BaseMailDA):
 
 
 class ArchiveMailDa(BaseMailDA):
-
     folder_name = "Archive"
 
     folder_exclude_query = None
 
     @classmethod
     def folder_query(cls, member_id):
-        folder_id = MailFolderDA.get_folder_id_for_member(cls.folder_name, member_id)
+        folder_id = MailFolderDA.get_folder_id_for_member(str(cls.folder_name).upper(), member_id)
         return (f"""AND mfx.mail_folder_id = {folder_id}
                 AND xref.deleted = FALSE
                 AND xref.archived = TRUE
@@ -1210,8 +1264,8 @@ class ArchiveMailDa(BaseMailDA):
         cls.source.execute(xref_query, (member_id, mail_id))
         if cls.source.has_results():
             xref_id = cls.source.cursor.fetchone()[0]
-            MailFolderDA.remove_all_non_origin_folders_from_mail(xref_id, member_id, False, ["sent"])
-            MailFolderDA.add_folder_to_mail(cls.folder_name, xref_id, member_id, False)
+            MailFolderDA.remove_all_non_origin_folders_from_mail(xref_id, member_id, False, ["SENT"])
+            MailFolderDA.add_folder_to_mail(cls.folder_name.upper(), xref_id, member_id, False)
             cls.source.execute(xref_update, (member_id, xref_id))
             if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
                 cls.source.commit()
@@ -1229,7 +1283,7 @@ class ArchiveMailDa(BaseMailDA):
             WHERE (
                 mail_xref.member_id = %s
                 AND mail_xref.mail_header_id = %s
-                AND UPPER(mf.name) = UPPER('{cls.folder_name}')
+                AND mf.name = '{cls.folder_name.upper()}'
                 AND mail_xref.deleted = FALSE
             )
         """
@@ -1250,8 +1304,8 @@ class ArchiveMailDa(BaseMailDA):
         cls.source.execute(xref_query, (member_id, mail_id))
         if cls.source.has_results():
             xref_id = cls.source.cursor.fetchone()[0]
-            MailFolderDA.remove_folder_from_mail(cls.folder_name, xref_id, member_id, False)    # Remove from trash
-            MailFolderDA.add_folder_to_mail(TrashMailDa.folder_name, xref_id, member_id, False)    # Add to Archive
+            MailFolderDA.remove_folder_from_mail(cls.folder_name.upper(), xref_id, member_id, False)  # Remove from trash
+            MailFolderDA.add_folder_to_mail(TrashMailDa.folder_name.upper(), xref_id, member_id, False)  # Add to Archive
             cls.source.execute(xref_update, (member_id, xref_id))
             if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
                 cls.source.commit()
@@ -1284,7 +1338,7 @@ class ArchiveMailDa(BaseMailDA):
         cls.source.execute(xref_query, (member_id, mail_id))
         if cls.source.has_results():
             xref_id = cls.source.cursor.fetchone()[0]
-            MailFolderDA.remove_folder_from_mail(cls.folder_name, xref_id, member_id, False)
+            MailFolderDA.remove_folder_from_mail(cls.folder_name.upper(), xref_id, member_id, False)
             cls.source.execute(xref_update, (member_id, xref_id))
             if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
                 cls.source.commit()
@@ -1387,7 +1441,7 @@ class MailSettingsDA(BaseDA):
             )
         """
 
-        cls.source.execute(query, (member_id, ))
+        cls.source.execute(query, (member_id,))
         data = []
         if cls.source.has_results():
             for (sign_id, name, content) in cls.source.cursor.fetchall():
@@ -1406,7 +1460,11 @@ class MailSettingsDA(BaseDA):
             ON CONFLICT ON CONSTRAINT mail_setting_pkey
             DO
                 UPDATE
-                SET default_style = %(style)s, grammar = %(grammar)s, spelling = %(spell)s, autocorrect = %(autocorrect)s
+                SET
+                    default_style = %(style)s,
+                    grammar = %(grammar)s,
+                    spelling = %(spell)s,
+                    autocorrect = %(autocorrect)s
                 WHERE mail_setting.member_id = %(member_id)s
             RETURNING member_id;
         """
@@ -1481,7 +1539,7 @@ class MailSettingsDA(BaseDA):
             )
             LIMIT 1;
         """
-        cls.source.execute(get_query, (member_id, ))
+        cls.source.execute(get_query, (member_id,))
         if cls.source.has_results():
             content = cls.source.cursor.fetchone()[0]
             return content if content else ""
@@ -1499,7 +1557,7 @@ class MailSettingsDA(BaseDA):
             )
             LIMIT 1;
         """
-        cls.source.execute(get_query, (member_id, ))
+        cls.source.execute(get_query, (member_id,))
         if cls.source.has_results():
             content = cls.source.cursor.fetchone()[0]
             return content if content else ""
@@ -1507,143 +1565,5 @@ class MailSettingsDA(BaseDA):
 
 
 class SentMailDA(BaseMailDA):
-
     folder_name = "Sent"
-
-    @classmethod
-    def list_get_query(cls, start, search_query, order_query, member_id):
-        folder_query, folder_join = cls.folder_query(member_id)
-        return f"""
-            SELECT
-                head.id,
-                head.subject,
-                body.message,
-                head.message_ts,
-                head.number_attachments,
-                m.id,
-                (
-                    SELECT
-                        string_agg(rec_memb.email , ' , ') AS email
-                    FROM mail_xref
-                    INNER JOIN member rec_memb on rec_memb.id = mail_xref.member_id
-                    WHERE
-                        mail_xref.owner_member_id = xref.owner_member_id
-                        AND mail_xref.mail_header_id = head.id
-                        AND mail_xref.id != xref.id
-                ),
-                (
-                    SELECT
-                        string_agg(rec_memb.first_name || ' ' || rec_memb.last_name, ' , ') AS first_name
-                    FROM mail_xref
-                    INNER JOIN member rec_memb on rec_memb.id = mail_xref.member_id
-                    WHERE
-                        mail_xref.owner_member_id = xref.owner_member_id
-                        AND mail_xref.mail_header_id = head.id
-                        AND mail_xref.id != xref.id
-                ),
-                '' AS last_name,
-                xref.read,
-                xref.new_mail,
-                '',
-                starred,
-                COUNT(head.id) OVER() AS full_count,
-                head.message_to,
-                head.message_cc,
-                head.message_bcc
-            FROM mail_header as head
-            INNER JOIN mail_xref xref on head.id = xref.mail_header_id
-            INNER JOIN mail_body body on head.id = body.mail_header_id
-            INNER JOIN member m on m.id = xref.owner_member_id
-            {folder_join} 
-            WHERE (
-                {'head.id < %s' if start > 0 else 'head.id > %s'}
-                AND xref.member_id = %s
-                AND head.message_locked = %s
-                {folder_query}
-                AND (
-                    {search_query}
-                )
-            )
-            {order_query}
-            LIMIT %s;
-        """
-
-    @classmethod
-    def detail_get_query(cls, member_id):
-        folder_query, folder_join = cls.folder_query(member_id)
-        return f"""
-            SELECT
-                head.subject,
-                body.message,
-                head.message_ts,
-                head.number_attachments,
-                m.id,
-                (
-                    SELECT
-                        string_agg(rec_memb.email , ' , ') AS email
-                    FROM mail_xref
-                    INNER JOIN member rec_memb on rec_memb.id = mail_xref.member_id
-                    WHERE
-                        mail_xref.owner_member_id = xref.owner_member_id
-                        AND mail_xref.mail_header_id = head.id
-                        AND mail_xref.id != xref.id
-                ),
-                (
-                    SELECT
-                        string_agg(rec_memb.first_name || ' ' || rec_memb.last_name, ' , ') AS first_name
-                    FROM mail_xref
-                    INNER JOIN member rec_memb on rec_memb.id = mail_xref.member_id
-                    WHERE
-                        mail_xref.owner_member_id = xref.owner_member_id
-                        AND mail_xref.mail_header_id = head.id
-                        AND mail_xref.id != xref.id
-                ),
-                '' AS last_name,
-                '',
-                folder.name,
-                folder.id,
-                xref.read,
-                xref.replied_id,
-                xref.replied_ts,
-                CASE
-                    WHEN xref.replied_id IS NOT NULL THEN
-                        reply.subject
-                    ELSE ''
-                END,
-                CASE
-                    WHEN xref.replied_id IS NOT NULL THEN
-                        reply_body.message
-                    ELSE ''
-                END,
-                starred,
-                head.message_to,
-                head.message_cc,
-                head.message_bcc
-            FROM mail_header as head
-            INNER JOIN mail_xref xref on head.id = xref.mail_header_id
-            INNER JOIN mail_body body on head.id = body.mail_header_id
-            INNER JOIN mail_folder_xref mfx on xref.id = mfx.mail_xref_id
-            INNER JOIN mail_folder folder on mfx.mail_folder_id = folder.id
-            INNER JOIN member m on m.id = xref.owner_member_id
-            INNER JOIN mail_header reply on (
-                CASE 
-                    WHEN xref.replied_id IS NOT NULL THEN 
-                        reply.id = xref.replied_id
-                    ELSE TRUE
-                END
-            )
-            INNER JOIN mail_body reply_body on (
-                CASE
-                    WHEN xref.replied_id IS NOT NULL THEN 
-                        reply_body.mail_header_id = xref.replied_id
-                    ELSE TRUE
-                END
-            )
-            WHERE (
-                head.id = %s
-                AND xref.member_id = %s
-                AND head.message_locked = %s
-                {folder_query}
-            )
-            LIMIT 1;
-        """
+    user_folders = True

@@ -1,4 +1,6 @@
 import json
+import time
+
 from loguru import logger
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -72,6 +74,7 @@ async def status_event_generator(request, member_id):
                     logger.debug('Current status :%s', 'call_delivered')
                 else:
                     logger.debug('No change in status...')
+            time.sleep(1)
     except Exception as exc:
         logger.debug(exc)
 

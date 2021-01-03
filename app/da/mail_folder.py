@@ -3,20 +3,20 @@ import logging
 from falcon import HTTPInternalServerError
 
 from app.util.db import source
-from app.exceptions.data import HTTPBadRequest
-
+from app.exceptions.data import HTTPBadRequest, HTTPNotFound
 
 logger = logging.getLogger(__name__)
 
 
 class MailFolderDA:
+    ORIGINAL_FOLDERS = ("INBOX", "STARRED", "DRAFT", "TRASH", "SENT", "ARCHIVE",)
     source = source
 
     @classmethod
     def create_folder_for_member(cls, folder_name, member_id, commit=True):
         query = """
             INSERT INTO mail_folder (member_id, name) 
-            VALUES (%s, UPPER(%s))
+            VALUES (%s, %s)
             RETURNING id;
         """
         cls.source.execute(query, (member_id, folder_name))
@@ -32,23 +32,16 @@ class MailFolderDA:
     @classmethod
     def create_initial_folders_for_member(cls, member_id):
 
-        folders = (
-            ("Inbox",),
-            ("Starred", ),
-            ("Drafts", ),
-            ("Trash", ),
-            ("Sent", ),
-            ("Archive", ),
-        )
+        folders = cls.ORIGINAL_FOLDERS
 
         for eachDataGroup in folders:
-            cls.create_folder_for_member(eachDataGroup[0], member_id)
+            cls.create_folder_for_member(eachDataGroup, member_id)
 
     @classmethod
     def get_folder_id_for_member(cls, folder_name, member_id, commit=True, create=True):
         query = """
             SELECT id FROM mail_folder
-            WHERE member_id = %s AND UPPER(name) = UPPER(%s)
+            WHERE member_id = %s AND name = %s
             LIMIT 1;
         """
         cls.source.execute(query, (member_id, folder_name))
@@ -153,3 +146,125 @@ class MailFolderDA:
                 cls.source.commit()
             return cls.source.cursor.fetchone()[0]
         return None
+
+
+class MailMemberFolder(object):
+    source = source
+
+    @classmethod
+    def folder_exists(cls, member_id, folder_name):
+        if str(folder_name) in MailFolderDA.ORIGINAL_FOLDERS:
+            return True
+        query = f"""
+            SELECT EXISTS(
+                SELECT id
+                FROM mail_folder
+                WHERE
+                    name = %s
+                    AND member_id = %s
+            );
+        """
+        cls.source.execute(query, (str(folder_name).upper(), member_id))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        raise HTTPInternalServerError
+
+    @classmethod
+    def get_member_folders(cls, member_id):
+        get_query = f"""
+            SELECT
+                id,
+                name
+            FROM mail_folder
+            WHERE
+                member_id = %s
+                AND name NOT IN {MailFolderDA.ORIGINAL_FOLDERS}
+            ORDER BY name
+        """
+        cls.source.execute(get_query, (member_id, ))
+        if cls.source.has_results():
+            result = []
+            for (fid, name) in cls.source.cursor.fetchall():
+                result.append({
+                    "id": fid,
+                    "name": name
+                })
+            return result
+        return []
+
+    @classmethod
+    def cu_folder_for_member(cls, member_id, folder_name, folder_id=None):
+        insert_query = """
+            INSERT INTO mail_folder (member_id, name)
+            VALUES (%s, %s)
+            RETURNING id
+        """
+        update_query = """
+            UPDATE mail_folder
+            SET name = %s
+            WHERE
+                id = %s
+                AND member_id = %s
+        """
+        if not folder_id and cls.folder_exists(member_id, folder_name):
+            raise HTTPBadRequest("Folder already exists!")
+        cls.source.execute(insert_query if not folder_id else update_query,
+                           (member_id, folder_name) if not folder_id else (folder_name, folder_id, member_id))
+        if cls.source.has_results():
+            cls.source.commit()
+            return folder_id if folder_id else cls.source.cursor.fetchone()[0]
+        if folder_id:
+            raise HTTPNotFound("Folder not found")
+        else:
+            raise HTTPBadRequest("Failed to create folder")
+
+    @classmethod
+    def delete_folder(cls, member_id, folder_id):
+        delete_query = f"""
+            DELETE FROM mail_folder
+            WHERE
+                id = %s
+                AND member_id = %s
+                AND name NOT IN {MailFolderDA.ORIGINAL_FOLDERS}
+            RETURNING id
+        """
+
+        cls.source.execute(delete_query, (folder_id, member_id))
+        if cls.source.has_results():
+            cls.source.commit()
+            return cls.source.cursor.fetchone()[0]
+        raise HTTPNotFound("Folder not found")
+
+    @classmethod
+    def move_to_folder(cls, member_id, mail_id, folder_id):
+        update_query = f"""
+            UPDATE mail_xref
+            SET recent_mail_folder_id = %(folder_id)s
+            FROM mail_header as head
+            WHERE
+                head.id = mail_xref.mail_header_id
+                AND head.message_locked = TRUE
+                AND head.id = %(mail_id)s
+                AND mail_xref.member_id = %(member_id)s
+                AND mail_xref.archived = FALSE
+                AND mail_xref.deleted = FALSE
+                AND NOT EXISTS(
+                    SELECT * FROM mail_folder
+                    WHERE
+                        mail_folder.member_id = %(member_id)s
+                        AND mail_folder.id = %(folder_id)s
+                        AND mail_folder.name IN {MailFolderDA.ORIGINAL_FOLDERS}
+                )
+        """
+        if folder_id == -1:
+            folder_id = None
+        cls.source.execute(update_query, ({
+            "member_id": member_id,
+            "mail_id": mail_id,
+            "folder_id": folder_id
+        }))
+        if cls.source.has_results():
+            cls.source.commit()
+            return folder_id
+        raise HTTPNotFound(title="Invalid folder or folder cannot be changed",
+                           description="Invalid folder or folder cannot be changed")
