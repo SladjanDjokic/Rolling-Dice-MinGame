@@ -385,7 +385,7 @@ class SessionDA(object):
         LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id
         LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
         WHERE member_session.session_id = %s AND member_session.expiration_date >= current_timestamp
-        GROUP BY 
+        GROUP BY
             member_session.session_id,
             member_session.member_id,
             member_session.email,
@@ -667,10 +667,10 @@ class SessionDA(object):
                 'region': 'member_session.remote_region_name',
                 'country': 'member_session.remote_country_name',
                 'user_os': 'member_session.user_os',
-                'carrier_name': 'member_session.carrier_name',
+                'organization_name': 'member_session.organization_name',
                 'user_browser': 'member_session.user_browser',
                 'remote_postal_code': 'member_session.remote_postal_code',
-                'remote_timezone_name': 'member_session.remote_timezone_name'
+                'remote_timezone_name': 'member_session.remote_timezone_name',
             }
             sort_columns_string = formatSortingParams(
                 sort_params, session_dict) or sort_columns_string
@@ -682,7 +682,11 @@ class SessionDA(object):
                 member_session.username,
                 member_session.first_name,
                 member_session.last_name,
-                member_session.status,
+                CASE
+                    WHEN
+                        jsonb_extract_path(ipregistry_response, 'security') -> 'is_threat' = 'true'
+                    THEN 'Threat'
+                    ELSE 'Normal' END AS status,
                 member_session.create_date,
                 member_session.update_date,
                 member_session.expiration_date,
@@ -694,8 +698,10 @@ class SessionDA(object):
                 member_session.remote_region_name,
                 member_session.remote_country_name,
                 member_session.user_os,
-                member_session.carrier_name,
-                CONCAT(member_session.user_browser, ' ', member_session.user_browser_version) AS user_browser,
+                member_session.organization_name,
+                member_session.organization_type,
+                member_session.user_browser,
+                member_session.user_browser_version,
                 member_session.remote_postal_code,
                 member_session.remote_timezone_name
             FROM member_session
@@ -758,8 +764,10 @@ class SessionDA(object):
                     remote_region_name,
                     remote_country_name,
                     user_os,
-                    carrier_name,
-                    user_agent,
+                    organization_name,
+                    organization_type,
+                    user_browser,
+                    user_browser_version,
                     remote_postal_code,
                     remote_timezone_name
             ) in cls.source.cursor:
@@ -781,8 +789,10 @@ class SessionDA(object):
                     "region": remote_region_name,
                     "country": remote_country_name,
                     "user_os": user_os,
-                    "carrier_name": carrier_name,
-                    "user_agent": user_agent,
+                    "organization_name": organization_name,
+                    "organization_type": organization_type,
+                    "user_browser": user_browser,
+                    "user_browser_version": user_browser_version,
                     "remote_postal_code": remote_postal_code,
                     "remote_timezone_name": remote_timezone_name
                 }
