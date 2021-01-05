@@ -415,7 +415,7 @@ class MemberEventDA(object):
                                     file_id,
                                     member_file.file_name as file_name,
                                     member_file.file_size_bytes as file_size_bytes,
-                                    file_storage_engine.storage_engine_id as file_link
+                                    file_path(file_storage_engine.storage_engine_id, '/member/file') as file_url
                                 FROM event_media
                                 LEFT JOIN member_file ON member_file.id = member_file_id
                                 LEFT JOIN file_storage_engine ON file_storage_engine.id = member_file.file_id
@@ -442,6 +442,7 @@ class MemberEventDA(object):
         params = (event_id,)
         cls.source.execute(query, params)
         if cls.source.has_results():
+
             return cls.source.cursor.fetchone()[0]
         else:
             return None
@@ -481,7 +482,7 @@ class MemberEventDA(object):
                                         file_id,
                                         member_file.file_name as file_name,
                                         member_file.file_size_bytes as file_size_bytes,
-                                        file_storage_engine.storage_engine_id as file_link
+                                        file_path(file_storage_engine.storage_engine_id, '/member/file') as file_url
                                     FROM event_media
                                     LEFT JOIN member_file ON member_file.id = member_file_id
                                     LEFT JOIN file_storage_engine ON file_storage_engine.id = member_file.file_id
@@ -557,7 +558,7 @@ class MemberEventDA(object):
                                         file_id,
                                         member_file.file_name as file_name,
                                         member_file.file_size_bytes as file_size_bytes,
-                                        file_storage_engine.storage_engine_id as file_link
+                                        file_path(file_storage_engine.storage_engine_id, '/member/file') as file_url
                                     FROM event_media
                                     LEFT JOIN member_file ON member_file.id = member_file_id
                                     LEFT JOIN file_storage_engine ON file_storage_engine.id = member_file.file_id
