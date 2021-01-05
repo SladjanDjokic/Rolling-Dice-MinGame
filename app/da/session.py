@@ -250,7 +250,7 @@ class SessionDA(object):
         LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
         LEFT OUTER JOIN member_profile ON member_session.member_id = member_profile.member_id
         LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
-        WHERE member_session.session_id = %s AND member_session.expiration_date >= current_timestamp
+        WHERE member_session.session_id = %s AND member_session.expiration_date >= current_timestamp AND member_session.status = 'online'
         """)
 
         params = (session_id,)
@@ -384,7 +384,7 @@ class SessionDA(object):
         LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
         LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id
         LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
-        WHERE member_session.session_id = %s AND member_session.expiration_date >= current_timestamp
+        WHERE member_session.session_id = %s AND member_session.expiration_date >= current_timestamp AND member_session.status = 'online'
         GROUP BY
             member_session.session_id,
             member_session.member_id,
@@ -587,63 +587,13 @@ class SessionDA(object):
     @classmethod
     def delete_session(cls, session_id):
         query = ("""
-        DELETE
-        FROM member_session
-        WHERE session_id = %s
+        UPDATE member_session SET status = 'disconnected' WHERE session_id = %s
         """)
 
         params = (session_id,)
         cls.source.execute(query, params)
         cls.source.commit()
 
-        return None
-
-    @classmethod
-    def get_session_table(cls):
-        query = ("""
-        SELECT
-            session_id,
-            member_id,
-            email,
-            create_date,
-            update_date,
-            expiration_date,
-            username,
-            status,
-            first_name,
-            last_name
-        FROM member_session
-        """)
-
-        cls.source.execute(query, [])
-        if cls.source.has_results():
-            for (
-                    session_id,
-                    member_id,
-                    email,
-                    create_date,
-                    update_date,
-                    expiration_date,
-                    username,
-                    status,
-                    first_name,
-                    last_name,
-            ) in cls.source.cursor:
-                session = {
-                    "session_id": session_id,
-                    "member_id": member_id,
-                    "email": email,
-                    "create_date": create_date,
-                    "update_date": update_date,
-                    "expiration_date": expiration_date,
-                    "username": username,
-                    "status": status,
-                    "first_name": first_name,
-                    "last_name": last_name,
-                }
-
-                yield session
-            cls.source.cursor.close()
         return None
 
     @classmethod

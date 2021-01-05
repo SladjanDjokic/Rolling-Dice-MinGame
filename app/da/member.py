@@ -879,7 +879,9 @@ class MemberContactDA(object):
                 json_agg(DISTINCT member_contact_2.*) AS contact_information,
                 json_agg(DISTINCT country_code.*) AS country_code,
                 json_agg(DISTINCT member_achievement.*) AS achievement_information,
-                file_storage_engine.storage_engine_id as s3_avatar_url
+                file_storage_engine.storage_engine_id as s3_avatar_url,
+                contact.security_exchange_option,
+                contact.status
             FROM contact
                 LEFT JOIN member ON member.id = contact.contact_member_id
                 LEFT OUTER JOIN role ON contact.role_id = role.id
@@ -948,7 +950,9 @@ class MemberContactDA(object):
                     contact_information,
                     country_code,
                     achievement_information,
-                    s3_avatar_url
+                    s3_avatar_url,
+                    security_exchange_option,
+                    status
             ) in cls.source.cursor:
                 contact = {
                     "id": id,
@@ -978,7 +982,15 @@ class MemberContactDA(object):
                     "contact_information": contact_information,
                     "country_code": country_code,
                     "achievement_information": achievement_information,
-                    "amera_avatar_url": amerize_url(s3_avatar_url)
+                    "amera_avatar_url": amerize_url(s3_avatar_url),
+                    "security_exchange_option": {
+                        "NO_ENCRYPTION": 0,
+                        "LEAST_SECURE": 25,
+                        "SECURE": 50,
+                        "VERY_SECURE": 75,
+                        "MOST_SECURE": 100,
+                    }.get(security_exchange_option, 0),
+                    "status": status
                     # "city": city,
                     # "state": state,
                     # "province": province,
@@ -1083,7 +1095,7 @@ class MemberContactDA(object):
                 country = {
                     "id": id,
                     "name": name,
-                    "totat": total
+                    "total": total
                 }
                 countries.append(country)
         return countries
@@ -1440,7 +1452,7 @@ class MemberContactDA(object):
         return None
 
     @classmethod
-    def update_security(cls, member_id, contact_member_id, 
+    def update_security(cls, member_id, contact_member_id,
                         security_picture_storage_id, security_pin, exchangeOption, commit=True):
         query = """
             UPDATE contact SET
@@ -1456,7 +1468,7 @@ class MemberContactDA(object):
 
         try:
             cls.source.execute(query, params)
-            
+
             if commit:
                 cls.source.commit()
         except Exception as err:
@@ -1467,7 +1479,7 @@ class MemberContactDA(object):
             contact_member_id, member_id)
 
         try:
-            cls.source.execute(query, params)            
+            cls.source.execute(query, params)
             if commit:
                 cls.source.commit()
         except Exception as err:
@@ -1745,3 +1757,48 @@ class MemberInfoDA(object):
             return True
         except:
             pass
+
+
+class MemberNotificationsSettingDA(object):
+    source = source
+    @classmethod
+    def update_notifications_setting(cls, member_id, notifications_setting):
+        try:
+            query = """
+                UPDATE member_profile
+                SET notification_settings = %s
+                WHERE member_id = %s
+            """
+            params= (notifications_setting, member_id, )
+
+            cls.source.execute(query, params)
+            if cls.source.has_results():
+                cls.source.commit()
+                return True
+            else: 
+                return False
+        except Exception as e:
+            logger.debug(e.message)
+    
+    @classmethod
+    def get_notifications_setting(cls, memberId):
+        try:
+            query = """
+                SELECT 
+                    member_id,
+                    notification_settings
+                FROM member_profile
+                WHERE member_id = %s
+            """
+            params= (memberId, )
+            cls.source.execute(query, params)
+            result = None
+            if cls.source.has_results():
+                ( member_id, notification_settings) = cls.source.cursor.fetchone()
+                result = {
+                    "member_id": member_id,
+                    "data": notification_settings
+                }
+            return result
+        except Exception as e:
+            logger.debug(e.message)

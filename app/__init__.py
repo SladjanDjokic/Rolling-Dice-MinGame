@@ -45,6 +45,8 @@ from app.resources.mail import MailDraftComposeResource, MailAttachmentResource,
 from app.resources.role import RolesResource
 from app.resources.avatar import AvatarResource
 from app.resources.activity import ActivitiesResource
+
+from app.resources.notifications_setting import MemberNotificationsSetting
 # from app.resources.memberfile import
 # from app.resources.keygen import KeyGenResource, KeyGenFileUpload
 
@@ -199,6 +201,9 @@ def _setup_routes(app):
     app.add_route("/member/register/country", CountryCodeResource())
     app.add_route("/member/role", RolesResource())
     app.add_route("/member/avatar", AvatarResource())
+
+    # Notifications setting
+    app.add_route("/member/notifications/setting", MemberNotificationsSetting())
 
     # Draft
     draft_resource = MailDraftComposeResource()
