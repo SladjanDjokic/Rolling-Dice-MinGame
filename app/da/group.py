@@ -472,11 +472,11 @@ class GroupMembershipDA(object):
                 return None
 
             query = ("""
-                INSERT INTO member_group_membership (group_id, member_id)
-                VALUES (%s, %s)
+                INSERT INTO member_group_membership (group_id, member_id, status)
+                VALUES (%s, %s, %s)
                 RETURNING member_id
             """)
-            params = (group_id, member_id)
+            params = (group_id, member_id, 'invited')
             cls.source.execute(query, params)
             id = cls.source.get_last_row_id()
             if commit:
@@ -738,6 +738,22 @@ class GroupMembershipDA(object):
             logger.exception('Unable to delete from group membership')
             return None
 
+    @classmethod
+    def accept_group_invitation(cls, group_id, member_id, status, commit=True):
+        try:
+            query = """
+                UPDATE member_group_membership SET
+                    status = %s
+                WHERE group_id = %s AND member_id = %s
+            """
+            params = (status, group_id, member_id)
+            cls.source.execute(query, params)
+            if commit:
+                cls.source.commit()
+
+        except Exception as err:
+            logger.exception('Unable to update group membership')
+            raise err
 
 class GroupMemberInviteDA(object):
     source = source

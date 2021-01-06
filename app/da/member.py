@@ -716,7 +716,7 @@ class MemberDA(object):
 
     @classmethod
     def get_timezones(cls,):
-        query = (""" 
+        query = ("""
                 SELECT * FROM timezone
             """)
         params = ()
@@ -738,7 +738,7 @@ class MemberDA(object):
 
     @classmethod
     def assign_tree(cls, tree_type, member_id, tree_id):
-        ''' 
+        '''
             This is used to assign a tree id to an existing members for migration purposes
         '''
         main_query = ("""
@@ -1485,6 +1485,34 @@ class MemberContactDA(object):
         except Exception as err:
             raise err
 
+    @classmethod
+    def accept_invitation(cls, member_id, contact_member_id,
+                          status, commit=True):
+        query = """
+            UPDATE contact SET
+                status = %s
+            WHERE
+                member_id = %s AND contact_member_id = %s;
+        """
+        params = (status, member_id, contact_member_id)
+
+        try:
+            cls.source.execute(query, params)
+
+            if commit:
+                cls.source.commit()
+        except Exception as err:
+            raise err
+
+        params = (status, contact_member_id, member_id)
+
+        try:
+            cls.source.execute(query, params)
+            if commit:
+                cls.source.commit()
+        except Exception as err:
+            raise err
+
 
 class MemberInfoDA(object):
     source = source
@@ -1775,16 +1803,16 @@ class MemberNotificationsSettingDA(object):
             if cls.source.has_results():
                 cls.source.commit()
                 return True
-            else: 
+            else:
                 return False
         except Exception as e:
             logger.debug(e.message)
-    
+
     @classmethod
     def get_notifications_setting(cls, memberId):
         try:
             query = """
-                SELECT 
+                SELECT
                     member_id,
                     notification_settings
                 FROM member_profile

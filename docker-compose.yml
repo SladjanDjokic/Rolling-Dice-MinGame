@@ -250,6 +250,7 @@ services:
       - ../web-api/datasource/postgresql/schema-updates-2021-01-04_member_profile_security_update.sql:/docker-entrypoint-initdb.d/h-6-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-01-04_member_session_status.sql:/docker-entrypoint-initdb.d/h-7-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-01-05_file_path_function.sql:/docker-entrypoint-initdb.d/h-9-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-01-04.sql:/docker-entrypoint-initdb.d/h-10-schema-updates.group-1.sql
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/z-3-test-schedule.sql

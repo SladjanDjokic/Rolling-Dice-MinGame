@@ -387,6 +387,33 @@ class GroupMemberInviteResource(object):
                 "register_url": register_url
             })
 
+class GroupMemberAccept(object):
+    def on_put(self, req, resp, group_id=None):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+
+        try:
+
+            (status, ) = request.get_json_or_form(
+                "status", req=req
+            )
+            
+            GroupMembershipDA.accept_group_invitation(group_id, member_id, status)
+
+            resp.body = json.dumps({
+                "description": "Successfully done",
+                "success": True
+            }, default_parser=json.parser)
+        except Exception as err:
+            resp.body = json.dumps({
+                "description": "Something went wrong",
+                "success": False
+            })
 
 class GroupMembersResource(object):
     @staticmethod

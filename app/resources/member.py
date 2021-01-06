@@ -4,6 +4,7 @@ from uuid import UUID
 
 import app.util.json as json
 import app.util.request as request
+from app.util.auth import inject_member
 from app.da.member import MemberDA, MemberContactDA, MemberInfoDA
 from app.da.file_sharing import FileStorageDA, FileTreeDA
 from app.da.invite import InviteDA
@@ -507,7 +508,7 @@ class MemberContactSecurity(object):
             member_id = session["member_id"]
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
-        
+
         try:
             security_info = MemberContactDA.get_security(member_id, contact_member_id)
             resp.body = json.dumps({
@@ -540,7 +541,7 @@ class MemberContactSecurity(object):
             logger.debug("pin: {}".format(pin))
             if picture is not None:
                 security_picture_storage_id = FileStorageDA().put_file_to_storage(picture)
-            
+
             security_params = {
                 "member_id": member_id,
                 "contact_member_id": contact_member_id,
@@ -548,9 +549,9 @@ class MemberContactSecurity(object):
                 "security_pin": pin,
                 "exchangeOption": exchangeOption
             }
-            
+
             MemberContactDA.update_security(**security_params)
-            
+
             resp.body = json.dumps({
                 "description": "Stored Successfully!",
                 "success": True
@@ -763,3 +764,24 @@ class MemberContactsCountries(object):
 
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
+
+
+class MemberContactAccept(object):
+    @inject_member
+    def on_put(self, req, resp, member, contact_member_id):
+        member_id = member['member_id']
+        try:
+            (status,) = request.get_json_or_form(
+                "status", req=req)
+
+            MemberContactDA.accept_invitation(member_id, contact_member_id, status)
+            MemberContactDA.accept_invitation(contact_member_id, member_id, status)
+            resp.body = json.dumps({
+                "description": "Successfully accepted",
+                "success": True
+            }, default_parser=json.parser)
+        except Exception as e:
+            resp.body = json.dumps({
+                "description": "Something went wrong",
+                "success": False
+            }, default_parser=json.parser)

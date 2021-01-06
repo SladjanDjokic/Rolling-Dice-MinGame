@@ -1,0 +1,1 @@
+ALTER TYPE group_member_status ADD VALUE 'declined';

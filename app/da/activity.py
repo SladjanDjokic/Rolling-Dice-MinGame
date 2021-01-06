@@ -95,7 +95,7 @@ class ActivityDA(object):
                     LIMIT 10
             """
             query_invitations = """
-                SELECT 
+                SELECT
                     activity_trace.id,
                     activity_trace.event_key,
                     activity_trace.request_params,
@@ -105,46 +105,52 @@ class ActivityDA(object):
                     activity_trace.status,
                     activity_trace.http_status,
                     activity_trace.create_date,
-                    member.first_name as inviter_first_name,
-                    member.last_name as last_name,
+                    member_requester.first_name as first_name,
+                    member_requester.last_name as last_name,
                     job_title.name as job_title,
-                    file_storage_engine.storage_engine_id as s3_avatar_url
+                    file_storage_engine.storage_engine_id as s3_avatar_url,
+                    contact.status AS contact_requested_status,
+                    member_group_membership.status AS group_membership_status
                 FROM activity_trace
-                LEFT OUTER JOIN member ON member.id = activity_trace.member_id
-                LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
+                LEFT OUTER JOIN member AS member_requester ON member_requester.id = activity_trace.member_id
+                LEFT OUTER JOIN member AS member_requested ON member_requested.id = %s
+                LEFT OUTER JOIN job_title ON job_title.id = member_requester.job_title_id
                 LEFT OUTER JOIN member_profile ON activity_trace.member_id = member_profile.member_id
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
-                WHERE 
-                    activity_trace.event_type='activity' 
+                LEFT OUTER JOIN contact ON contact.contact_member_id = activity_trace.member_id AND contact.member_id = member_requested.id
+                LEFT OUTER JOIN member_group_membership ON member_group_membership.group_id = (activity_trace.request_params->>'groupId')::INT AND member_group_membership.member_id = member_requested.id
+                WHERE
+                    activity_trace.event_type='activity'
                     AND
-                    (activity_trace.request_params::text <> '{}'::text AND activity_trace.response::text <> 'null') 
+                    (activity_trace.request_params::text <> '{}'::text AND activity_trace.response::text <> 'null')
                     AND
                     (
                         (
                             request_params->>'type' = 'add-contact'
-                            AND 
-                            %s = ANY (CONCAT('{', activity_trace.request_params->>'member_id_list', '}')::int[])
-                        )  
+                            AND
+                            member_requested.id = ANY (CONCAT('{', activity_trace.request_params->>'member_id_list', '}')::int[])
+                            AND
+                            contact.status = 'pending'
+                        )
                         OR
                         (
-                            request_params->>'type' = 'add-group-member' 
-                            AND 
-                            %s = activity_trace.request_params->>'groupMemberEmail')
+                            request_params->>'type' = 'add-group-member'
+                            AND
+                            member_requested.email = activity_trace.request_params->>'groupMemberEmail')
+                            AND
+                            member_group_membership.status = 'invited'
                         OR
                         (
-                            request_params->>'type' = 'create-group' 
-                            AND 
-                            EXISTS (
-                                SELECT FROM jsonb_array_elements((request_params->>'members')::jsonb) pil   
-                                WHERE (pil)::text = %s
-                            )
-						)                    
+                            request_params->>'type' = 'create-group'
+                            AND
+                            (request_params->>'members')::jsonb @> to_char(member_requested.id, '999')::jsonb
+                        )
                     )
                     ORDER BY activity_trace.create_date DESC
                     LIMIT 10
-            """
+                """
             param_mails = (str(member_id), )
-            param_invitations = (str(member_id), member_email, str(member_id), )
+            param_invitations = (str(member_id),)
             
             cls.source.execute(query_mails, param_mails)
             if cls.source.has_results():
@@ -201,7 +207,9 @@ class ActivityDA(object):
                         first_name,
                         last_name,
                         job_title,
-                        s3_avatar_url
+                        s3_avatar_url,
+                        contact_requested_status,
+                        group_membership_status
                 ) in cls.source.cursor:
                     contact_invitaiton = {
                         "id": id,
@@ -216,7 +224,9 @@ class ActivityDA(object):
                         "first_name": first_name,
                         "last_name": last_name,
                         "job_title": job_title,
-                        "amera_avatar_url": amerize_url(s3_avatar_url)
+                        "amera_avatar_url": amerize_url(s3_avatar_url),
+                        "contact_requested_status": contact_requested_status,
+                        "group_membership_status": group_membership_status
                     }
                     invitations.append(contact_invitaiton)
             
