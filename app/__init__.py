@@ -35,7 +35,8 @@ from app.resources.system import SystemActivityResource
 from app.resources.language import LanguageResource
 from app.resources.static import StaticResource
 from app.resources.member_scheduler_setting import MemberSchedulerSettingResource
-from app.resources.member_schedule_event import MemberScheduleEventResource, MemberScheduleEventColors, EventAttachmentResorce
+from app.resources.member_schedule_event import MemberScheduleEventResource, MemberScheduleEventColors, \
+    EventAttachmentResorce, MemberUpcomingEvents, MemberEventInvitations, MemberEventInvitateStatus
 from app.resources.member_schedule_holiday import MemberScheduleHolidayResource
 from app.resources.member_schedule_event_invite import MemberScheduleEventInviteResource, \
     MemberScheduleEventInviteAddSingleResource, MemberScheduleEventInviteSetStatusResource
@@ -271,3 +272,10 @@ def _setup_routes(app):
 
     # Call Notificaitons
     app.add_route("/notifications/incoming-call", IncomingCallView())
+
+    # Upcoming Events
+    app.add_route("/member/event/upcoming", MemberUpcomingEvents())
+    # Event Invitations
+    app.add_route("/member/event/invite", MemberEventInvitations())
+    # Event Invitation Accept/Decline
+    app.add_route("/member/event/invite/response", MemberEventInvitateStatus())

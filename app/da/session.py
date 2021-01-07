@@ -653,7 +653,9 @@ class SessionDA(object):
                 member_session.user_browser,
                 member_session.user_browser_version,
                 member_session.remote_postal_code,
-                member_session.remote_timezone_name
+                member_session.remote_timezone_name,
+                member_session.remote_country_code_2,
+                member_session.remote_region_code
             FROM member_session
                 LEFT JOIN member on member_session.member_id = member.id
             WHERE
@@ -719,7 +721,9 @@ class SessionDA(object):
                     user_browser,
                     user_browser_version,
                     remote_postal_code,
-                    remote_timezone_name
+                    remote_timezone_name,
+                    remote_country_code_2,
+                    remote_region_code,
             ) in cls.source.cursor:
                 session = {
                     "session_id": session_id,
@@ -744,7 +748,9 @@ class SessionDA(object):
                     "user_browser": user_browser,
                     "user_browser_version": user_browser_version,
                     "remote_postal_code": remote_postal_code,
-                    "remote_timezone_name": remote_timezone_name
+                    "remote_timezone_name": remote_timezone_name,
+                    "country_code": remote_country_code_2,
+                    "region_code": remote_region_code,
                 }
 
                 sessions.append(session)

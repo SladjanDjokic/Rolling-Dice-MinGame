@@ -405,3 +405,79 @@ class EventAttachmentResorce(object):
     @inject_member
     def on_delete(self, req, resp, member):
         logger.debug('ccc')
+
+class MemberUpcomingEvents(object):
+    @staticmethod
+    def on_get(req, resp):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+            current = req.get_param('current')
+            limit = req.get_param('limit')
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+
+        upcoming_events = MemberEventDA().get_upcoming_events(member_id, current, limit)
+
+        resp.body = json.dumps({
+            "data": upcoming_events,
+            "message": "Upcoming Events",
+            "status": "success",
+            "success": True
+        }, default_parser=json.parser)
+
+
+class MemberEventInvitations(object):
+    @staticmethod
+    def on_get(req, resp):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+
+        event_invitations = MemberEventDA().get_event_invitations(member_id)
+
+        resp.body = json.dumps({
+            "data": event_invitations,
+            "message": "Upcoming Events",
+            "status": "success",
+            "success": True
+        }, default_parser=json.parser)
+
+
+class MemberEventInvitateStatus(object):
+    @staticmethod
+    def on_get(req, resp):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+            event_invite_id = req.get_param('event_invite_id')
+            status = req.get_param('status')
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+
+        status_list = ['Accepted', 'Declined']
+        if status in status_list:
+            event_invitations = MemberEventDA().set_event_invitate_status(member_id, event_invite_id, status)
+
+            if event_invitations:
+                resp.body = json.dumps({
+                    "data": event_invitations,
+                    "message": "success to set event status",
+                    "status": "success",
+                    "success": True
+                }, default_parser=json.parser)
+            else:
+                resp.body = json.dumps({
+                    "description": "Did not set event status",
+                    "success": False
+                }, default_parser=json.parser)
+        else:
+            resp.body = json.dumps({
+                "description": "Invalid status",
+                "success": False
+            }, default_parser=json.parser)

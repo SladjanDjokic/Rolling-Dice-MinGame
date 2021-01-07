@@ -6,6 +6,7 @@ import app.util.json as json
 from app.util.config import settings
 from app.exceptions.file_sharing import FileShareExists, FileNotFound, \
     FileUploadCreateException, FileStorageUploadError
+from app.util.filestorage import amerize_url
 
 logger = logging.getLogger(__name__)
 
@@ -637,3 +638,111 @@ class MemberEventDA(object):
     #         return id
     #     except Exception as e:
     #         return None
+
+    @classmethod
+    def get_upcoming_events(cls, member_id, current, limit):
+        query = ("""
+            SELECT
+                events.id as id,
+                events.event_name,
+                events.event_description,
+                events.start_datetime,
+                member.first_name as first_name,
+                member.last_name as last_name,
+                file_storage_engine.storage_engine_id,
+                role.name
+            FROM (
+                SELECT event_2.*, event_2.host_member_id AS viewer_member_id
+                FROM event_2 WHERE event_2.host_member_id = %s
+                UNION
+                SELECT event_2.*, event_invite_2.invite_member_id AS viewer_member_id
+                FROM event_2
+                INNER JOIN event_invite_2 ON event_2.id=event_invite_2.event_id
+                WHERE event_invite_2.invite_member_id = %s and event_2.event_status='Active' and event_invite_2.invite_status='Accepted'
+            ) as events
+            LEFT JOIN member ON member.id = events.host_member_id
+            LEFT JOIN member_profile ON member.id = member_profile.member_id
+            LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+            LEFT OUTER JOIN contact ON
+                (   events.host_member_id = contact.contact_member_id
+                AND contact.member_id = viewer_member_id)
+            LEFT OUTER JOIN role ON (contact.role_id = role.id)
+            WHERE events.start_datetime >= %s and events.event_status='Active'
+            ORDER BY events.start_datetime
+            Limit %s
+        """)
+        params = (member_id, member_id, current, limit)
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            entry = list()
+            for (row) in cls.source.cursor:
+                upcoming_events = {
+                    "id": row[0],
+                    "name": row[1],
+                    "message": row[2],
+                    "create_date": row[3],
+                    "first_name": row[4],
+                    "last_name": row[5],
+                    "amera_avatar_url": amerize_url(row[6]),
+                    "role": row[7],
+                    "type": "event-upcoming",
+                }
+                entry.append(upcoming_events)
+            return entry
+        return None
+
+    @classmethod
+    def get_event_invitations(cls, member_id):
+        query = ("""
+            SELECT
+                event_invite_2.id as id,
+                event_2.event_name,
+                event_2.event_description,
+                event_2.start_datetime,
+                member.first_name as first_name,
+                member.last_name as last_name,
+                file_storage_engine.storage_engine_id,
+                role.name
+            FROM event_invite_2
+            LEFT JOIN event_2 ON event_invite_2.event_id = event_2.id
+            LEFT JOIN member ON member.id = event_2.host_member_id
+            LEFT JOIN member_profile ON member.id = member_profile.member_id
+            LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+            LEFT OUTER JOIN contact ON
+                (   event_2.host_member_id = contact.contact_member_id
+                AND event_invite_2.invite_member_id = contact.member_id)
+            LEFT OUTER JOIN role ON (contact.role_id = role.id)
+            WHERE event_invite_2.invite_member_id = %s and event_2.event_status='Active' and event_invite_2.invite_status='Tentative'
+            ORDER BY event_2.start_datetime
+        """)
+        params = (member_id,)
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            entry = list()
+            for (row) in cls.source.cursor:
+                upcoming_events = {
+                    "id": row[0],
+                    "name": row[1],
+                    "description": row[2],
+                    "create_date": row[3],
+                    "first_name": row[4],
+                    "last_name": row[5],
+                    "amera_avatar_url": amerize_url(row[6]),
+                    "role": row[7],
+                    "type": "event-invite",
+                }
+                entry.append(upcoming_events)
+            return entry
+        return None
+
+    @classmethod
+    def set_event_invitate_status(cls, member_id, event_invite_id, status):
+        query = ("""
+            UPDATE event_invite_2
+            SET invite_status = %s
+            WHERE id = %s and invite_member_id=%s
+        """)
+        params = (status, event_invite_id, member_id)
+        cls.source.execute(query, params)
+        cls.source.commit()
+        return True
