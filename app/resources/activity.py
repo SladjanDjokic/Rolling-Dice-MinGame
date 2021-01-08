@@ -17,7 +17,7 @@ class ActivitiesResource(object):
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
         if member_id:
-            result = ActivityDA().get_recent_acticities(member_id, member_email)
+            result = ActivityDA().get_recent_activity(member_id, member_email)
             if result: 
                 resp.body = json.dumps({
                     "activities": result,

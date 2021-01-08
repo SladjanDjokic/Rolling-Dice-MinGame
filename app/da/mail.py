@@ -49,16 +49,17 @@ class BaseMailDA(BaseDA):
             {folder_join}
             WHERE (
                 mail_xref.mail_header_id IN %s
-                AND mail_xref.member_id = %s
+                AND mail_xref.owner_member_id = %s
                 {folder_query}
                 AND xref.deleted = FALSE
             );
         """
 
     @classmethod
-    def list_get_query(cls, start, search_query, order_query, has_folder_filter, member_id):
+    def list_get_query(cls, start, search_query, order_query, has_folder_filter, has_member_filter, member_id):
         folder_query, folder_join = cls.folder_query(member_id)
         user_folders_query = ""
+
         if cls.user_folders:
             user_folders_query = f"""
                 AND (xref.recent_mail_folder_id {('=' if has_folder_filter else '>')
@@ -66,6 +67,14 @@ class BaseMailDA(BaseDA):
                     {'OR xref.recent_mail_folder_id IS NULL' if not has_folder_filter and has_folder_filter is not None
             else ''}
                 )
+            """
+        if has_member_filter and cls.folder_name != "Sent":
+            user_folders_query += """
+                AND xref.owner_member_id = %s
+            """
+        if has_member_filter and cls.folder_name == "Sent":
+            user_folders_query += """
+                AND message_to->'amera' @> to_char(%s, '999')::jsonb
             """
         return f"""
             SELECT
@@ -252,11 +261,14 @@ class BaseMailDA(BaseDA):
         header_query = cls.list_get_query(start, search_query, order_query,
                                           filter_list["folder"] >= 0 if bool(filter_list and ("folder" in filter_list))
                                           else None,
+                                          bool(filter_list and ("member_id" in filter_list)),
                                           member_id)
         header_update = cls.list_after_update_query(member_id)
         folder_filter_data = []
         if cls.user_folders:
             folder_filter_data.append(filter_list["folder"] if filter_list and "folder" in filter_list else None)
+        if filter_list and ("member_id" in filter_list):
+            folder_filter_data.append(filter_list["member_id"])
         # # Get mail header
         cls.source.execute(header_query, (start, member_id, cls.message_locked, *folder_filter_data, *search_params,
                                           size))

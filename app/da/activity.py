@@ -21,7 +21,7 @@ class ActivityDA(object):
             """
             INSERT INTO activity_trace
                 (event_key, headers, request_params, request_url_params,
-                request_data, response, http_status, session_key, 
+                request_data, response, http_status, session_key,
                 session_data, member_id, event_type, status, create_date)
                 Values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
             """
@@ -53,20 +53,21 @@ class ActivityDA(object):
     #         logger.error(e, exc_info=True)
 
     @classmethod
-    def get_recent_acticities(cls, member_id, member_email):
+    def get_recent_activity(cls, member_id, member_email):
         mails = list()
         invitations = list()
         try:
             query_mails = """
-                SELECT 
+                SELECT
                     activity_trace.id,
                     activity_trace.event_key,
+                    activity_trace.event_type,
                     activity_trace.request_params,
                     activity_trace.request_url_params,
                     activity_trace.request_data,
                     activity_trace.response,
                     activity_trace.http_status,
-                    activity_trace.session_key, 
+                    activity_trace.session_key,
                     activity_trace.member_id,
                     activity_trace.event_type,
                     activity_trace.status,
@@ -74,23 +75,16 @@ class ActivityDA(object):
                     member.first_name as first_name,
                     member.last_name as last_name,
                     job_title.name as job_title,
-                    file_storage_engine.storage_engine_id as s3_avatar_url
+                    file_path(file_storage_engine.storage_engine_id, '/member/file') as s3_avatar_url
                 FROM activity_trace
                 LEFT OUTER JOIN member ON member.id = activity_trace.member_id
                 LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
                 LEFT OUTER JOIN member_profile ON activity_trace.member_id = member_profile.member_id
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
                 WHERE
-                    activity_trace.event_type='activity' 
-                    AND 
-                    (json_typeof(activity_trace.request_data)::text <> 'null' AND json_typeof(activity_trace.response)::text <> 'null')
+                    activity_trace.response ? 'fails'
                     AND
-                    activity_trace.response::jsonb ? 'fails'
-                    AND
-                    EXISTS (
-                        SELECT FROM json_array_elements(activity_trace.request_data->'receivers'->'amera') pil
-                            WHERE (pil)::text = %s
-                    )
+                    activity_trace.request_data->'receivers'->'amera' @> %s
                     ORDER BY activity_trace.create_date DESC
                     LIMIT 10
             """
@@ -159,18 +153,19 @@ class ActivityDA(object):
                 """
             param_mails = (str(member_id), )
             param_invitations = (str(member_id),)
-            
+
             cls.source.execute(query_mails, param_mails)
             if cls.source.has_results():
                 for (
                         id,
                         event_key,
+                        event_type,
                         request_params,
                         request_url_params,
                         request_data,
                         response,
                         http_status,
-                        session_key, 
+                        session_key,
                         member_id,
                         event_type,
                         status,
@@ -183,12 +178,13 @@ class ActivityDA(object):
                     mail = {
                         "id": id,
                         "event_key": event_key,
+                        "event_type": event_type,
                         "request_params": request_params,
                         "request_url_params": request_url_params,
                         "request_data": request_data,
                         "response": response,
                         "http_status": http_status,
-                        "session_key": session_key, 
+                        "session_key": session_key,
                         "member_id": member_id,
                         "event_type": event_type,
                         "status": status,
@@ -199,7 +195,7 @@ class ActivityDA(object):
                         "amera_avatar_url": amerize_url(s3_avatar_url)
                     }
                     mails.append(mail)
-            
+
             cls.source.execute(query_invitations, param_invitations)
             if cls.source.has_results():
                 for (
@@ -239,7 +235,7 @@ class ActivityDA(object):
                         "role": role
                     }
                     invitations.append(contact_invitaiton)
-            
+
             return {
                 "invitations": {
                     "id"   : 2,

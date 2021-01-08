@@ -72,6 +72,13 @@ class MailBaseResource(object):
             except ValueError:
                 raise HTTPBadRequest("Folder is not valid")
             filter_data["folder"] = folder_id
+        member_filter = req.params.get('member_filter', None)
+        if member_filter is not None:
+            try:
+                member_filter = int(member_filter)
+            except ValueError:
+                raise HTTPBadRequest("Member filter is not valid")
+            filter_data["member_id"] = member_filter
         data, total = self.main_da_class.list_folder(member["member_id"], start, size,
                                                      ("%" + str(search) + "%") if search else None, sort, order,
                                                      filter_data)

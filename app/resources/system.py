@@ -26,7 +26,7 @@ class SystemActivityResource(object):
         session_id = get_session_cookie(req)
         session = validate_session(session_id)
 
-        if get_all and session["user_type"] is 'administrator':
+        if get_all and session["user_type"] == 'administrator':
             raise falcon.HTTPForbidden(description="Not enough permissions")
 
         search_key = req.get_param('search_key') or ''
@@ -35,7 +35,7 @@ class SystemActivityResource(object):
 
         sort_params = req.get_param('sort')
 
-        get_func = SessionDA.get_sessions if self.resource is "sessions" else InviteDA.get_invites
+        get_func = SessionDA.get_sessions if self.resource == "sessions" else InviteDA.get_invites
 
         result = get_func(search_key, page_size, page_number, sort_params, get_all, session["member_id"])
 

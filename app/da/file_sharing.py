@@ -1072,7 +1072,7 @@ class FileTreeDA(object):
         return root_id
 
     @classmethod
-    def create_tree(cls, tree_type, target_type):
+    def create_tree(cls, tree_type, target_type, is_return_item_id=False):
         '''
             We use to create empty trees (having only root folders) when member is created
             tree id is returned to be written in member table
@@ -1088,7 +1088,7 @@ class FileTreeDA(object):
                     TRUE,
                     %s
                 FROM rows
-                RETURNING file_tree_id
+                RETURNING file_tree_id, id
         """)
         if tree_type == 'main':
             if target_type == 'member':
@@ -1099,8 +1099,11 @@ class FileTreeDA(object):
             node_name = 'Trash'
         params = (tree_type, node_name)
         cls.source.execute(query, params)
-        (tree_id,) = cls.source.cursor.fetchone()
+        (tree_id, file_tree_id) = cls.source.cursor.fetchone()
         cls.source.commit()
+
+        if is_return_item_id:
+            return tree_id, file_tree_id
         return tree_id
 
     @classmethod
