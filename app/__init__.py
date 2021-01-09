@@ -183,6 +183,7 @@ def _setup_routes(app):
     app.add_route("/member/group/security/{group_id}", MemberGroupSecurity())
     app.add_route("/system/activity/invite", SystemActivityResource("invites"))
     app.add_route("/system/activity/session", SystemActivityResource("sessions"))
+    app.add_route("/system/activity/threat", SystemActivityResource("threats"))
 
     app.add_route("/member/activity", ActivitiesResource())
 

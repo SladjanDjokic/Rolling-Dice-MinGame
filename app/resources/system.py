@@ -38,7 +38,12 @@ class SystemActivityResource(object):
 
         sort_params = req.get_param('sort')
 
-        get_func = SessionDA.get_sessions if self.resource == "sessions" else InviteDA.get_invites
+        if self.resource == "invites":
+            get_func = InviteDA.get_invites
+        elif self.resource == "threats":
+            get_func = SessionDA.get_threats
+        else:
+            get_func = SessionDA.get_sessions
 
         result = get_func(search_key, page_size, page_number, sort_params, get_all, session["member_id"])
 

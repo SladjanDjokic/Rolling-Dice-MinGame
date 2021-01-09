@@ -8,6 +8,7 @@ from app.exceptions.data import DuplicateKeyError, DataMissingError, \
 from app.exceptions.invite import InviteExistsError, InviteDataMissingError, \
     InviteInvalidInviterError
 from app.util.filestorage import amerize_url
+from app.util.security import SECURITY_EXCHANGE_OPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -98,8 +99,9 @@ class GroupDA(object):
                 'group_id': 'member_group.id',
                 'group_leader_id': 'member_group.group_leader_id',
                 'group_name': 'member_group.group_name',
-                'create_date': 'member_group.create_date',
-                'update_date': 'member_group.update_date',
+                'group_exchange_option': 'member_group.exchange_option',
+                'group_create_date': 'member_group.create_date',
+                'group_update_date': 'member_group.update_date',
                 'group_leader_first_name': 'member.first_name',
                 'group_leader_last_name': 'member.last_name',
                 'total_member': 'total_member',
@@ -114,12 +116,13 @@ class GroupDA(object):
                 member_group.id AS group_id,
                 member_group.group_leader_id AS group_leader_id,
                 member_group.group_name AS group_name,
-                member_group.create_date AS create_date,
-                member_group.update_date AS update_date,
+                member_group.create_date AS group_create_date,
+                member_group.update_date AS group_update_date,
                 member.first_name AS group_leader_first_name,
                 member.last_name AS group_leader_last_name,
                 count(DISTINCT member_group_membership.member_id) AS total_member,
-                count(DISTINCT file_tree_item.id) AS total_files
+                count(DISTINCT file_tree_item.id) AS total_files,
+                member_group.exchange_option AS group_exchange_option
             FROM member_group
             LEFT JOIN member ON member_group.group_leader_id = member.id
             LEFT OUTER JOIN member_group_membership ON (member_group_membership.group_id = member_group.id)
@@ -136,6 +139,7 @@ class GroupDA(object):
                 member_group.id,
                 member_group.group_leader_id,
                 member_group.group_name,
+                member_group.exchange_option,
                 member_group.create_date,
                 member_group.update_date,
                 member.first_name,
@@ -151,11 +155,12 @@ class GroupDA(object):
                     "group_id": row[0],
                     "group_leader_id": row[1],
                     "group_name": row[2],
+                    "group_exchange_option": SECURITY_EXCHANGE_OPTIONS.get(row[9]),
                     "group_leader_name": f'{row[5]} {row[6]}',
                     "total_member": row[7],
                     "total_files": row[8],
-                    "create_date": row[3],
-                    "update_date": row[4],
+                    "group_create_date": row[3],
+                    "group_update_date": row[4],
                 }
                 group_list.append(group)
         return group_list
@@ -264,7 +269,7 @@ class GroupDA(object):
                     "group_id": row[0],
                     "group_leader_id": row[1],
                     "group_name": row[2],
-                    "group_exchange_option": row[3],
+                    "group_exchange_option": SECURITY_EXCHANGE_OPTIONS.get(row[3]),
                     "group_status": row[4],
                     "group_role": row[5],
                     "group_create_date": row[6],
