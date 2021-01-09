@@ -15,7 +15,14 @@ import app.util.email as sendmail
 
 logger = logging.getLogger(__name__)
 
+
 class MemberForgotPasswordResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.forgot_password'),
+                                    "topic": settings.get('kafka.topics.member')
+                                    },
+                           }
 
     def on_post(self, req, resp):
         (email) = request.get_json_or_form("email", req=req)

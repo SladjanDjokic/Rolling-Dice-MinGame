@@ -2,6 +2,7 @@ import logging
 
 import app.util.json as json
 import app.util.request as request
+from app import settings
 from app.util.session import get_session_cookie, validate_session
 from app.util.auth import inject_member
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
@@ -22,6 +23,18 @@ logger = logging.getLogger(__name__)
 
 
 class MemberScheduleEventResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.create_event'),
+                                    "topic": settings.get('kafka.topics.calendar')
+                                    },
+                           "PUT": {"event_type": settings.get('kafka.event_types.put.edit_event'),
+                                    "topic": settings.get('kafka.topics.calendar')
+                                    },
+                           "DELETE": {"event_type": settings.get('kafka.event_types.delete.delete_event'),
+                                      "topic": settings.get('kafka.topics.calendar')
+                                    },
+                           }
 
     @inject_member
     def on_get(self, req, resp, member):
@@ -367,6 +380,16 @@ class MemberScheduleEventColors(object):
 
 
 class EventAttachmentResorce(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.create_event_attachment'),
+                                    "topic": settings.get('kafka.topics.calendar')
+                                    },
+                           "DELETE": {"event_type": settings.get('kafka.event_types.delete.delete_event_attachment'),
+                                    "topic": settings.get('kafka.topics.calendar')
+                                    },
+                           }
+
     @inject_member
     def on_get(self, req, resp, member):
         logger.debug('aaa')
@@ -449,6 +472,12 @@ class MemberEventInvitations(object):
 
 
 class MemberEventInvitateStatus(object):
+    def __init__(self):
+        self.kafka_data = {"GET": {"event_type": settings.get('kafka.event_types.get.event_invite_response'),
+                                    "topic": settings.get('kafka.topics.calendar')
+                                    },
+                           }
+
     @staticmethod
     def on_get(req, resp):
         try:

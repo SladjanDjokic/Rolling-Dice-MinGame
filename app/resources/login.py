@@ -25,6 +25,15 @@ logger = logging.getLogger(__name__)
 
 class MemberLoginResource(object):
 
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.member_login'),
+                                    "topic": settings.get('kafka.topics.auth')
+                                    },
+                           "GET": {"event_type": settings.get('kafka.event_types.get.member_login'),
+                                   "topic": settings.get('kafka.topics.auth')
+                                   },
+                           }
+
     auth = {
         'exempt_methods': ['POST']
     }

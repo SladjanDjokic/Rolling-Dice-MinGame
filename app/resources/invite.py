@@ -22,6 +22,19 @@ logger = logging.getLogger(__name__)
 
 
 class MemberInviteResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.member_invite'),
+                                    "topic": settings.get('kafka.topics.member')
+                                    },
+                           "GET": {"event_type": settings.get('kafka.event_types.get.member_invite'),
+                                   "topic": settings.get('kafka.topics.member')
+                                   },
+                           "PUT": {"event_type": settings.get('kafka.event_types.put.member_invite'),
+                                   "topic": settings.get('kafka.topics.member')
+                                   },
+                           }
+
     def on_put(self, req, resp):
         (id, first_name, invite_key, email) = request.get_json_or_form("id", "first_name", "invite_key", "email",
                                                                        req=req)
@@ -182,6 +195,14 @@ class MemberInviteResource(object):
 
 
 class ValidInviteResource(object):
+
+    def __init__(self):
+        self.kafka_data = {
+                           "GET": {"event_type": settings.get('kafka.event_types.get.valid_member_invite'),
+                                   "topic": settings.get('kafka.topics.member')
+                                   },
+
+                           }
 
     def on_get(self, req, resp, invite_key):
         if not invite_key:

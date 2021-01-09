@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class Verification(object):
+
     auth = {
         'exempt_methods': ["POST", "PUT"]
     }

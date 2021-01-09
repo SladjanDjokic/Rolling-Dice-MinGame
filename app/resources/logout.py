@@ -2,11 +2,18 @@ import uuid
 import falcon
 import app.util.json as json
 import app.util.request as request
+from app import settings
 from app.da.session import SessionDA
 from app.exceptions.session import SessionExistsError
 
 
 class MemberLogoutResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.member_logout'),
+                                    "topic": settings.get('kafka.topics.auth')
+                                    }
+                           }
 
     auth = {
         'exempt_methods': ['POST']

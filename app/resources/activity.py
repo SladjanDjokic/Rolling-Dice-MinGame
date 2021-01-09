@@ -2,6 +2,7 @@ import logging
 
 import app.util.json as json
 from app.da.activity import ActivityDA
+from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 from app.util.session import get_session_cookie, validate_session
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,6 @@ class ActivitiesResource(object):
             else:
                 resp.body = json.dumps({
                     "activities": {},
-                    "message": "Failed to get acticities",
+                    "message": "Failed to get activities",
                     "success": False
                 }, default_parser=json.parser)

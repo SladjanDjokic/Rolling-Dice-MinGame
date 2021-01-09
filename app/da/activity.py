@@ -15,21 +15,23 @@ class ActivityDA(object):
                         req_url_params={}, req_data={}, resp_data={},
                         http_status="", session_key="", session_data={},
                         member_id="", event_type="activity", status="",
-                        create_date="", commit=True):
+                        create_date="", topic="", referer_url="", url="", commit=True):
 
         insert_activity_q = (
             """
             INSERT INTO activity_trace
                 (event_key, headers, request_params, request_url_params,
-                request_data, response, http_status, session_key,
-                session_data, member_id, event_type, status, create_date)
-                Values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                request_data, response, http_status, session_key, 
+                session_data, member_id, event_type, status, create_date,
+                topic, referer_url, url)
+                Values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
             """
         )
         params = (
                     event_key, headers, req_params, req_url_params, req_data,
                     resp_data, http_status, session_key, session_data,
-                    member_id, event_type, status, create_date
+                    member_id, event_type, status, create_date, topic, referer_url,
+                    url
                 )
         try:
             cls.source.execute(insert_activity_q, params)
@@ -102,10 +104,15 @@ class ActivityDA(object):
                     member_requester.first_name as first_name,
                     member_requester.last_name as last_name,
                     job_title.name as job_title,
-                    file_storage_engine.storage_engine_id as s3_avatar_url,
+                    file_path(file_storage_engine.storage_engine_id, '/member/file') as s3_avatar_url,
                     contact.status AS contact_requested_status,
-                    member_group_membership.status AS group_membership_status,
-                    role.name
+                    CASE 
+                        WHEN add_group_membership.status IS NOT NULL THEN add_group_membership.status
+                        WHEN create_group_membership.status IS NOT NULL THEN create_group_membership.status
+                        ELSE NULL
+                    END AS group_membership_status,
+                    role.name,
+                    activity_trace.response
                 FROM activity_trace
                 LEFT OUTER JOIN member AS member_requester ON member_requester.id = activity_trace.member_id
                 LEFT OUTER JOIN member AS member_requested ON member_requested.id = %s
@@ -116,13 +123,16 @@ class ActivityDA(object):
                     contact.contact_member_id = activity_trace.member_id
                     AND contact.member_id = member_requested.id
                 LEFT OUTER JOIN role ON contact.role_id = role.id
-                LEFT OUTER JOIN member_group_membership ON
-                    member_group_membership.group_id = (activity_trace.request_params->>'groupId')::INT
-                    AND member_group_membership.member_id = member_requested.id
+                LEFT OUTER JOIN member_group_membership AS add_group_membership ON
+                    add_group_membership.group_id = (activity_trace.request_params->>'groupId')::INT
+                    AND add_group_membership.member_id = member_requested.id
+                LEFT OUTER JOIN member_group_membership AS create_group_membership ON
+                    create_group_membership.group_id = (activity_trace.response->'data'->0->'group_id')::INT
+                    AND create_group_membership.member_id = member_requested.id
                 WHERE
-                    activity_trace.event_type='activity'
+                    activity_trace.status = 'ended'
                     AND
-                    (activity_trace.request_params::text <> '{}'::text AND activity_trace.response::text <> 'null')
+                    activity_trace.http_status = '200 OK'
                     AND
                     (
                         (
@@ -138,18 +148,18 @@ class ActivityDA(object):
                             AND
                             member_requested.email = activity_trace.request_params->>'groupMemberEmail')
                             AND
-                            member_group_membership.status = 'invited'
+                            add_group_membership.status = 'invited'
                         OR
                         (
                             request_params->>'type' = 'create-group'
                             AND
                             (request_params->>'members')::jsonb @> to_char(member_requested.id, '999')::jsonb
                             AND
-                            member_group_membership.status = 'invited'
+                            create_group_membership.status = 'invited'
                         )
                     )
-                    ORDER BY activity_trace.create_date DESC
-                    LIMIT 10
+                ORDER BY activity_trace.create_date DESC
+                LIMIT 10
                 """
             param_mails = (str(member_id), )
             param_invitations = (str(member_id),)
@@ -192,7 +202,7 @@ class ActivityDA(object):
                         "first_name": first_name,
                         "last_name": last_name,
                         "job_title": job_title,
-                        "amera_avatar_url": amerize_url(s3_avatar_url)
+                        "amera_avatar_url": s3_avatar_url
                     }
                     mails.append(mail)
 
@@ -214,7 +224,8 @@ class ActivityDA(object):
                         s3_avatar_url,
                         contact_requested_status,
                         group_membership_status,
-                        role
+                        role,
+                        response
                 ) in cls.source.cursor:
                     contact_invitaiton = {
                         "id": id,
@@ -229,10 +240,11 @@ class ActivityDA(object):
                         "first_name": first_name,
                         "last_name": last_name,
                         "job_title": job_title,
-                        "amera_avatar_url": amerize_url(s3_avatar_url),
+                        "amera_avatar_url": s3_avatar_url,
                         "contact_requested_status": contact_requested_status,
                         "group_membership_status": group_membership_status,
-                        "role": role
+                        "role": role,
+                        "response": response,
                     }
                     invitations.append(contact_invitaiton)
 

@@ -50,6 +50,7 @@ argh = "*"
 certifi = "*"
 avro = "*"
 ipregistry = "*"
+mock = "*"
 
 [requires]
 python_version = "3.7.9"

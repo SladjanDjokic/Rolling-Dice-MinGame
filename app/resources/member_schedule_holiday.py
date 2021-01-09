@@ -2,6 +2,7 @@ import logging
 
 import app.util.json as json
 import app.util.request as request
+from app import settings
 from app.util.session import get_session_cookie, validate_session
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 from app.da.member_schedule_holiday import MemberScheduleHolidayDA
@@ -11,6 +12,13 @@ logger = logging.getLogger(__name__)
 
 
 class MemberScheduleHolidayResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.holiday_scheduled'),
+                                    "topic": settings.get('kafka.topics.calendar')
+                                    }
+                           }
+
     @staticmethod
     def on_get(req, resp):
         try:

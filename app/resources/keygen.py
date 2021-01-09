@@ -9,6 +9,8 @@ from imsecure.biastests import check_odd_bias, check_odd_even_run, check_repeats
 from io import StringIO
 import sys
 
+from app import settings
+
 
 class Capturing(list):
     def __enter__(self):
@@ -69,6 +71,16 @@ def call_key_gen(image_file, pin="000000", factor="", keysize=256, mode="lowxor"
 
 
 class KeyGenFileUpload(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.keygen_file_upload'),
+                                    "topic": settings.get('kafka.topics.keygen')
+                                    },
+                           "GET": {"event_type": settings.get('kafka.event_types.get.keygen_file_upload'),
+                                   "topic": settings.get('kafka.topics.keygen')
+                                   },
+                           }
+
     auth = {
         'exempt_methods': ['POST']
     }
@@ -114,7 +126,17 @@ class KeyGenFileUpload(object):
         binary = file.read_bytes()
         resp.body = binary
 
+
 class KeyGenResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.keygen_resource_crud'),
+                                    "topic": settings.get('kafka.topics.keygen')
+                                    },
+                           "GET": {"event_type": settings.get('kafka.event_types.get.keygen_resource_crud'),
+                                   "topic": settings.get('kafka.topics.keygen')
+                                   },
+                           }
 
     auth = {
         'exempt_methods': ['POST']

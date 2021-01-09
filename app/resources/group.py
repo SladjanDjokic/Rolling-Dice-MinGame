@@ -38,6 +38,19 @@ def is_integer(n):
 
 
 class MemberGroupResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.member_group_resource'),
+                                    "topic": settings.get('kafka.topics.member')
+                                    },
+                           "GET": {"event_type": settings.get('kafka.event_types.get.member_group_resource'),
+                                   "topic": settings.get('kafka.topics.member')
+                                   },
+                           "DELETE": {"event_type": settings.get('kafka.event_types.delete.member_group_resource'),
+                                      "topic": settings.get('kafka.topics.member')
+                                   },
+                           }
+
     def on_post(self, req, resp):
         (name, pin, members, exchange_option) = request.get_json_or_form(
             "name", "pin", "members", "exchangeOption", req=req)
@@ -195,6 +208,14 @@ class MemberGroupResource(object):
 
 
 class GroupDetailResource(object):
+
+    def __init__(self):
+        self.kafka_data = {
+                           "GET": {"event_type": settings.get('kafka.event_types.get.member_group_detail'),
+                                   "topic": settings.get('kafka.topics.member')
+                                   },
+                           }
+
     def on_get(self, req, resp, group_id=None):
         # TODO: Build pagination
         group = self.get_group_detail(group_id)
@@ -215,6 +236,19 @@ class GroupDetailResource(object):
 
 
 class GroupMembershipResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.group_crud'),
+                                    "topic": settings.get('kafka.topics.member')
+                                    },
+                           "GET": {"event_type": settings.get('kafka.event_types.get.group_crud'),
+                                   "topic": settings.get('kafka.topics.member')
+                                   },
+                           "DELETE": {"event_type": settings.get('kafka.event_types.delete.group_crud'),
+                                   "topic": settings.get('kafka.topics.member')
+                                   },
+                           }
+
     @staticmethod
     def on_post(req, resp):
         (group_id, group_member_email) = request.get_json_or_form(
@@ -272,6 +306,13 @@ class GroupMembershipResource(object):
 
 
 class GroupMemberInviteResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.group_member_invite'),
+                                    "topic": settings.get('kafka.topics.member')
+                                    }
+                           }
+
     def on_post(self, req, resp):
 
         logger.debug("Content-Type: {}".format(req.content_type))
@@ -339,7 +380,7 @@ class GroupMemberInviteResource(object):
             logger.debug(f"DOMAINS FOUND: {domains}")
             register_domain = request_domain
             logger.debug(f"REGISTER DOMAIN: {register_domain}")
-            
+
             register_url = settings.get(
                 "web.member_invite_register_url"
             ).format(invite_key)
@@ -387,7 +428,13 @@ class GroupMemberInviteResource(object):
                 "register_url": register_url
             })
 
+
 class GroupMemberAccept(object):
+    def __init__(self):
+        self.kafka_data = {"PUT": {"event_type": settings.get('kafka.event_types.put.group_membership_response'),
+                                    "topic": settings.get('kafka.topics.member')
+                                    }
+                           }
     def on_put(self, req, resp, group_id=None):
         try:
             session_id = get_session_cookie(req)
@@ -402,7 +449,7 @@ class GroupMemberAccept(object):
             (status, ) = request.get_json_or_form(
                 "status", req=req
             )
-            
+
             GroupMembershipDA.accept_group_invitation(group_id, member_id, status)
 
             resp.body = json.dumps({
@@ -416,6 +463,12 @@ class GroupMemberAccept(object):
             })
 
 class GroupMembersResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"GET": {"event_type": settings.get('kafka.event_types.get.retrieve_all_group_members'),
+                                    "topic": settings.get('kafka.topics.member')
+                                    }
+                           }
     @staticmethod
     def on_get(req, resp):
 
@@ -434,7 +487,18 @@ class GroupMembersResource(object):
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
 
+
 class MemberGroupSecurity(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.member_group_security'),
+                                    "topic": settings.get('kafka.topics.member')
+                                    },
+                           "GET": {"event_type": settings.get('kafka.event_types.get.member_group_security'),
+                                   "topic": settings.get('kafka.topics.member')
+                                   },
+                           }
+
     def on_get(self, req, resp, group_id=None):
         try:
             session_id = get_session_cookie(req)
@@ -450,7 +514,7 @@ class MemberGroupSecurity(object):
                 "data": security,
                 "success": True
             }, default_parser=json.parser)
-        except expression as e:
+        except Exception as e:
             resp.body = json.dumps({
                 "description": "Something went wrong",
                 "success": False
@@ -483,7 +547,7 @@ class MemberGroupSecurity(object):
                 "description": "Successfully saved",
                 "success": True
             }, default_parser=json.parser)
-        except expression as e:
+        except Exception as e:
             resp.body = json.dumps({
                 "description": "Something went wrong",
                 "success": False

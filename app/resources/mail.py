@@ -1,5 +1,6 @@
 import logging
 
+from app import settings
 from app.da.file_sharing import FileStorageDA
 from app.da.mail import DraftMailDA, InboxMailDa, StarMailDa, TrashMailDa, ArchiveMailDa, MailSettingsDA, SentMailDA
 from app.da.mail_folder import MailMemberFolder
@@ -13,6 +14,12 @@ logger = logging.getLogger(__name__)
 
 
 class MailAttachmentResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.mail_attachment'),
+                                    "topic": settings.get('kafka.topics.mail')
+                                    },
+                           }
 
     @inject_member
     def on_post(self, req, response, member):
@@ -38,6 +45,18 @@ class MailAttachmentResource(object):
 
 
 class MailBaseResource(object):
+
+    def __init__(self):
+        self.kafka_data = {
+                            "POST": {"uri": {"/mail/forward":
+                                                 {"event_type": settings.get('kafka.event_types.post.forward_mail'),
+                                                   "topic": settings.get('kafka.topics.mail')
+                                                },
+                                             }
+                                    }
+                            }
+
+
 
     @property
     def main_da_class(self):
@@ -133,6 +152,23 @@ class MailBaseResource(object):
 
 
 class MailDraftComposeResource(MailBaseResource):
+
+    def __init__(self):
+        self.kafka_data = {
+            "POST": {"uri": {"/mail/draft": {"event_type": settings.get('kafka.event_types.post.mail_draft_compose'),
+                                             "topic": settings.get('kafka.topics.mail')
+                                             },
+                             "/mail/draft/send": {
+                                 "event_type": settings.get('kafka.event_types.post.mail_draft_send'),
+                                 "topic": settings.get('kafka.topics.mail')
+                             },
+                             }
+                     },
+            "DELETE": {"event_type": settings.get('kafka.event_types.delete.mail_draft_delete'),
+                       "topic": settings.get('kafka.topics.mail')
+                       },
+        }
+
     main_da_class = DraftMailDA
 
     @inject_member
@@ -210,6 +246,13 @@ class MailInboxResource(MailBaseResource):
 
 
 class MailStaredResource(MailBaseResource):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.mail_starred'),
+                                    "topic": settings.get('kafka.topics.mail')
+                                    },
+                           }
+
     main_da_class = StarMailDa
 
     @inject_member
@@ -232,6 +275,27 @@ class MailStaredResource(MailBaseResource):
 
 
 class MailTrashResource(MailBaseResource):
+
+    def __init__(self):
+        self.kafka_data = {
+            "POST": {"uri": {"/mail/trash": {"event_type": settings.get('kafka.event_types.post.delete_mail'),
+                                             "topic": settings.get('kafka.topics.mail')
+                                             },
+                             "/mail/trash/mv/origin": {
+                                 "event_type": settings.get('kafka.event_types.post.move_trash_to_origin'),
+                                 "topic": settings.get('kafka.topics.mail')
+                             },
+                             "/mail/trash/mv/archive": {
+                                 "event_type": settings.get('kafka.event_types.post.move_trash_to_archive'),
+                                 "topic": settings.get('kafka.topics.mail')
+                             },
+                             }
+                     },
+            "DELETE": {"event_type": settings.get('kafka.event_types.delete.delete_mail'),
+                       "topic": settings.get('kafka.topics.mail')
+                       },
+        }
+
     main_da_class = TrashMailDa
 
     @inject_member
@@ -265,6 +329,24 @@ class MailTrashResource(MailBaseResource):
 
 
 class MailArchiveResource(MailBaseResource):
+
+    def __init__(self):
+        self.kafka_data = {
+            "POST": {"uri": {"/mail/archive": {"event_type": settings.get('kafka.event_types.post.archive_mail'),
+                                               "topic": settings.get('kafka.topics.mail')
+                                               },
+                             "/mail/archive/mv/origin": {
+                                 "event_type": settings.get('kafka.event_types.post.move_archive_mail_to_origin'),
+                                 "topic": settings.get('kafka.topics.mail')
+                             },
+                             "/mail/archive/mv/trash": {
+                                 "event_type": settings.get('kafka.event_types.post.move_archive_to_trash'),
+                                 "topic": settings.get('kafka.topics.mail')
+                             },
+                             }
+                     },
+        }
+
     main_da_class = ArchiveMailDa
 
     @inject_member
@@ -302,6 +384,19 @@ class MailSentResource(MailBaseResource):
 
 
 class MailSettingsResource(object):
+
+    def __init__(self):
+        self.kafka_data = {
+            "POST": {
+                "uri": {"/mail/settings": {"event_type": settings.get('kafka.event_types.post.create_mail_settings'),
+                                           "topic": settings.get('kafka.topics.mail')
+                                           },
+                        "/mail/sign": {
+                            "event_type": settings.get('kafka.event_types.post.create_signature'),
+                            "topic": settings.get('kafka.topics.mail')
+                        },
+                        },
+                }}
 
     @inject_member
     def on_get(self, req, response, member):

@@ -4,13 +4,22 @@ import app.util.json as json
 
 import app.util.request as request
 from datetime import datetime
+
+from app import settings
 from app.da.member import MemberDA
 from app.exceptions.member import ForgotDataNotFound, ForgotKeyExpired
 from urllib.parse import urljoin
 
 logger = logging.getLogger(__name__)
 
+
 class MemberResetPasswordResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.reset_password_attempted'),
+                                    "topic": settings.get('kafka.topics.member')
+                                    }
+                           }
 
     def on_post(self, req, resp, forgot_key):
         logger.debug('{}'.format(forgot_key))

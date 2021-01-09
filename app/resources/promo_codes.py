@@ -8,6 +8,13 @@ logger = logging.getLogger(__name__)
 
 
 class PromoCodes(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.attempt_to_use_promo_code'),
+                                    "topic": settings.get('kafka.topics.promotions')
+                                    }
+                           }
+
     auth = {
         'exempt_methods': ["POST"]
     }

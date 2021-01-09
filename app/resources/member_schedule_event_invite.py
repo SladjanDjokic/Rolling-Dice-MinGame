@@ -3,6 +3,7 @@ from datetime import timezone, datetime
 
 import app.util.json as json
 import app.util.request as request
+from app import settings
 from app.util.session import get_session_cookie, validate_session
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 from app.da.member_schedule_event_invite import MemberScheduleEventInviteDA
@@ -16,6 +17,13 @@ logger = logging.getLogger(__name__)
 
 
 class MemberScheduleEventInviteResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.invite_users_to_event'),
+                                    "topic": settings.get('kafka.topics.calendar')
+                                    }
+                           }
+
     @staticmethod
     def on_get(req, resp):
         try:
@@ -73,6 +81,13 @@ class MemberScheduleEventInviteResource(object):
     
 
 class MemberScheduleEventInviteAddSingleResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.invite_single_user_event'),
+                                    "topic": settings.get('kafka.topics.calendar')
+                                    }
+                           }
+
     @staticmethod
     def on_post(req, resp):
         (event_id, event_invite_to) = request.get_json_or_form(
@@ -104,6 +119,13 @@ class MemberScheduleEventInviteAddSingleResource(object):
     
 
 class MemberScheduleEventInviteSetStatusResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.calendar_event_status_update'),
+                                    "topic": settings.get('kafka.topics.calendar')
+                                    }
+                           }
+
     @staticmethod
     def on_post(req, resp):
 

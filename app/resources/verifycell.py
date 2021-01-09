@@ -10,6 +10,16 @@ logger = logging.getLogger(__name__)
 
 
 class VerifyCell(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.send_verification_code'),
+                                    "topic": settings.get('kafka.topics.auth')
+                                    },
+                           "PUT": {"event_type": settings.get('kafka.event_types.post.verify_sms_code'),
+                                    "topic": settings.get('kafka.topics.auth')
+                                    }
+                           }
+
     auth = {
         'exempt_methods': ["POST", "PUT"]
     }

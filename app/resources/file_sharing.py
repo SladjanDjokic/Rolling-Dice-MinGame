@@ -1,6 +1,7 @@
 import logging
 import app.util.json as json
 import app.util.request as request
+from app import settings
 from app.da.member import MemberDA
 from app.da.file_sharing import FileStorageDA, ShareFileDA, FileTreeDA
 from app.util.session import get_session_cookie, validate_session
@@ -13,6 +14,22 @@ logger = logging.getLogger(__name__)
 
 
 class FileStorage(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.file_storage'),
+                                    "topic": settings.get('kafka.topics.files')
+                                    },
+                           "GET": {"event_type": settings.get('kafka.event_types.get.file_storage'),
+                                   "topic": settings.get('kafka.topics.files')
+                                   },
+                           "PUT": {"event_type": settings.get('kafka.event_types.put.file_storage'),
+                                   "topic": settings.get('kafka.topics.files')
+                                   },
+                           "DELETE": {"event_type": settings.get('kafka.event_types.delete.file_storage'),
+                                      "topic": settings.get('kafka.topics.files')
+                                      },
+                           }
+
     @staticmethod
     def on_post(req, resp):
         (member_id, file_length, category) = request.get_json_or_form(
@@ -133,7 +150,7 @@ class FileStorage(object):
 
     @staticmethod
     def on_delete(req, resp):
-        (file_id_list, ) = request.get_json_or_form("file_id_list", req=req)
+        (file_id_list,) = request.get_json_or_form("file_id_list", req=req)
         try:
             for file_id in file_id_list:
                 FileStorageDA().delete_file(file_id)
@@ -149,10 +166,27 @@ class FileStorage(object):
                 "success": False
             })
 
+
 # A new resource to replace existing once it is finished
 
 
 class MemberFileCloud(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.member_file_cloud'),
+                                    "topic": settings.get('kafka.topics.files')
+                                    },
+                           "GET": {"event_type": settings.get('kafka.event_types.get.member_file_cloud'),
+                                   "topic": settings.get('kafka.topics.files')
+                                   },
+                           "PUT": {"event_type": settings.get('kafka.event_types.put.member_file_cloud'),
+                                   "topic": settings.get('kafka.topics.files')
+                                   },
+                           "DELETE": {"event_type": settings.get('kafka.event_types.delete.member_file_cloud'),
+                                      "topic": settings.get('kafka.topics.files')
+                                      },
+                           }
+
     @staticmethod
     def on_get(req, resp):
         '''
@@ -373,6 +407,17 @@ class MemberFileCloud(object):
 
 
 class MemberFileBin(object):
+
+    def __init__(self):
+        self.kafka_data = {
+                           "PUT": {"event_type": settings.get('kafka.event_types.put.member_file_bin'),
+                                   "topic": settings.get('kafka.topics.files')
+                                   },
+                           "DELETE": {"event_type": settings.get('kafka.event_types.delete.member_file_bin'),
+                                      "topic": settings.get('kafka.topics.files')
+                                      },
+                           }
+
     @staticmethod
     def on_delete(req, resp):
         ''' Delete forever logic goes here '''
@@ -437,6 +482,18 @@ class MemberFileBin(object):
 
 
 class MemberShareFile(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.member_share_file'),
+                                    "topic": settings.get('kafka.topics.files')
+                                    },
+                           "PUT": {"event_type": settings.get('kafka.event_types.put.member_share_file'),
+                                   "topic": settings.get('kafka.topics.files')
+                                   },
+                           "DELETE": {"event_type": settings.get('kafka.event_types.delete.member_share_file'),
+                                      "topic": settings.get('kafka.topics.files')
+                                      },
+                           }
     @staticmethod
     def on_post(req, resp):
         ''' Receive information over files shared with individuals
@@ -556,6 +613,22 @@ class MemberShareFile(object):
 
 
 class GroupFileCloud(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.group_file_cloud'),
+                                    "topic": settings.get('kafka.topics.files')
+                                    },
+                           "GET": {"event_type": settings.get('kafka.event_types.get.group_file_cloud'),
+                                   "topic": settings.get('kafka.topics.files')
+                                   },
+                           "PUT": {"event_type": settings.get('kafka.event_types.put.group_file_cloud'),
+                                   "topic": settings.get('kafka.topics.files')
+                                   },
+                           "DELETE": {"event_type": settings.get('kafka.event_types.delete.group_file_cloud'),
+                                      "topic": settings.get('kafka.topics.files')
+                                      },
+                           }
+
     @staticmethod
     def on_get(req, resp, group_id):
         '''
@@ -564,7 +637,8 @@ class GroupFileCloud(object):
         logger.debug(f"Group tree {group_id}")
         main_tree = FileTreeDA().get_group_tree(group_id, "main")
         bin_tree = FileTreeDA().get_group_tree(group_id, "bin")
-        logger.debug(f'GroupFileCloud. group_id: {group_id} len of main_tree: {len(main_tree)} main_tree: {main_tree[0]["id"]}')
+        logger.debug(
+            f'GroupFileCloud. group_id: {group_id} len of main_tree: {len(main_tree)} main_tree: {main_tree[0]["id"]}')
 
         if len(main_tree) > 0 and main_tree[0]['id'] is None:
             logger.debug(f'main_tree for groud with id {group_id} not exist. Will create it')
@@ -572,16 +646,18 @@ class GroupFileCloud(object):
             bin_file_tree_id = FileTreeDA().create_group_tree("bin")
             logger.debug(f'file_tree id: {main_file_tree_id} {bin_file_tree_id}')
             updated_row_id = FileTreeDA.bind_group_tree_with(main_file_tree_id=main_file_tree_id,
-                                            bin_file_tree_id=bin_file_tree_id,
-                                            member_group_id=group_id)
+                                                             bin_file_tree_id=bin_file_tree_id,
+                                                             member_group_id=group_id)
             logger.debug(f'updated_row_id: {updated_row_id}')
             main_file_tree_root_folder_id = FileTreeDA().create_group_tree_root_folder(main_file_tree_id, 'main folder')
             bin_file_tree_root_folder_id = FileTreeDA().create_group_tree_root_folder(bin_file_tree_id, 'bin folder')
-            logger.debug(f'root folders for group with id {group_id} created: main: {main_file_tree_root_folder_id} bin: {bin_file_tree_root_folder_id}')
+            logger.debug(
+                f'root folders for group with id {group_id} created: main: {main_file_tree_root_folder_id} bin: {bin_file_tree_root_folder_id}')
 
             main_tree = FileTreeDA().get_group_tree(group_id, "main")
             bin_tree = FileTreeDA().get_group_tree(group_id, "bin")
-            logger.debug(f'GroupFileCloud. group_id: {group_id} len of main_tree: {len(main_tree)} main_tree: {main_tree[0]["id"]}')
+            logger.debug(
+                f'GroupFileCloud. group_id: {group_id} len of main_tree: {len(main_tree)} main_tree: {main_tree[0]["id"]}')
 
         resp.body = json.dumps({
             "main_tree": main_tree,
@@ -775,11 +851,21 @@ class GroupFileCloud(object):
 
 
 class GroupFileBin(object):
+
+    def __init__(self):
+        self.kafka_data = {
+                           "PUT": {"event_type": settings.get('kafka.event_types.put.group_file_bin'),
+                                   "topic": settings.get('kafka.topics.files')
+                                   },
+                           "DELETE": {"event_type": settings.get('kafka.event_types.delete.group_file_bin'),
+                                      "topic": settings.get('kafka.topics.files')
+                                      },
+                           }
     @staticmethod
     def on_delete(req, resp, group_id):
         ''' Delete forever logic goes here, only available for Group Leader '''
         (node_ids,) = request.get_json_or_form(
-            "node_ids_list",  req=req)
+            "node_ids_list", req=req)
         try:
             for node_id in node_ids:
                 FileTreeDA().delete_branch_forever(node_id)
@@ -835,6 +921,14 @@ class GroupFileBin(object):
 
 
 class FileStorageDetail(object):
+
+    def __init__(self):
+        self.kafka_data = {
+                           "GET": {"event_type": settings.get('kafka.event_types.get.file_storage_detail'),
+                                   "topic": settings.get('kafka.topics.files')
+                                   },
+                           }
+
     @staticmethod
     def on_get(req, resp, file_id=None):
         member_id = req.get_param('memberId')
@@ -855,6 +949,13 @@ class FileStorageDetail(object):
 
 
 class DownloadStorageFile(object):
+
+    def __init__(self):
+        self.kafka_data = {"GET": {"event_type": settings.get('kafka.event_types.get.download_storage_file'),
+                                   "topic": settings.get('kafka.topics.files')
+                                   }
+                           }
+
     @staticmethod
     def on_get(req, resp, file_id=None):
         item_key = FileStorageDA().store_file_to_static(file_id)
@@ -874,6 +975,7 @@ class DownloadStorageFile(object):
 
 
 class ShareFile(object):
+
     @staticmethod
     def on_post(req, resp):
         (file_id_list, group_id, shared_member_id) = request.get_json_or_form(
@@ -936,7 +1038,7 @@ class ShareFile(object):
             session = validate_session(session_id)
             member_id = session["member_id"]
             if member_id:
-                (shared_key_list, ) = request.get_json_or_form(
+                (shared_key_list,) = request.get_json_or_form(
                     "shared_key_list", req=req)
                 removed_key_list = list()
                 for shared_key in shared_key_list:
@@ -995,6 +1097,12 @@ class DownloadSharedFile(object):
 
 
 class FileGroupResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"GET": {"event_type": settings.get('kafka.event_types.get.file_group_resource'),
+                                   "topic": settings.get('kafka.topics.files')
+                                   },
+                           }
     @staticmethod
     def on_get(req, resp):
         try:

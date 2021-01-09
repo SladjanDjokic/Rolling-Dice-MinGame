@@ -1,10 +1,12 @@
 import copy
+import inspect
 import logging
 from datetime import datetime, timezone
+from inspect import Signature
 
 import falcon
 import uuid
-from confluent_kafka import Producer
+from confluent_kafka import Producer, KafkaError, KafkaException
 
 # from app.tasks.main import producer_async
 # from app.events.publishers.publisher import producer_async
@@ -25,6 +27,9 @@ logger = logging.getLogger(__name__)
 # Topic route table based on resource and method.
 # TODO move this to env file or vyper
 # TODO add event type to resource dict as well
+
+ignore_routes = ['/healthz']
+
 topic_routes = {"MemberScheduleEventResource": {"GET": {"event_type": "check_calendar", "topic": "calendar"},
                                                 "POST": {"event_type": "create_event", "topic": "calendar"}},
                 "MemberLoginResource": {"GET": {"event_type": "login", "topic": "login"},
@@ -38,6 +43,10 @@ topic_routes = {"MemberScheduleEventResource": {"GET": {"event_type": "check_cal
 
 class CrossDomain(object):
     def process_response(self, req, resp, resource, req_succeeded):
+        if req.path in ignore_routes:
+            logger.debug(f"Ignoring route: {req.path}")
+            resp.complete = True
+            return
 
         access_control_allow_origin = settings.get(
             "ACCESS_CONTROL_ALLOW_ORIGIN")
@@ -146,10 +155,24 @@ class TopicData(object):
         self.event_type = ""
         self.status = "started"
         self.create_date = ""
+        self.referer_url = ""
+        self.url = ""
 
 
 class KafkaProducerMiddleware(object):
-    ignore_routes = ['/healthz']
+
+    def __handle_kafka_errors(self, err):
+        # https://docs.confluent.io/3.0.0/clients/confluent-kafka-python/index.html#kafkaerror
+        # KafkaError{code=_TRANSPORT,val=-195,str="kafka:9092/bootstrap:
+        #   Connect to ipv4#23.202.231.169:9092 failed:
+        #   Connection refused (after 50ms in state CONNECT)"}
+        # KafkaError{code=_ALL_BROKERS_DOWN,val=-187,
+        #   str="1/1 brokers are down"}
+        logger.error(f"Kafka Error: {err}")
+        if err.name() in ['_ALL_BROKERS_DOWN', '_TRANSPORT']:
+            self.producer_connected = False
+            self.p.abort_transaction()
+            logger.error(f"Kafka Connection issue: {err}")
 
     def __init__(self):
 
@@ -164,6 +187,8 @@ class KafkaProducerMiddleware(object):
                 'sasl.username': settings.get('kafka.sasl.username'),
                 'sasl.password': settings.get('kafka.sasl.password'),
             })
+        if settings.get('ENV_NAME') == 'LOCAL':
+            producer_conf['error_cb'] = self.__handle_kafka_errors
 
         self.topic = None
         self.session_id = ""
@@ -172,29 +197,51 @@ class KafkaProducerMiddleware(object):
         self.u = ""
         self.topic_data = TopicData()
         self.db_query_data = {}
-        self.p = Producer(producer_conf)
+        try:
+            self.p = Producer(producer_conf, logger=logger)
+            self.producer_connected = True
+        except KafkaException as e:
+            logger.debug(f"KafkaException: {e}")
+            self.__handle_kafka_errors(e.args[0])
+
         # self.p = Producer({
         #     'bootstrap.servers': 'kafka:9092'
         # })
 
     def process_request(self, req, resp):
-        if req.path in self.ignore_routes:
-            resp.complete = True
+        if req.path in ignore_routes:
+            logger.debug(f"Ignoring route: {req.path}")
+            return
 
     def process_resource(self, req, resp, resource, params):
+        topic_data = TopicData()
+        db_query_data = {}
+        topic = None
+        if req.path in ignore_routes:
+            logger.debug(f"Ignoring route: {req.path}")
+            return
+
         # Topics determined by resource as http method
         r = topic_routes.get(resource.__class__.__name__)
         logger.debug(f"Route Topics: {r}")
+
         try:
             logger.debug(f"Attempt to get route method: {req.method}")
-            self.topic = r.get(req.method).get('topic')
-            self.topic_data.event_type = r.get(req.method).get('event_type')
+            # Get kafka data from resource for  topic routing and event_type
+            if hasattr(resource, 'kafka_data'):
+                if "uri" in resource.kafka_data.get(req.method):
+                    # Special if for mail since we use suffix for routing. Events determined by uri
+                    topic = resource.kafka_data.get(req.method).get('uri').get(req.path).get('topic')
+                    topic_data.event_type = resource.kafka_data.get(req.method).get('uri').get(req.path).get(
+                        'event_type')
+                else:
+                    topic = resource.kafka_data.get(req.method).get('topic')
+                    topic_data.event_type = resource.kafka_data.get(req.method).get('event_type')
+                logger.debug(f"TOPIC AND EVENT_TYPE FOUND: {topic}, {topic_data.event_type}")
+                logger.debug(f"### {resource.kafka_data}")
         except Exception as e:
-            self.topic = None
             logger.debug(f'''
                 Failed to retrieve topic from: {resource.__class__.__name__}
-                Topic Routes are: {topic_routes}
-                Route Metadata is: {r}
                 Request Method: {req.method}
             ''')
             logger.exception(
@@ -203,82 +250,136 @@ class KafkaProducerMiddleware(object):
 
             pass
 
-        if not self.topic:
+        if not topic:
             # If no specific topic necessary. Send all other data to activity topic for monitoring purposes
-            self.topic = "activity"
-            self.topic_data.event_type = "activity"
+            topic = "activity"
+            topic_data.event_type = "activity"
 
         try:
+            # Get member and session data
             session_key = get_session_cookie(req)
             try:
-                self.topic_data.session_key = session_key
-                self.topic_data.session_data = validate_session(session_key, full=True)
-                self.topic_data.member_id = self.topic_data.session_data["member_id"]
+                topic_data.session_key = session_key
+                topic_data.session_data = validate_session(session_key, full=True)
+                topic_data.member_id = topic_data.session_data["member_id"]
             except InvalidSessionError:
-                self.topic_data.session_data = {}
-                self.topic_data.member_id = None
+                topic_data.session_data = {}
+                topic_data.member_id = None
 
             body = None
-            # TODO Does this get all body types?
             if req.content_type == falcon.MEDIA_JSON:
                 body = req.media
-            self.u = str(uuid.uuid4())
-            self.topic_data.event_key = self.u
-            self.topic_data.headers = req.headers
-            self.topic_data.req_params = req.params
-            self.topic_data.req_url_params = params
-            self.topic_data.req_data = body
-            self.topic_data.headers = self._sanitize(req.headers)
-            self.topic_data.req_params = self._sanitize(req.params)
-            self.topic_data.req_url_params = self._sanitize(params)
-            self.topic_data.req_data = self._sanitize(body)
-            self.topic_data.resp_data = None
-            # TODO add query for event from Topic/Resource dict
-            self.topic_data.create_date = datetime.now(timezone.utc)
+            u = str(uuid.uuid4())
+            # Set event_key on headers so we can  link req/resp
+            req.headers['event_key'] = u
+            topic_data.status = 'started'
+            topic_data.event_key = u
+            topic_data.headers = req.headers
+            topic_data.req_params = req.params
+            topic_data.req_url_params = params
+            topic_data.req_data = body
+            topic_data.headers = self._sanitize(req.headers)
+            topic_data.req_params = self._sanitize(req.params)
+            topic_data.req_url_params = self._sanitize(params)
+            topic_data.req_data = self._sanitize(body)
+            topic_data.resp_data = None
+            topic_data.create_date = datetime.now(timezone.utc)
+            topic_data.referer_url = req.headers.get('REFERER')
+            topic_data.url = req.url
 
             # Gevent to not block request. Create dict from topic_data model for kafka
-            topic_data_dict = vars(self.topic_data)
-            #gevent.spawn(self.producer_async(self.topic,
-            #                                 [json.dumps(topic_data_dict, default_parser=json.parser)]))
+            topic_data_dict = vars(topic_data)
+            logger.debug("### PRODUCING")
+            self.producer_async(topic, [json.dumps(topic_data_dict,
+                                                   default_parser=json.parser)])
 
-            logger.debug(f"### After kafka {type(self.topic_data.headers)}")
             # Write activity to db - copy topic data to preserve json
-            self.db_query_data = copy.deepcopy(topic_data_dict)
-            self.db_query_data['headers'] = json.dumps(self.topic_data.headers, default_parser=json.parser)
-            self.db_query_data["req_params"] = json.dumps(self.topic_data.req_params, default_parser=json.parser)
-            self.db_query_data["req_url_params"] = json.dumps(self.topic_data.req_url_params,
-                                                           default_parser=json.parser)
-            self.db_query_data["req_data"] = json.dumps(self.topic_data.req_data, default_parser=json.parser)
-            self.db_query_data["resp_data"] = json.dumps(self.topic_data.resp_data, default_parser=json.parser)
-            self.db_query_data["session_data"] = json.dumps(self.topic_data.session_data,
-                                                            default_parser=json.parser)
+            db_query_data = copy.deepcopy(topic_data_dict)
+            db_query_data['topic'] = topic
+            db_query_data['headers'] = json.dumps(topic_data.headers, default_parser=json.parser)
+            db_query_data["req_params"] = json.dumps(topic_data.req_params, default_parser=json.parser)
+            db_query_data["req_url_params"] = json.dumps(topic_data.req_url_params,
+                                                         default_parser=json.parser)
+            db_query_data["req_data"] = json.dumps(topic_data.req_data, default_parser=json.parser)
+            db_query_data["resp_data"] = json.dumps(topic_data.resp_data, default_parser=json.parser)
+            db_query_data["session_data"] = json.dumps(topic_data.session_data,
+                                                       default_parser=json.parser)
 
-
-            logger.debug(f"### After JSON DUMP QUERY {type(self.topic_data.headers)}")
-
-            logger.debug("### REQUEST")
-            ActivityDA.insert_activity(**self.db_query_data)
+            ActivityDA.insert_activity(**db_query_data)
         except Exception as e:
             logger.error(e, exc_info=True)
 
         return
 
     def process_response(self, req, resp, resource, req_succeeded):
+        topic_data = TopicData()
+        db_query_data = {}
+        topic = None
+        if req.path in ignore_routes:
+            logger.debug(f"Ignoring route: {req.path}")
+            return
+
+        # Topics determined by resource as http method
+        r = topic_routes.get(resource.__class__.__name__)
+        logger.debug(f"Route Topics: {r}")
+
         try:
-            if not self.topic:
-                self.topic = "activity"
-            self.topic_data.http_status = resp.status
+            logger.debug(f"Attempt to get route method: {req.method}")
+            if hasattr(resource, 'kafka_data'):
+                if "uri" in resource.kafka_data.get(req.method):
+                    # Special if for mail since we use suffix for routing. Events determined by uri
+                    topic = resource.kafka_data.get(req.method).get('uri').get(req.path).get('topic')
+                    topic_data.event_type = resource.kafka_data.get(req.method).get('uri').get(req.path).get(
+                        'event_type')
+                else:
+                    topic = resource.kafka_data.get(req.method).get('topic')
+                    topic_data.event_type = resource.kafka_data.get(req.method).get('event_type')
+                logger.debug(f"TOPIC AND EVENT_TYPE FOUND: {topic}, {topic_data.event_type}")
+                logger.debug(f"### {resource.kafka_data}")
+        except Exception as e:
+            logger.debug(f'''
+                Failed to retrieve topic from: {resource.__class__.__name__}
+                Request Method: {req.method}
+            ''')
+            logger.exception(
+                f'Failed to retrieve topic from: {resource.__class__.__name__}')
+            logger.error(e)
 
-            # Capture invalid sessions so we can still log it
-            # send none for session and member
+            pass
+
+        if not topic:
+            # If no specific topic necessary. Send all other data to activity topic for monitoring purposes
+            topic = "activity"
+            topic_data.event_type = "activity"
+
+        try:
+            session_key = get_session_cookie(req)
             try:
-                self.topic_data.session_data = validate_session(self.session_id)
+                topic_data.session_key = session_key
+                topic_data.session_data = validate_session(session_key, full=True)
+                topic_data.member_id = topic_data.session_data["member_id"]
             except InvalidSessionError:
-                self.topic_data.session_data = {}
-                self.topic_data.member_id = None
+                topic_data.session_data = {}
+                topic_data.member_id = None
 
-            self.topic_data.status = "ended"
-            body = json.loads(resp.body)
+            body = None
+            if req.content_type == falcon.MEDIA_JSON:
+                body = req.media
+            u = req.headers.get('event_key')
+            topic_data.status = 'ended'
+            topic_data.event_key = u
+            topic_data.headers = req.headers
+            topic_data.req_params = req.params
+            # topic_data.req_url_params = params
+            topic_data.req_data = body
+            topic_data.headers = self._sanitize(req.headers)
+            topic_data.req_params = self._sanitize(req.params)
+            # topic_data.req_url_params = self._sanitize(params)
+            topic_data.req_data = self._sanitize(body)
+            topic_data.create_date = datetime.now(timezone.utc)
+            topic_data.referer_url = req.headers.get('REFERER')
+            topic_data.url = req.url
+
             body = None
             try:
                 body = json.loads(resp.body)
@@ -286,22 +387,28 @@ class KafkaProducerMiddleware(object):
                 # Response is non json, do nothing
                 pass
 
-            self.topic_data.resp_data = body
-            self.topic_data.create_date = datetime.now(timezone.utc)
+            topic_data.resp_data = body
+            topic_data.http_status = resp.status
 
-            # Gevent kafka producer
-            logger.debug("### Kafka")
-            logger.debug(vars(self.topic_data))
-            #gevent.spawn(self.producer_async(self.topic, [json.dumps(vars(self.topic_data),
-            #                                                         default_parser=json.parser)]))
+            # Gevent to not block request. Create dict from topic_data model for kafka
+            topic_data_dict = vars(topic_data)
 
-            # convert dicts to json for db query
-            self.db_query_data['resp_data'] = json.dumps(self.topic_data.resp_data,
+            self.producer_async(topic, [json.dumps(topic_data_dict,
+                                                    default_parser=json.parser)])
+
+            # Write activity to db - copy topic data to preserve json
+            db_query_data = copy.deepcopy(topic_data_dict)
+            db_query_data['topic'] = topic
+            db_query_data['headers'] = json.dumps(topic_data.headers, default_parser=json.parser)
+            db_query_data["req_params"] = json.dumps(topic_data.req_params, default_parser=json.parser)
+            db_query_data["req_url_params"] = json.dumps(topic_data.req_url_params,
                                                          default_parser=json.parser)
-            logger.debug("### Response")
-            ActivityDA.insert_activity(**self.db_query_data)
-            # gevent.spawn(ActivityDA.insert_activity(**self.topic_data))
+            db_query_data["req_data"] = json.dumps(topic_data.req_data, default_parser=json.parser)
+            db_query_data["resp_data"] = json.dumps(topic_data.resp_data, default_parser=json.parser)
+            db_query_data["session_data"] = json.dumps(topic_data.session_data,
+                                                       default_parser=json.parser)
 
+            ActivityDA.insert_activity(**db_query_data)
         except Exception as e:
             logger.error(e, exc_info=True)
 
@@ -310,22 +417,30 @@ class KafkaProducerMiddleware(object):
     def producer_async(self, topic, data_source):
         # create_topic(self.topic)
         for data in data_source:
-            # Poll will trigger the callback self.deliver_report which indicates if the message has
-            # successfully been delivered. Not sure if this means a consumer has read it or its been successfully
-            # been delivered to a client
-            self.p.poll(0)
-
-            # Asynchronously produce a message, the delivery report callback
-            # will be triggered from poll() above, or flush() below, when the message has
-            # been successfully delivered or failed permanently.
             try:
-                self.p.produce(topic, value=data.encode('utf-8'), callback=self.delivery_report)
+                # Poll will trigger the callback self.deliver_report which indicates if the message has
+                # successfully been delivered. Not sure if this means a consumer has read it or its been successfully
+                # been delivered to a client
+
+                self.p.poll(0)
+                # Asynchronously produce a message, the delivery report callback
+                # will be triggered from poll() above, or flush() below, when the message has
+                # been successfully delivered or failed permanently.
+                data = data.encode('utf-8')
+                self.p.produce(topic, value=data, callback=self.delivery_report)
+            except KafkaException as exc:
+                logger.error('KafkaException When Producing or Polling')
+                self.__handle_kafka_errors(exc.args[0])
+            except KafkaError as exc:
+                logger.error('KafkaError When Producing or Polling')
+                self.__handle_kafka_errors(exc)
             except Exception as exc:
                 logger.exception(exc, exc_info=True)
 
         # Wait for any outstanding messages to be delivered and delivery report
         # callbacks to be triggered.
-        self.p.flush()
+        if self.producer_connected:
+            self.p.flush()
 
     @staticmethod
     def _sanitize(data):

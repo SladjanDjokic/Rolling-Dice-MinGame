@@ -1,4 +1,5 @@
 import app.util.json as json
+from app import settings
 from app.da.file_sharing import FileStorageDA
 from app.da.avatar import AvatarDA
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
@@ -9,6 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 class AvatarResource(object):
+
+
     @staticmethod
     def on_put(req, resp):
         try:

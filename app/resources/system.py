@@ -26,7 +26,10 @@ class SystemActivityResource(object):
         session_id = get_session_cookie(req)
         session = validate_session(session_id)
 
-        if get_all and session["user_type"] == 'administrator':
+        logger.debug(f"User Type: {session['user_type']}")
+        logger.debug(f"Resource: {self.resource}")
+
+        if get_all and session["user_type"] != 'administrator':
             raise falcon.HTTPForbidden(description="Not enough permissions")
 
         search_key = req.get_param('search_key') or ''

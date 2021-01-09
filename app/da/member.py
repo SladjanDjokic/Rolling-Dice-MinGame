@@ -1,3 +1,4 @@
+from app.util.security import SECURITY_EXCHANGE_OPTIONS
 import logging
 import datetime
 from urllib import parse
@@ -983,13 +984,8 @@ class MemberContactDA(object):
                     "country_code": country_code,
                     "achievement_information": achievement_information,
                     "amera_avatar_url": amerize_url(s3_avatar_url),
-                    "security_exchange_option": {
-                        "NO_ENCRYPTION": 0,
-                        "LEAST_SECURE": 25,
-                        "SECURE": 50,
-                        "VERY_SECURE": 75,
-                        "MOST_SECURE": 100,
-                    }.get(security_exchange_option, 0),
+                    "security_exchange_option":
+                        SECURITY_EXCHANGE_OPTIONS.get(security_exchange_option, 0),
                     "status": status
                     # "city": city,
                     # "state": state,
@@ -1253,7 +1249,8 @@ class MemberContactDA(object):
                 json_agg(DISTINCT member_location.*) AS location_information,
                 json_agg(DISTINCT member_contact_2.*) AS contact_information,
                 json_agg(DISTINCT country_code.*) AS country_code,
-                file_storage_engine.storage_engine_id as s3_avatar_url
+                file_storage_engine.storage_engine_id as s3_avatar_url,
+                contact.security_exchange_option
             FROM contact
                 LEFT JOIN member ON member.id = contact.contact_member_id
                 LEFT OUTER JOIN member_location ON member_location.member_id = contact.contact_member_id
@@ -1286,7 +1283,8 @@ class MemberContactDA(object):
                 contact.contact_role,
                 contact.create_date,
                 contact.update_date,
-                file_storage_engine.storage_engine_id
+                file_storage_engine.storage_engine_id,
+                security_exchange_option
             """.format(key))
 
         get_contact_params = (value,)
@@ -1317,7 +1315,8 @@ class MemberContactDA(object):
                     location_information,
                     contact_information,
                     country_code,
-                    s3_avatar_url
+                    s3_avatar_url,
+                    security_exchange_option
             ) in cls.source.cursor:
                 contact = {
                     "id": id,
@@ -1344,7 +1343,9 @@ class MemberContactDA(object):
                     "location_information": location_information,
                     "contact_information": contact_information,
                     "country_code": country_code,
-                    "amera_avatar_url": amerize_url(s3_avatar_url)
+                    "amera_avatar_url": amerize_url(s3_avatar_url),
+                    "security_exchange_option":
+                        SECURITY_EXCHANGE_OPTIONS.get(security_exchange_option, 0),
                 }
 
                 return contact

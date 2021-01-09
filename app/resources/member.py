@@ -5,6 +5,7 @@ from uuid import UUID
 import app.util.json as json
 import app.util.request as request
 from app.util.auth import inject_member
+from app import settings
 from app.da.member import MemberDA, MemberContactDA, MemberInfoDA
 from app.da.file_sharing import FileStorageDA, FileTreeDA
 from app.da.invite import InviteDA
@@ -43,7 +44,6 @@ class MemberResource(object):
             "members": members,
             "success": True
         })
-
 
 
 class MemberSearchResource(object):
@@ -112,6 +112,13 @@ class MemberGroupSearchResource(object):
 
 
 class MemberRegisterResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.member_registration'),
+                                    "topic": settings.get('kafka.topics.registration')
+                                    },
+                           }
+
     auth = {
         'exempt_methods': ['POST']
     }
@@ -291,9 +298,23 @@ class MemberRoleResource(object):
 
 
 class ContactMembersResource(object):
+
     auth = {
         'exempt_methods': ['POST']
     }
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.create_contact'),
+                                    "topic": settings.get('kafka.topics.contact')
+                                    },
+                           "DELETE": {"event_type": settings.get('kafka.event_types.delete.delete_contact'),
+                                   "topic": settings.get('kafka.topics.contact')
+                                   },
+                           "GET": {"event_type": settings.get('kafka.event_types.get.get_members'),
+                                   "topic": settings.get('kafka.topics.contact')
+                                   },
+
+                           }
 
     def on_post(self, req, resp):
 
@@ -386,8 +407,7 @@ class ContactMembersResource(object):
             "success": True
         }, default_parser=json.parser)
 
-    @staticmethod
-    def on_get(req, resp):
+    def on_get(self, req, resp):
         try:
             session_id = get_session_cookie(req)
             session = validate_session(session_id)
@@ -408,6 +428,16 @@ class ContactMembersResource(object):
 
 
 class MemberContactResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.create_contact'),
+                                    "topic": settings.get('kafka.topics.contact')
+                                    },
+                           "PUT": {"event_type": settings.get('kafka.event_types.put.update_member_contact'),
+                                   "topic": settings.get('kafka.topics.contact')
+                                   },
+                           }
+
     auth = {
         'exempt_methods': ['POST']
     }
@@ -514,7 +544,18 @@ class MemberContactResource(object):
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
 
+
 class MemberContactSecurity(object):
+
+    def __init__(self):
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.create_contact_security'),
+                                    "topic": settings.get('kafka.topics.contact')
+                                    },
+                           "GET": {"event_type": settings.get('kafka.event_types.get.contact_security'),
+                                   "topic": settings.get('kafka.topics.contact')
+                                   },
+                           }
+
     def on_get(self, req, resp, contact_member_id=None):
         try:
             session_id = get_session_cookie(req)
@@ -529,7 +570,7 @@ class MemberContactSecurity(object):
                 "data": security_info,
                 "success": True
             }, default_parser=json.parser)
-        except expression as e:
+        except Exception as e:
             resp.body = json.dumps({
                 "description": "Something went wrong",
                 "success": False
@@ -576,6 +617,7 @@ class MemberContactSecurity(object):
                 "success": False
             }, default_parser=json.parser)
 
+
 class MemberContactsRoles(object):
     def on_get(self, req, resp):
         try:
@@ -595,6 +637,13 @@ class MemberContactsRoles(object):
 
 
 class MemberInfoResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"PUT": {"event_type": settings.get('kafka.event_types.put.member_info_update'),
+                                   "topic": settings.get('kafka.topics.member')
+                                   },
+                           }
+
     @staticmethod
     def on_get(req, resp):
 
@@ -641,6 +690,7 @@ class MemberInfoResource(object):
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
 
+
 class MemberInfoByIdResource(object):
     def on_get(self, req, resp, member_id):
 
@@ -659,6 +709,7 @@ class MemberInfoByIdResource(object):
             #     "success": False
             # }, default_parser=json.parser)
             raise UnauthorizedSession() from err
+
 
 class MemberJobTitles(object):
     auth = {
@@ -781,6 +832,14 @@ class MemberContactsCountries(object):
 
 
 class MemberContactAccept(object):
+
+    def __init__(self):
+        self.kafka_data = {"PUT": {"event_type": settings.get('kafka.event_types.put.contact_request_response'),
+                                    "topic": settings.get('kafka.topics.registration')
+                                    }
+                          }
+                                
+
     @inject_member
     def on_put(self, req, resp, member, contact_member_id):
         member_id = member['member_id']

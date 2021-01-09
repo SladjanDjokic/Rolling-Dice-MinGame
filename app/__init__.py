@@ -271,7 +271,6 @@ def _setup_routes(app):
     app.add_route("/chat", ChatView())
 
     # Call Notificaitons
-    app.add_route("/notifications/incoming-call", IncomingCallView())
 
     # Upcoming Events
     app.add_route("/member/event/upcoming", MemberUpcomingEvents())
@@ -279,3 +278,4 @@ def _setup_routes(app):
     app.add_route("/member/event/invite", MemberEventInvitations())
     # Event Invitation Accept/Decline
     app.add_route("/member/event/invite/response", MemberEventInvitateStatus())
+    app.add_route("/notifications/incoming_call", IncomingCallView())

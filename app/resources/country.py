@@ -8,6 +8,7 @@ from app.da.country import CountryCodeDA
 class CountryCodeResource(object):
     exempt_methods = ['GET']
 
+
     @staticmethod
     def on_get(req, resp):
         # try:

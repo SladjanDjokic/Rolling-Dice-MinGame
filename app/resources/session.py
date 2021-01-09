@@ -1,10 +1,12 @@
 import logging
 import app.util.json as json
+from app import settings
 from app.util.session import get_session_cookie, validate_session
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 from app.da.group import GroupMembershipDA, GroupDA
 
 logger = logging.getLogger(__name__)
+
 
 class SessionResource(object):
 
@@ -20,6 +22,12 @@ class SessionResource(object):
 
 
 class ValidateSessionResource(object):
+
+    def __init__(self):
+        self.kafka_data = {"GET": {"event_type": settings.get('kafka.event_types.get.attempt_validate_session'),
+                                    "topic": settings.get('kafka.topics.auth')
+                                    }
+                           }
 
     auth = {
         'exempt_methods': ['GET']
