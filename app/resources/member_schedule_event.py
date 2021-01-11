@@ -29,11 +29,11 @@ class MemberScheduleEventResource(object):
                                     "topic": settings.get('kafka.topics.calendar')
                                     },
                            "PUT": {"event_type": settings.get('kafka.event_types.put.edit_event'),
-                                    "topic": settings.get('kafka.topics.calendar')
-                                    },
+                                   "topic": settings.get('kafka.topics.calendar')
+                                   },
                            "DELETE": {"event_type": settings.get('kafka.event_types.delete.delete_event'),
                                       "topic": settings.get('kafka.topics.calendar')
-                                    },
+                                      },
                            }
 
     @inject_member
@@ -74,6 +74,7 @@ class MemberScheduleEventResource(object):
             color_id,  # color id
             event_description,
             invited_members,  # [contact_member_id]
+            invited_group,  # group_id or None
             event_tz,  # [IANA string, not matches the V2 table]
             event_start_utc,
             event_end_utc,
@@ -92,6 +93,7 @@ class MemberScheduleEventResource(object):
                         'colorId',
                         'description',
                         'invitedMembers',
+                        'invitedGroup',
                         'eventTimeZone',
                         'start',
                         'end',
@@ -135,7 +137,8 @@ class MemberScheduleEventResource(object):
             location_mode=location_mode,
             location_id=location_id,
             location_address=location_address,
-            repeat_times=repeat_times
+            repeat_times=repeat_times,
+            group_id=invited_group
         )
 
         '''
@@ -172,18 +175,20 @@ class MemberScheduleEventResource(object):
                         location_mode=location_mode,
                         location_id=location_id,
                         location_address=location_address,
-                        repeat_times=repeat_times
+                        repeat_times=repeat_times,
+                        group_id=invited_group
                     )
                     all_event_ids.append(recurring_id)
 
         '''
             Invite members for all events in the row. 1 event x 1 member = 1 invite
         '''
-        if len(invited_members) > 0:
+        if invited_members and len(invited_members) > 0:
             if len(all_event_ids) > 0:
                 for invitee_id in invited_members:
                     for event_id in all_event_ids:
-                        MemberScheduleEventInviteDA().create_invite(invitee_id, event_id)
+                        MemberScheduleEventInviteDA().create_invite(
+                            invitee_id=invitee_id, event_id=event_id)
 
         '''
             Now get the sequence we've created and send it back to front end.
@@ -356,12 +361,13 @@ class MemberScheduleEventColors(object):
         """
         Create an event for a user
         """
+
     def on_get(self, req, resp):
         try:
 
             session_id = get_session_cookie(req)
             session = validate_session(session_id)
-            
+
             colors = MemberScheduleEventDA().get_colors()
 
             if colors:
@@ -386,8 +392,8 @@ class EventAttachmentResorce(object):
                                     "topic": settings.get('kafka.topics.calendar')
                                     },
                            "DELETE": {"event_type": settings.get('kafka.event_types.delete.delete_event_attachment'),
-                                    "topic": settings.get('kafka.topics.calendar')
-                                    },
+                                      "topic": settings.get('kafka.topics.calendar')
+                                      },
                            }
 
     @inject_member
@@ -428,6 +434,7 @@ class EventAttachmentResorce(object):
     @inject_member
     def on_delete(self, req, resp, member):
         logger.debug('ccc')
+
 
 class MemberUpcomingEvents(object):
     @staticmethod
@@ -474,8 +481,8 @@ class MemberEventInvitations(object):
 class MemberEventInvitateStatus(object):
     def __init__(self):
         self.kafka_data = {"GET": {"event_type": settings.get('kafka.event_types.get.event_invite_response'),
-                                    "topic": settings.get('kafka.topics.calendar')
-                                    },
+                                   "topic": settings.get('kafka.topics.calendar')
+                                   },
                            }
 
     @staticmethod
@@ -491,7 +498,8 @@ class MemberEventInvitateStatus(object):
 
         status_list = ['Accepted', 'Declined']
         if status in status_list:
-            event_invitations = MemberEventDA().set_event_invitate_status(member_id, event_invite_id, status)
+            event_invitations = MemberEventDA().set_event_invitate_status(
+                member_id, event_invite_id, status)
 
             if event_invitations:
                 resp.body = json.dumps({

@@ -259,20 +259,20 @@ class MemberEventDA(object):
     @classmethod
     def add_2(cls, sequence_id, event_color_id, event_name, event_description, host_member_id,
               is_full_day, event_tz, start_datetime, end_datetime, event_type, event_recurrence_freq,
-              end_condition, repeat_weekdays, end_date_datetime, location_mode, location_id, location_address, repeat_times):
+              end_condition, repeat_weekdays, end_date_datetime, location_mode, location_id, location_address, repeat_times, group_id=None):
         try:
             query = (
                 """ INSERT INTO event_2
                     (sequence_id, event_color_id, event_name, event_description, host_member_id,
                     is_full_day, event_tz, start_datetime, end_datetime, event_type,
                     event_recurrence_freq, end_condition, repeat_weekdays, end_date_datetime, location_mode,
-                    location_id, location_address, repeat_times)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    location_id, location_address, repeat_times, group_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 """)
             params = (sequence_id, event_color_id, event_name, event_description, host_member_id,
                       is_full_day, event_tz, start_datetime, end_datetime, event_type, event_recurrence_freq,
-                      end_condition, json.dumps(repeat_weekdays), end_date_datetime, location_mode, location_id, location_address, repeat_times)
+                      end_condition, json.dumps(repeat_weekdays), end_date_datetime, location_mode, location_id, location_address, repeat_times, group_id)
             cls.source.execute(query, params)
             id = None
             if cls.source.has_results():
@@ -389,6 +389,7 @@ class MemberEventDA(object):
                     SELECT
                         id as event_id,
                         sequence_id,
+                        group_id,
                         event_color_id,
                         event_name,
                         event_type,
@@ -456,6 +457,7 @@ class MemberEventDA(object):
                         SELECT
                             id as event_id,
                             sequence_id,
+                            group_id,
                             event_color_id,
                             event_name,
                             event_type,
@@ -532,6 +534,7 @@ class MemberEventDA(object):
                         SELECT
                             id as event_id,
                             sequence_id,
+                            group_id,
                             event_color_id,
                             event_name,
                             event_type,

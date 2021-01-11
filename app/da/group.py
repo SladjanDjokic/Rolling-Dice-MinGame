@@ -99,11 +99,14 @@ class GroupDA(object):
                 'group_id': 'member_group.id',
                 'group_leader_id': 'member_group.group_leader_id',
                 'group_name': 'member_group.group_name',
-                'group_exchange_option': 'member_group.exchange_option',
-                'group_create_date': 'member_group.create_date',
-                'group_update_date': 'member_group.update_date',
+                'group_exchange_option': 'member_groups.group_exchange_option',
+                'group_status': 'member_groups.group_status',
+                'group_role': 'member_groups.group_role',
+                'group_create_date': 'member_groups.group_create_date',
+                'group_update_date': 'member_groups.group_update_date',
                 'group_leader_first_name': 'member.first_name',
                 'group_leader_last_name': 'member.last_name',
+                'group_leader_email': 'member.email',
                 'total_member': 'total_member',
                 'total_files': 'total_files'
             }
@@ -113,37 +116,64 @@ class GroupDA(object):
         group_list = list()
         query = (f"""
             SELECT
-                member_group.id AS group_id,
-                member_group.group_leader_id AS group_leader_id,
-                member_group.group_name AS group_name,
-                member_group.create_date AS group_create_date,
-                member_group.update_date AS group_update_date,
+                member_group.id,
+                member_group.group_leader_id,
+                member_group.group_name,
+                member_group.exchange_option,
+                member_group.status,
+                'group_leader' as group_role,
+                member_group.create_date,
+                member_group.update_date,
+                NULL as group_join_date,
                 member.first_name AS group_leader_first_name,
                 member.last_name AS group_leader_last_name,
+                member.email AS group_leader_email,
                 count(DISTINCT member_group_membership.member_id) AS total_member,
                 count(DISTINCT file_tree_item.id) AS total_files,
-                member_group.exchange_option AS group_exchange_option
+            -- 	Members TODO: THIS QUERY NEEDS IMPROVEMENT
+                (
+                    SELECT json_agg(group_members) as members
+                    FROM (
+                        SELECT
+                            member_group_membership.member_id as id,
+                            member.first_name as first_name,
+                            member.last_name as last_name,
+                            member.email as email,
+                            member.company_name as company,
+                            job_title.name as title,
+                            file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url,
+                            member_group_membership.create_date as create_date
+                        FROM member_group_membership
+                        LEFT JOIN member ON member_group_membership.member_id = member.id 
+                        LEFT JOIN job_title ON member.job_title_id = job_title.id
+                        LEFT JOIN member_profile ON member.id = member_profile.member_id
+                        LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id 
+                        WHERE member_group_membership.group_id = member_group.id
+                    ) AS group_members
+                )
             FROM member_group
             LEFT JOIN member ON member_group.group_leader_id = member.id
-            LEFT OUTER JOIN member_group_membership ON (member_group_membership.group_id = member_group.id)
+            LEFT JOIN member_group_membership ON (member_group_membership.group_id = member_group.id)
             LEFT OUTER JOIN file_tree ON (file_tree.id = member_group.main_file_tree)
             LEFT OUTER JOIN (
-              SELECT id, file_tree_id
-              FROM file_tree_item
-              WHERE file_tree_item.member_file_id is NOT NULL
+            SELECT id, file_tree_id
+            FROM file_tree_item
+            WHERE file_tree_item.member_file_id is NOT NULL
             ) as file_tree_item ON (file_tree_item.file_tree_id = file_tree.id)
             WHERE
-                member_group.group_leader_id = %s AND
+                member_group.group_leader_id = 1 AND
                 member_group.status = 'active'
             GROUP BY
                 member_group.id,
                 member_group.group_leader_id,
                 member_group.group_name,
                 member_group.exchange_option,
+                member_group.status,
                 member_group.create_date,
                 member_group.update_date,
                 member.first_name,
-                member.last_name
+                member.last_name,
+                member.email
             ORDER BY {sort_columns_string}
         """)
         params = (group_leader_id,)
@@ -155,14 +185,22 @@ class GroupDA(object):
                     "group_id": row[0],
                     "group_leader_id": row[1],
                     "group_name": row[2],
-                    "group_exchange_option": SECURITY_EXCHANGE_OPTIONS.get(row[9]),
-                    "group_leader_name": f'{row[5]} {row[6]}',
-                    "total_member": row[7],
-                    "total_files": row[8],
-                    "group_create_date": row[3],
-                    "group_update_date": row[4],
+                    "group_exchange_option": SECURITY_EXCHANGE_OPTIONS.get(row[3]),
+                    "group_status": row[4],
+                    "group_role": row[5],
+                    "group_create_date": row[6],
+                    "group_update_date": row[7],
+                    "group_join_date": row[8],
+                    "group_leader_first_name": row[9],
+                    "group_leader_last_name": row[10],
+                    "group_leader_email": row[11],
+                    "total_member": row[12],
+                    "total_files": row[13],
+                    "members": row[14],
+                    "group_leader_name": f'{row[9]} {row[10]}'
                 }
                 group_list.append(group)
+
         return group_list
 
     @classmethod
@@ -170,7 +208,7 @@ class GroupDA(object):
         sort_columns_string = 'member_groups.group_name ASC'
         if sort_params:
             entity_dict = {
-                'group_id': 'member_groups.group_id',
+                'group_id': 'member_groups.id',
                 'group_leader_id': 'member_groups.group_leader_id',
                 'group_name': 'member_groups.group_name',
                 'group_exchange_option': 'member_groups.group_exchange_option',
@@ -182,6 +220,8 @@ class GroupDA(object):
                 'group_leader_first_name': 'member.first_name',
                 'group_leader_last_name': 'member.last_name',
                 'group_leader_email': 'member.email',
+                'total_member': 'total_member',
+                'total_files': 'total_files'
             }
             sort_columns_string = cls.formatSortingParams(
                 sort_params, entity_dict) or sort_columns_string
@@ -202,12 +242,27 @@ class GroupDA(object):
                 member.email AS group_leader_email,
                 count(DISTINCT group_membership_member.member_id) AS total_member,
                 count(DISTINCT file_tree_item.id) AS total_files,
-                json_agg(DISTINCT ( group_member_detail.id,
-                          group_member_detail.first_name,
-                          group_member_detail.last_name,
-                          group_member_detail.email,
-                          group_membership_member.create_date)
-                  ) AS members
+                 -- 	Members TODO: THIS QUERY NEEDS IMPROVEMENT
+                (
+                    SELECT json_agg(group_members) as members
+                    FROM (
+                        SELECT
+                            member_group_membership.member_id as id,
+                            member.first_name as first_name,
+                            member.last_name as last_name,
+                            member.email as email,
+                            member.company_name as company,
+                            job_title.name as title,
+                            file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url,
+                            member_group_membership.create_date as create_date
+                        FROM member_group_membership
+                        LEFT JOIN member ON member_group_membership.member_id = member.id 
+                        LEFT JOIN job_title ON member.job_title_id = job_title.id
+                        LEFT JOIN member_profile ON member.id = member_profile.member_id
+                        LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id 
+                        WHERE member_group_membership.group_id = member_groups.group_id
+                    ) AS group_members
+                )
           FROM ( SELECT member_group.id AS group_id,
                       member_group.group_leader_id,
                       member_group.group_name,
@@ -283,13 +338,13 @@ class GroupDA(object):
                     "members": row[14],
                     "group_leader_name": f'{row[9]} {row[10]}'
                 }
-                group["members"] = [{
-                    "id": m["f1"],
-                    "first_name": m["f2"],
-                    "last_name": m["f3"],
-                    "email": m["f4"],
-                    "create_date": m["f5"]
-                } for m in group["members"]]
+                # group["members"] = [{
+                #     "id": m["f1"],
+                #     "first_name": m["f2"],
+                #     "last_name": m["f3"],
+                #     "email": m["f4"],
+                #     "create_date": m["f5"]
+                # } for m in group["members"]]
                 group_list.append(group)
 
         return group_list
@@ -438,7 +493,7 @@ class GroupDA(object):
                 "security_picture": amerize_url(security_picture)
             }
         return None
-    
+
     @classmethod
     def update_security(cls, group_id, picture_file_id, pin, exchange_option, commit=True):
         query = """
@@ -453,11 +508,12 @@ class GroupDA(object):
 
         try:
             cls.source.execute(query, params)
-            
+
             if commit:
                 cls.source.commit()
         except Exception as err:
             raise err
+
 
 class GroupMembershipDA(object):
     source = source
@@ -759,6 +815,7 @@ class GroupMembershipDA(object):
         except Exception as err:
             logger.exception('Unable to update group membership')
             raise err
+
 
 class GroupMemberInviteDA(object):
     source = source
