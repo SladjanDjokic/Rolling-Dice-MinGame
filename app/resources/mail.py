@@ -107,6 +107,21 @@ class MailBaseResource(object):
         }, default_parser=json.parser)
 
     @inject_member
+    def on_get_thread_mails(self, req, response, member):
+        start = req.params.get('start', -1)
+        try:
+            start = int(start)
+        except ValueError:
+            raise HTTPBadRequest("Start is not valid")
+        thread_id = req.params.get('start', -1)
+        try:
+            thread_id = int(thread_id)
+        except ValueError:
+            raise HTTPBadRequest("Thread is not valid")
+        return_data = self.main_da_class.get_reply_chain(member["member_id"], thread_id, start)
+        response.body = json.dumps(return_data, default_parser=json.parser)
+
+    @inject_member
     def on_get_detail(self, req, response, member, mail_id):
         if not mail_id:
             raise HTTPBadRequest("Email is not specified")
@@ -263,7 +278,13 @@ class MailStaredResource(MailBaseResource):
 
         if not mail_id:
             raise HTTPBadRequest("Email is not specified")
-
+        if not type(mail_id) == list:
+            mail_id = [mail_id]
+        for each in mail_id:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Email id is invalid")
         if not rm:
             rm = False
         else:
@@ -271,7 +292,8 @@ class MailStaredResource(MailBaseResource):
                 rm = bool(rm)
             except ValueError:
                 raise HTTPBadRequest("Only boolean is allowed for 'rm'")
-        self.main_da_class.add_remove_mail_to_star(mail_id, member["member_id"], not rm)
+        for each in mail_id:
+            self.main_da_class.add_remove_mail_to_star(int(each), member["member_id"], not rm)
 
 
 class MailTrashResource(MailBaseResource):
@@ -307,25 +329,65 @@ class MailTrashResource(MailBaseResource):
         if not mail_id:
             raise HTTPBadRequest("Email is not specified")
 
-        self.main_da_class.add_to_trash(mail_id, member["member_id"])
+        if not type(mail_id) == list:
+            mail_id = [mail_id]
+        for each in mail_id:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Email id is invalid")
+
+        for each in mail_id:
+            self.main_da_class.add_to_trash(int(each), member["member_id"])
 
     @inject_member
     def on_delete_detail(self, req, response, member, mail_id):
         if not mail_id:
             raise HTTPBadRequest("Email is not specified")
-        self.main_da_class.delete_mail(mail_id, member["member_id"])
+        mail_id = str(mail_id).split(",")
+        for each in mail_id:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Email id is invalid")
+        for each in mail_id:
+            self.main_da_class.delete_mail(each, member["member_id"])
 
     @inject_member
     def on_post_remove(self, req, response, member):
         (mail_id,) = request.get_json_or_form(
             "mail_id", req=req)
-        self.main_da_class.remove_from_trash(mail_id, member["member_id"])
+        if not mail_id:
+            raise HTTPBadRequest("Email is not specified")
+
+        if not type(mail_id) == list:
+            mail_id = [mail_id]
+        for each in mail_id:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Email id is invalid")
+
+        for each in mail_id:
+            self.main_da_class.remove_from_trash(int(each), member["member_id"])
 
     @inject_member
     def on_post_archive(self, req, response, member):
         (mail_id,) = request.get_json_or_form(
             "mail_id", req=req)
-        self.main_da_class.add_to_archive(mail_id, member["member_id"])
+        if not mail_id:
+            raise HTTPBadRequest("Email is not specified")
+
+        if not type(mail_id) == list:
+            mail_id = [mail_id]
+        for each in mail_id:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Email id is invalid")
+
+        for each in mail_id:
+            self.main_da_class.add_to_archive(int(each), member["member_id"])
 
 
 class MailArchiveResource(MailBaseResource):
@@ -358,25 +420,65 @@ class MailArchiveResource(MailBaseResource):
         if not mail_id:
             raise HTTPBadRequest("Email is not specified")
 
-        self.main_da_class.add_to_archive(mail_id, member["member_id"])
+        if not type(mail_id) == list:
+            mail_id = [mail_id]
+        for each in mail_id:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Email id is invalid")
+
+        for each in mail_id:
+            self.main_da_class.add_to_archive(int(each), member["member_id"])
 
     @inject_member
     def on_delete_detail(self, req, response, member, mail_id):
         if not mail_id:
             raise HTTPBadRequest("Email is not specified")
-        self.main_da_class.delete_mail(mail_id, member["member_id"])
+        mail_id = str(mail_id).split(",")
+        for each in mail_id:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Email id is invalid")
+        for each in mail_id:
+            self.main_da_class.delete_mail(int(each), member["member_id"])
 
     @inject_member
     def on_post_remove(self, req, response, member):
         (mail_id,) = request.get_json_or_form(
             "mail_id", req=req)
-        self.main_da_class.remove_from_archive(mail_id, member["member_id"])
+        if not mail_id:
+            raise HTTPBadRequest("Email is not specified")
+
+        if not type(mail_id) == list:
+            mail_id = [mail_id]
+        for each in mail_id:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Email id is invalid")
+
+        for each in mail_id:
+            self.main_da_class.remove_from_archive(int(each), member["member_id"])
 
     @inject_member
     def on_post_trash(self, req, response, member):
         (mail_id,) = request.get_json_or_form(
             "mail_id", req=req)
-        self.main_da_class.add_to_trash(mail_id, member["member_id"])
+        if not mail_id:
+            raise HTTPBadRequest("Email is not specified")
+
+        if not type(mail_id) == list:
+            mail_id = [mail_id]
+        for each in mail_id:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Email id is invalid")
+
+        for each in mail_id:
+            self.main_da_class.add_to_trash(int(each), member["member_id"])
 
 
 class MailSentResource(MailBaseResource):
@@ -488,5 +590,17 @@ class MailMemberFolderResource(object):
                 folder_id = int(folder_id)
             except ValueError:
                 raise HTTPBadRequest("Folder is not valid")
-        result = MailMemberFolder.move_to_folder(member["member_id"], mail_id, folder_id)
+        if not mail_id:
+            raise HTTPBadRequest("Email is not specified")
+
+        if not type(mail_id) == list:
+            mail_id = [mail_id]
+        for each in mail_id:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Email id is invalid")
+        result = None
+        for each in mail_id:
+            result = MailMemberFolder.move_to_folder(member["member_id"], int(each), folder_id)
         response.body = json.dumps({"id": result}, default_parser=json.parser)
