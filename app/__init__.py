@@ -32,6 +32,7 @@ from app.resources.file_sharing import FileStorage, FileStorageDetail, \
     ShareFile, ShareFileDetail, DownloadStorageFile, DownloadSharedFile, \
     FileGroupResource
 from app.resources.system import SystemActivityResource
+from app.resources.system import SystemActivityUsersResource
 from app.resources.language import LanguageResource
 from app.resources.static import StaticResource
 from app.resources.member_scheduler_setting import MemberSchedulerSettingResource
@@ -184,6 +185,8 @@ def _setup_routes(app):
     app.add_route("/system/activity/invite", SystemActivityResource("invites"))
     app.add_route("/system/activity/session", SystemActivityResource("sessions"))
     app.add_route("/system/activity/threat", SystemActivityResource("threats"))
+    app.add_route("/system/activity/behaviour", SystemActivityResource("behaviour"))
+    app.add_route("/system/activity/users", SystemActivityUsersResource())
 
     app.add_route("/member/activity", ActivitiesResource())
 

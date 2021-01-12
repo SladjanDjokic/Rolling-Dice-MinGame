@@ -263,3 +263,184 @@ class ActivityDA(object):
         except Exception as e:
             logger.error(e, exc_info=True)
             return None
+
+    @classmethod
+    def get_recent_activity_users(cls, get_all=False):
+        users = list()
+        query = f"""
+            SELECT 
+                member_id,
+                member.first_name,
+                member.last_name
+            FROM activity_trace
+            LEFT OUTER JOIN member ON member.id = activity_trace.member_id
+            WHERE 
+                activity_trace.member_id IS NOT NULL
+            GROUP BY
+                member_id, 
+                member.first_name,
+                member.last_name
+            ORDER BY 
+                member.first_name,
+                member.last_name
+        """
+        params = ()
+
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            for (
+                member_id,
+                first_name,
+                last_name
+            ) in cls.source.cursor:
+                user = {
+                    "member_id": member_id,
+                    "first_name": first_name,
+                    "last_name": last_name
+                }
+                users.append(user)
+
+        return users
+    
+    @classmethod
+    def get_user_global_behaviour(cls, search_key, page_size=None, page_number=None, sort_params='', get_all=False, member_id=None):
+        try:
+            sort_columns_string = 'min(activity_trace.create_date) DESC'
+            activities = list()
+            if sort_params:
+                activities_dict = {
+                    'member_id': 'activity_trace.member_id',
+                    'first_name': 'member.first_name',
+                    'last_name': 'member.last_name',
+                    'referer_url': 'activity_trace.referer_url',
+                    # 'event_types': 'event_types', currently not sure how to sort by json_agg
+                    'create_date': 'min(activity_trace.create_date)',
+                }
+                sort_columns_string = cls.formatSortingParams(
+                    sort_params, activities_dict) or sort_columns_string
+
+            query = (f"""
+                SELECT
+                    activity_trace.member_id,
+                    member.first_name,
+                    member.last_name,
+                    activity_trace.referer_url as referer_url,
+                    json_agg(DISTINCT activity_trace.event_type) as event_types,
+                    min(activity_trace.create_date) as create_date
+                FROM
+                    activity_trace
+                LEFT OUTER JOIN member ON member.id = activity_trace.member_id 
+                WHERE
+                    {f"activity_trace.member_id = {member_id} AND " if member_id else ""}
+                    activity_trace.event_type != 'attempt_validate_session'
+                    AND activity_trace.referer_url IS NOT NULL
+                    AND activity_trace.status = 'ended'
+                    AND
+                    ( 
+                        activity_trace.referer_url LIKE %s
+                        OR member.first_name LIKE %s
+                        OR member.last_name LIKE %s
+                    )
+                GROUP BY
+                    activity_trace.referer_url,
+                    member.first_name,
+                    member.last_name,
+                    activity_trace.member_id
+                ORDER BY {sort_columns_string}
+            """)
+
+            countQuery = (f"""
+                SELECT COUNT(*) 
+                    FROM
+                        ( 
+                            SELECT
+                                activity_trace.member_id,
+                                member.first_name,
+                                member.last_name,
+                                activity_trace.referer_url as referer_url,
+                                json_agg(DISTINCT activity_trace.event_type) as event_types,
+                                min(activity_trace.create_date) as create_date
+                            FROM
+                                activity_trace
+                            LEFT OUTER JOIN member ON member.id = activity_trace.member_id 
+                            WHERE
+                                {f"activity_trace.member_id = {member_id} AND " if member_id else ""}
+                                activity_trace.event_type != 'attempt_validate_session'
+                                AND activity_trace.referer_url IS NOT NULL
+                                AND activity_trace.status = 'ended'
+                                AND
+                                ( 
+                                    activity_trace.referer_url LIKE %s
+                                    OR member.first_name LIKE %s
+                                    OR member.last_name LIKE %s
+                                )
+                            GROUP BY
+                                activity_trace.referer_url,
+                                member.first_name,
+                                member.last_name,
+                                activity_trace.member_id
+                        ) src;
+                """)
+
+            like_search_key = """%{}%""".format(search_key)
+            params = tuple(3 * [like_search_key])
+
+            cls.source.execute(countQuery, params)
+
+            count = 0
+            if cls.source.has_results():
+                (count,) = cls.source.cursor.fetchone()
+
+            if page_size and page_number >= 0:
+                query += """LIMIT %s OFFSET %s"""
+                offset = 0
+                if page_number > 0:
+                    offset = page_number * page_size
+                params = params + (page_size, offset)
+
+            logger.debug(f'members behaviour params {params} {query} {search_key}, {page_size}, {page_number}, {sort_params}, {get_all}, {member_id}')
+
+            cls.source.execute(query, params)
+            if cls.source.has_results():
+                for (
+                        member_id,
+                        first_name,
+                        last_name,
+                        referer_url,
+                        event_types,
+                        create_date
+                ) in cls.source.cursor:
+                    activity = {
+                        "member_id": member_id,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "referer_url": referer_url,
+                        "event_types": event_types,
+                        "create_date": create_date
+                    }
+                    activities.append(activity)
+
+                return {"activities": activities, "count": count}
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            return None
+
+    @classmethod
+    def formatSortingParams(cls, sort_by, entity_dict):
+        columns_list = sort_by.split(',')
+        new_columns_list = list()
+
+        for column in columns_list:
+            if column[0] == '-':
+                column = column[1:]
+                column = entity_dict.get(column)
+                if column:
+                    column = column + ' DESC'
+                    new_columns_list.append(column)
+            else:
+                column = entity_dict.get(column)
+                if column:
+                    column = column + ' ASC'
+                    new_columns_list.append(column)
+
+        return (',').join(column for column in new_columns_list)
