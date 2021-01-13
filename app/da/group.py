@@ -161,7 +161,7 @@ class GroupDA(object):
             WHERE file_tree_item.member_file_id is NOT NULL
             ) as file_tree_item ON (file_tree_item.file_tree_id = file_tree.id)
             WHERE
-                member_group.group_leader_id = 1 AND
+                member_group.group_leader_id = %s AND
                 member_group.status = 'active'
             GROUP BY
                 member_group.id,
