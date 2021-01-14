@@ -116,13 +116,14 @@ class MemberGroupResource(object):
         get_all = req.get_param('get_all')
         # sort_params = '-member_group.group_name' names in descending order
         sort_params = req.get_param('sort')
+        search_key = req.get_param('search_key')
 
         if get_all:
             resp_list = GroupDA().get_all_groups_by_member_id(
                 member_id, sort_params)
         else:
             resp_list = GroupDA().get_groups_by_group_leader_id(
-                member_id, sort_params)
+                member_id, sort_params, search_key)
 
         resp.body = json.dumps({
             "data": resp_list,
@@ -280,9 +281,10 @@ class GroupMembershipResource(object):
 
         # sort_params = '-member_group.group_name' names in descending order
         sort_params = req.get_param('sort')
+        search_key = req.get_param('search_key')
 
         group_list = GroupMembershipDA().get_group_membership_by_member_id(
-            member_id, sort_params)
+            member_id, sort_params, search_key)
         resp.body = json.dumps({
             "data": group_list,
             "message": "All Group",

@@ -92,18 +92,15 @@ class GroupDA(object):
         return None
 
     @classmethod
-    def get_groups_by_group_leader_id(cls, group_leader_id, sort_params):
+    def get_groups_by_group_leader_id(cls, group_leader_id, sort_params, search_key = None):
         sort_columns_string = 'group_name ASC'
         if sort_params:
             group_dict = {
                 'group_id': 'member_group.id',
                 'group_leader_id': 'member_group.group_leader_id',
                 'group_name': 'member_group.group_name',
-                'group_exchange_option': 'member_groups.group_exchange_option',
-                'group_status': 'member_groups.group_status',
-                'group_role': 'member_groups.group_role',
-                'group_create_date': 'member_groups.group_create_date',
-                'group_update_date': 'member_groups.group_update_date',
+                'group_create_date': 'member_group.create_date',
+                'group_update_date': 'member_group.update_date',
                 'group_leader_first_name': 'member.first_name',
                 'group_leader_last_name': 'member.last_name',
                 'group_leader_email': 'member.email',
@@ -161,8 +158,25 @@ class GroupDA(object):
             WHERE file_tree_item.member_file_id is NOT NULL
             ) as file_tree_item ON (file_tree_item.file_tree_id = file_tree.id)
             WHERE
-                member_group.group_leader_id = %s AND
+                member_group.group_leader_id = %s
+                AND
                 member_group.status = 'active'
+                AND
+                (
+                    member_group.group_name ILIKE %s
+                    OR concat_ws(' ', member.first_name, member.last_name) ILIKE %s
+                    OR member.email ILIKE %s
+                    OR concat('create year ', EXTRACT(YEAR FROM member_group.create_date)) LIKE %s
+                    OR concat('create month ', EXTRACT(MONTH FROM member_group.create_date)) LIKE %s
+                    OR concat('create month ', to_char(member_group.create_date, 'month')) LIKE %s
+                    OR concat('create day ', EXTRACT(DAY FROM member_group.create_date)) LIKE %s
+                    OR concat('create day ', to_char(member_group.create_date, 'day')) LIKE %s
+                    OR concat('update year ', EXTRACT(YEAR FROM member_group.update_date)) LIKE %s
+                    OR concat('update month ', EXTRACT(MONTH FROM member_group.update_date)) LIKE %s
+                    OR concat('update month ', to_char(member_group.update_date, 'month')) LIKE %s
+                    OR concat('update day ', EXTRACT(DAY FROM member_group.update_date)) LIKE %s
+                    OR concat('update day ', to_char(member_group.update_date, 'day')) LIKE %s
+                )
             GROUP BY
                 member_group.id,
                 member_group.group_leader_id,
@@ -176,7 +190,12 @@ class GroupDA(object):
                 member.email
             ORDER BY {sort_columns_string}
         """)
-        params = (group_leader_id,)
+
+        if not search_key:
+            search_key = ""
+
+        like_search_key = f"%{search_key}%"
+        params = (group_leader_id, ) + tuple(13 * [like_search_key])
         cls.source.execute(query, params)
         if cls.source.has_results():
             all_group = cls.source.cursor.fetchall()
@@ -569,7 +588,7 @@ class GroupMembershipDA(object):
             return None
 
     @classmethod
-    def get_group_membership_by_member_id(cls, member_id, sort_params):
+    def get_group_membership_by_member_id(cls, member_id, sort_params, search_key=None):
         sort_columns_string = 'member_group.create_date DESC'
         if sort_params:
             group_dict = {
@@ -620,7 +639,24 @@ class GroupMembershipDA(object):
                   WHERE file_tree_item.member_file_id is NOT NULL
                 ) as file_tree_item ON (file_tree_item.file_tree_id = file_tree.id)
                 INNER JOIN member ON member_group.group_leader_id = member.id
-                WHERE member_group_membership.member_id = %s
+                WHERE 
+                    member_group_membership.member_id = %s
+                    AND
+                    (
+                        member_group.group_name ILIKE %s
+                        OR concat_ws(' ', member.first_name, member.last_name) ILIKE %s
+                        OR member.email ILIKE %s
+                        OR concat('create year ', EXTRACT(YEAR FROM member_group.create_date)) LIKE %s
+                        OR concat('create month ', EXTRACT(MONTH FROM member_group.create_date)) LIKE %s
+                        OR concat('create month ', to_char(member_group.create_date, 'month')) LIKE %s
+                        OR concat('create day ', EXTRACT(DAY FROM member_group.create_date)) LIKE %s
+                        OR concat('create day ', to_char(member_group.create_date, 'day')) LIKE %s
+                        OR concat('update year ', EXTRACT(YEAR FROM member_group.update_date)) LIKE %s
+                        OR concat('update month ', EXTRACT(MONTH FROM member_group.update_date)) LIKE %s
+                        OR concat('update month ', to_char(member_group.update_date, 'month')) LIKE %s
+                        OR concat('update day ', EXTRACT(DAY FROM member_group.update_date)) LIKE %s
+                        OR concat('update day ', to_char(member_group.update_date, 'day')) LIKE %s
+                    )
                 GROUP BY member_group.id,
                         member_group.group_name,
                         member_group.create_date,
@@ -633,7 +669,12 @@ class GroupMembershipDA(object):
                         member_group_membership.update_date
                 ORDER BY {sort_columns_string}
             """)
-            params = (member_id,)
+
+            if not search_key:
+                search_key = ''
+
+            like_search_key = f"%{search_key}%"
+            params = (member_id, ) + tuple(13 * [like_search_key])
             group_list = list()
             cls.source.execute(query, params)
             if cls.source.has_results():
@@ -758,7 +799,10 @@ class GroupMembershipDA(object):
                     )
                 """)
 
-            like_search_key = """%{}%""".format(search_key)
+            if not search_key:
+                search_key = ""
+
+            like_search_key = f"%{search_key}%"
             params = (group_id, member_id, like_search_key,
                       like_search_key, like_search_key, like_search_key)
 
