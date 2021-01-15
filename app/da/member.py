@@ -813,7 +813,7 @@ class MemberContactDA(object):
     source = source
 
     @classmethod
-    def get_member_contacts(cls, member_id, sort_params, filter_params):
+    def get_member_contacts(cls, member_id, sort_params, filter_params, search_key='', page_size=None, page_number=None):
         sort_columns_string = 'first_name ASC'
         contact_dict = {
             'id': 'contact.id',
@@ -847,11 +847,7 @@ class MemberContactDA(object):
 
         (filter_conditions_query, filter_conditions_params) = cls.formatFilterConditions(
             filter_params, contact_dict)
-
-        logger.debug(
-            f"""filter params for contact members {filter_params} and filter_by_columns string {filter_conditions_query}{filter_conditions_params}""")
-        logger.debug('sorting params for contact members {} and sort_by_columns string {}'.format(
-            sort_params, sort_columns_string))
+        get_contacts_params = (member_id, ) + filter_conditions_params
         contacts = list()
         get_contacts_query = (f"""
             SELECT contact.id as id,
@@ -876,10 +872,10 @@ class MemberContactDA(object):
                 role.id as role_id,
                 contact.create_date as create_date,
                 contact.update_date as update_date,
-                json_agg(DISTINCT member_location.*) AS location_information,
-                json_agg(DISTINCT member_contact_2.*) AS contact_information,
-                json_agg(DISTINCT country_code.*) AS country_code,
-                json_agg(DISTINCT member_achievement.*) AS achievement_information,
+                COALESCE(json_agg(DISTINCT member_location.*) FILTER (WHERE member_location.id IS NOT NULL), '[]') AS location_information,
+                COALESCE(json_agg(DISTINCT member_contact_2.*) FILTER (WHERE member_contact_2.id IS NOT NULL), '[]') AS contact_information,
+                COALESCE(json_agg(DISTINCT country_code.*) FILTER (WHERE country_code.id IS NOT NULL), '[]') AS country_code,
+                COALESCE(json_agg(DISTINCT member_achievement.*) FILTER (WHERE member_achievement.id IS NOT NULL), '[]') AS achievement_information,
                 file_storage_engine.storage_engine_id as s3_avatar_url,
                 contact.security_exchange_option,
                 contact.status
@@ -894,7 +890,27 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN member_profile ON contact.contact_member_id = member_profile.member_id
                 LEFT OUTER JOIN member_achievement ON member_achievement.member_id = member.id
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
-            WHERE contact.member_id = %s {filter_conditions_query}
+            WHERE
+                contact.member_id = %s {filter_conditions_query}
+                AND 
+                (
+                    concat(contact.first_name, member.middle_name, contact.last_name) ILIKE %s
+                    OR contact.email ILIKE %s
+                    OR member_profile.biography LIKE %s
+                    OR contact.cell_phone LIKE %s
+                    OR contact.office_phone LIKE %s
+                    OR contact.home_phone LIKE %s
+                    OR contact.personal_email LIKE %s
+                    OR member.company_name LIKE %s
+                    OR job_title.name LIKE %s
+                    OR cast(member_location.country_code_id as varchar) LIKE %s
+                    OR member.company_name LIKE %s
+                    OR contact.company_phone LIKE %s
+                    OR contact.company_web_site LIKE %s
+                    OR contact.company_email LIKE %s
+                    OR contact.company_bio LIKE %s
+                    OR role.name LIKE %s
+                )
             GROUP BY
                 contact.id,
                 contact.contact_member_id,
@@ -921,7 +937,30 @@ class MemberContactDA(object):
                 file_storage_engine.storage_engine_id
             ORDER BY {sort_columns_string}
             """)
-        get_contacts_params = (member_id, ) + filter_conditions_params
+
+        like_search_key = """%{}%""".format(search_key)
+        get_contacts_params = get_contacts_params + tuple(16 * [like_search_key])
+
+        countQuery = (f"""
+            SELECT COUNT(*) 
+                FROM
+                    ( 
+                        {get_contacts_query}
+                    ) src;
+            """)
+
+        count = 0
+        cls.source.execute(countQuery, get_contacts_params)
+        if cls.source.has_results():
+            (count,) = cls.source.cursor.fetchone()
+
+        if page_size and page_number >= 0:
+            get_contacts_query += """LIMIT %s OFFSET %s"""
+            offset = 0
+            if page_number > 0:
+                offset = page_number * page_size
+            get_contacts_params = get_contacts_params + (page_size, offset)
+        
         cls.source.execute(get_contacts_query, get_contacts_params)
         if cls.source.has_results():
             for (
@@ -993,7 +1032,10 @@ class MemberContactDA(object):
                     # "country": country
                 }
                 contacts.append(contact)
-        return contacts
+        return {
+            "contacts": contacts,
+            "count": count
+            }
 
     @classmethod
     def get_contacts_roles(cls, member_id):
@@ -1246,9 +1288,9 @@ class MemberContactDA(object):
                 contact.contact_role as role,
                 contact.create_date as create_date,
                 contact.update_date as update_date,
-                json_agg(DISTINCT member_location.*) AS location_information,
-                json_agg(DISTINCT member_contact_2.*) AS contact_information,
-                json_agg(DISTINCT country_code.*) AS country_code,
+                COALESCE(json_agg(DISTINCT member_location.*) FILTER (WHERE member_location.id IS NOT NULL), '[]') AS location_information,
+                COALESCE(json_agg(DISTINCT member_contact_2.*) FILTER (WHERE member_contact_2.id IS NOT NULL), '[]') AS contact_information,
+                COALESCE(json_agg(DISTINCT country_code.*) FILTER (WHERE country_code.id IS NOT NULL), '[]') AS country_code,
                 file_storage_engine.storage_engine_id as s3_avatar_url,
                 contact.security_exchange_option
             FROM contact
@@ -1531,10 +1573,10 @@ class MemberInfoDA(object):
                 member.department_id as department_id,
                 member.create_date as create_date,
                 member.update_date as update_date,
-                json_agg(DISTINCT member_location.*) AS location_information,
-                json_agg(DISTINCT member_contact_2.*) AS contact_information,
-                json_agg(DISTINCT country_code.*) AS country_code,
-                json_agg(DISTINCT member_achievement.*) AS achievement_information,
+                COALESCE(json_agg(DISTINCT member_location.*) FILTER (WHERE member_location.id IS NOT NULL), '[]') AS location_information,
+                COALESCE(json_agg(DISTINCT member_contact_2.*) FILTER (WHERE member_contact_2.id IS NOT NULL), '[]') AS contact_information,
+                COALESCE(json_agg(DISTINCT country_code.*) FILTER (WHERE country_code.id IS NOT NULL), '[]') AS country_code,
+                COALESCE(json_agg(DISTINCT member_achievement.*) FILTER (WHERE member_achievement.id IS NOT NULL), '[]') AS achievement_information,
                 file_storage_engine.storage_engine_id as s3_avatar_url,
                 member_profile.biography as biography
             FROM member
