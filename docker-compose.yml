@@ -1,5 +1,6 @@
 version: "3.8"
 services:
+
   amera-dns:
     container_name: amera-dns
     image: andyshinn/dnsmasq:latest
@@ -14,7 +15,9 @@ services:
       - NET_ADMIN
     networks:
       - amera-net
+
   socat:
+    container_name: amera-dns-socat
     image: alpine/socat
     command: tcp-listen:80,fork,reuseaddr tcp-connect:host.docker.internal:9000
     environment:
@@ -22,6 +25,7 @@ services:
       - VIRTUAL_PORT=80
     expose:
       - 80
+
   amera-nginx:
     container_name: amera-nginx
     image: nginx:alpine
@@ -68,8 +72,8 @@ services:
         condition: service_healthy
       # amera-eventserver:
       #   condition: service_healthy
-      # - amera-dns
-      # - amera-web-auth
+      # amera-web-auth:
+      #   condition: service_healthy
 
   amera-web-main:
     container_name: amera-web-main
@@ -134,26 +138,47 @@ services:
         condition: service_healthy
 
   # amera-web-auth:
-  #    container_name: amera-web-auth
-  #    image: amera-web-auth:latest
-  #    restart: always
-  #    logging:
-  #      options:
-  #        max-size: "500k"
-  #        max-file: "1"
-  #    build:
-  #      context: ../web-api
-  #      dockerfile: Dockerfile.dev
-  #    depends_on:
-  #      - amera-web-db
-  #    networks:
-  #      - amera-net
-  #    expose:
-  #      - 5000
-  #    volumes:
-  #      - ../web-api:/app
-  #      - web-api-python-packages:/root/.local/share
-  #    command: ['pipenv', 'run', 'docker']
+  #   container_name: amera-web-auth
+  #   image: amera-web-api:latest
+  #   restart: always
+  #   logging:
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "1"
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 512M
+  #       reservations:
+  #         memory: 128M
+  #   build:
+  #     context: ../web-api
+  #     dockerfile: Dockerfile.dev
+  #   depends_on:
+  #     amera-web-db:
+  #       condition: service_healthy
+  #     amera-web-api:
+  #       condition: service_healthy
+  #     # kafka:
+  #     #   condition: service_started
+  #   networks:
+  #     - amera-net
+  #   expose:
+  #     - 5000
+  #   ports:
+  #     - 5000:5000
+  #   environment: 
+  #     - AMERA_API_KAFKA.BOOTSTRAP_SERVERS=kafka:9092
+  #   volumes:
+  #     - ../web-api:/app
+  #     - web-api-python-packages:/root/.local/share
+  #   command: ["pipenv", "run", "local"]
+  #   healthcheck:
+  #     # test: CMD wget --no-verbose --tries=1 --spider http://localhost:5000/healthz || exit 1
+  #     test: ["CMD", "curl", "-f", "http://localhost:5000/healthz"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 22
 
   amera-web-api:
     container_name: amera-web-api
@@ -192,6 +217,66 @@ services:
     healthcheck:
       # test: CMD wget --no-verbose --tries=1 --spider http://localhost:5000/healthz || exit 1
       test: ["CMD", "curl", "-f", "http://localhost:5000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 22
+
+  amera-signaling:
+    container_name: amera-signaling
+    image: amera-signaling:latest
+    restart: always
+    logging:
+      options:
+        max-size: "500k"
+        max-file: "1"
+    build:
+      context: ../web-signaling/
+      dockerfile: Dockerfile
+    networks:
+      - amera-net
+    ports:
+      - 8080:8080
+    expose:
+      - 8080
+    volumes:
+      - ../web-signaling:/app
+      - demo-signaling-python-packages:/root/.local/share
+    command: ['pipenv', 'run', 'docker']
+
+  amera-eventserver:
+    container_name: amera-eventserver
+    image: amera-web-api:latest
+    restart: always
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "1"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 12M
+    depends_on:
+      # kafka:
+      #   condition: service_healthy
+      # zookeeper:
+      #   condition: service_started
+      amera-web-api:
+        condition: service_healthy
+    networks:
+      - amera-net
+    expose:
+      - 4000
+    ports:
+      - 4000:4000
+    volumes:
+      - ../web-api:/app
+      - web-api-python-packages:/root/.local/share
+    # command: [ "uvicorn", "--app-dir=./eventserver", "test-star:app", "--host", "0.0.0.0", "--port", "4000", "--reload" ]
+    command: ["gunicorn", "--chdir", "eventserver", "sse:app", "--reload", "--bind=0.0.0.0:4000", "-k", "uvicorn.workers.UvicornWorker", "--log-level=DEBUG"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/healthz"]
       interval: 30s
       timeout: 10s
       retries: 22
@@ -331,66 +416,6 @@ services:
   #   depends_on:
   #     amera-web-db:
   #       condition: service_healthy
-
-  amera-demo-signaling:
-    container_name: amera-demo-signaling
-    image: amera-demo-signaling:latest
-    restart: always
-    logging:
-      options:
-        max-size: "500k"
-        max-file: "1"
-    build:
-      context: ../web-signaling/
-      dockerfile: Dockerfile
-    networks:
-      - amera-net
-    ports:
-      - 8080:8080
-    expose:
-      - 8080
-    volumes:
-      - ../web-signaling:/app
-      - demo-signaling-python-packages:/root/.local/share
-    command: ['pipenv', 'run', 'docker']
-
-  amera-eventserver:
-    container_name: amera-eventserver
-    image: amera-web-api:latest
-    restart: always
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "1"
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-        reservations:
-          memory: 12M
-    depends_on:
-      # kafka:
-      #   condition: service_started
-      # zookeeper:
-      #   condition: service_started
-      amera-web-api:
-        condition: service_healthy
-    networks:
-      - amera-net
-    expose:
-      - 4000
-    ports:
-      - 4000:4000
-    volumes:
-      - ../web-api:/app
-      - web-api-python-packages:/root/.local/share
-    # command: [ "uvicorn", "--app-dir=./eventserver", "test-star:app", "--host", "0.0.0.0", "--port", "4000", "--reload" ]
-    command: ["gunicorn", "--chdir", "eventserver", "sse:app", "--reload", "--bind=0.0.0.0:4000", "-k", "uvicorn.workers.UvicornWorker", "--log-level=DEBUG"]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 22
 
   amera-call-consumer:
     container_name: amera-call-consumer
