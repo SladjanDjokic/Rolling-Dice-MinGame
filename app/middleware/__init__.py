@@ -44,7 +44,7 @@ topic_routes = {"MemberScheduleEventResource": {"GET": {"event_type": "check_cal
 class CrossDomain(object):
     def process_response(self, req, resp, resource, req_succeeded):
         if req.path in ignore_routes:
-            logger.debug(f"Ignoring route: {req.path}")
+            # logger.debug(f"Ignoring route: {req.path}")
             resp.complete = True
             return
 
@@ -221,10 +221,6 @@ class KafkaProducerMiddleware(object):
             logger.debug(f"Ignoring route: {req.path}")
             return
 
-        # Topics determined by resource as http method
-        r = topic_routes.get(resource.__class__.__name__)
-        logger.debug(f"Route Topics: {r}")
-
         try:
             logger.debug(f"Attempt to get route method: {req.method}")
             # Get kafka data from resource for  topic routing and event_type
@@ -238,7 +234,6 @@ class KafkaProducerMiddleware(object):
                     topic = resource.kafka_data.get(req.method).get('topic')
                     topic_data.event_type = resource.kafka_data.get(req.method).get('event_type')
                 logger.debug(f"TOPIC AND EVENT_TYPE FOUND: {topic}, {topic_data.event_type}")
-                logger.debug(f"### {resource.kafka_data}")
         except Exception as e:
             logger.debug(f'''
                 Failed to retrieve topic from: {resource.__class__.__name__}

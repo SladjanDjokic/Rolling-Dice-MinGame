@@ -464,6 +464,7 @@ class GroupMemberAccept(object):
                 "success": False
             })
 
+
 class GroupMembersResource(object):
 
     def __init__(self):

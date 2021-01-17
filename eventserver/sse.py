@@ -1,26 +1,62 @@
 import json
 import time
+from app.config import settings
+from app import configure
 
 from loguru import logger
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
 from starlette.routing import Route
 
+from vyper import v
+
+
+def init_app():
+    v.add_config_path('../config')
+    # Get the configuration values from runtime/env/parameters
+    # Essentially puts them in the settings variable
+    configure()
+    logger.debug(settings.get('database'))
+    return
+
+
 # Global to hold notification data before its sent to client
-MESSAGES = {}
+CALL_NOTIFICATIONS = {}
 
 
 async def consumer_call_event(request):
     """ API endpoint for consumer call notifications to be posted to MESSAGES"""
     data = await request.json()
-    member_id = int(data.get('callee_id'))
-    MESSAGES[member_id] = data
-    logger.debug(MESSAGES)
-    response = {"data": "call notification messages stored"}
-    # TODO Can I make request and response await? Not working right now with uvicorn bug
+    logger.debug(f"Received call data {data}")
+
+    call_type = data.get('type')
+    reply_type = data.get('reply_type')
+    if call_type == "person":
+        if reply_type is None:
+            # Incoming call to single user. Route call to callee connected to sse
+            logger.debug("INCOMING CALL")
+            member_id = int(data.get('callee_id'))
+            CALL_NOTIFICATIONS[member_id] = data
+        elif reply_type == 'decline':
+            logger.debug("DECLINE PERSON")
+            # Decline notification. Route to caller_id
+            member_id = int(data.get('caller_id'))
+            CALL_NOTIFICATIONS[member_id] = data
+    elif call_type == 'group':
+        if reply_type == 'decline':
+            logger.debug("DECLINE GROUP")
+            # Decline group call notification. Route to caller_id
+            member_id = int(data.get('caller_id'))
+            CALL_NOTIFICATIONS[member_id] = data
+        elif reply_type is None:
+            logger.debug("SENDING GROUP CALL")
+            member_id = data.get('callee_id')
+            CALL_NOTIFICATIONS[int(member_id)] = data
+
+    response = {"data": "call notification message stored"}
     return JSONResponse(response, status_code=201)
 
 
@@ -65,15 +101,15 @@ async def status_event_generator(request, member_id):
                 #     "data": ''
                 # }
                 break
-            if MESSAGES.get(member_id):
-                data = MESSAGES.pop(int(member_id))
-                if data:
-                    payload = {"data": json.dumps(data), "event": "NOTIFY"}
-                    yield payload
-                    previous_status = 'call_delivered'
-                    logger.debug('Current status :%s', 'call_delivered')
-                else:
-                    logger.debug('No change in status...')
+            data = None
+            if CALL_NOTIFICATIONS.get(member_id):
+                data = CALL_NOTIFICATIONS.pop(int(member_id))
+
+            if data:
+                payload = {"data": json.dumps(data), "event": "NOTIFY"}
+                yield payload
+                previous_status = 'call_delivered'
+
             time.sleep(1)
     except Exception as exc:
         logger.debug(exc)
@@ -84,4 +120,5 @@ routes = [
     Route('/subscribe/{member_id}', calls_sse, methods=["GET"])
 ]
 
+init_app()
 app = Starlette(debug=True, routes=routes)

@@ -66,6 +66,7 @@ mail = 'mail_activity'
 registration = 'registration_activity'
 contact = 'contact_activity'
 calendar = 'calendar_activity'
+member_change_password = 'member_activity'
 
 [kafka.event_types]
 
@@ -91,6 +92,7 @@ attempt_validate_session = 'attempt_validate_session'
 contact_security = 'contact_security'
 get_members = 'get_members'
 event_invite_response = 'event_invite_response'
+mail_base_resource = ''
 
 [kafka.event_types.post]
 member_change_password = 'change_password'

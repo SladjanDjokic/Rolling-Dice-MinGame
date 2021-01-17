@@ -19,7 +19,6 @@ class FileDownloadResource():
 
     @staticmethod
     def on_get(req, resp, file_path):
-        logger.debug('file amidala', file_path)
         type = mimetypes.MimeTypes().guess_type(file_path)[0]
         s3_resp = FileStorageDA().stream_s3_file(file_path)
         resp.content_type = type

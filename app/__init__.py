@@ -286,4 +286,4 @@ def _setup_routes(app):
     app.add_route("/member/event/invite", MemberEventInvitations())
     # Event Invitation Accept/Decline
     app.add_route("/member/event/invite/response", MemberEventInvitateStatus())
-    app.add_route("/notifications/incoming_call", IncomingCallView())
+    app.add_route("/notify", IncomingCallView())

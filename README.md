@@ -2,6 +2,20 @@
 
 This API is for the purposes of supporting Amera's Web API
 
+## DNS
+
+We use custom DNS to start up the service
+
+### OSX
+
+Create a file: `/etc/resolver/dev.amera.local`
+With contents:
+
+```shell
+nameserver 127.0.0.1
+port 5380
+```
+
 ## Run
 
 Run `docker-compose up -d` from the root of the directory.   This depends on the `web`, `web-share` directories, and starts PostgreSQL and a nginx proxy for all applications
