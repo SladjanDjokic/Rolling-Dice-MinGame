@@ -5,7 +5,7 @@ gunicorn_preload = true
 log_level = "DEBUG"
 
 [web]
-session_expiration = 14400
+session_expiration = 28800
 cookie_secure = false
 cookie_domain = "ameraiot.com"
 cookie_path = "/"
@@ -43,7 +43,7 @@ access_key_id = "${AWS_ACCESS_KEY_ID}"
 secret_access_key = "${AWS_SECRET_ACCESS_KEY}"
 [services.twilio]
 totp_length = 6
-totp_lifetime_seconds=30
+totp_lifetime_seconds=60
 
 [storage]
 [storage.s3]

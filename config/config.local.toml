@@ -44,7 +44,7 @@ access_key_id = "${AWS_ACCESS_KEY_ID}"
 secret_access_key = "${AWS_SECRET_ACCESS_KEY}"
 [services.twilio]
 totp_length = 6
-totp_lifetime_seconds=30
+totp_lifetime_seconds=60
 
 [storage]
 [storage.s3]

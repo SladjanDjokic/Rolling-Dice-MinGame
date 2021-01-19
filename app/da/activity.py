@@ -6,6 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 from app.util.filestorage import amerize_url
 
+from app.config import settings
 
 class ActivityDA(object):
     source = source
@@ -21,7 +22,7 @@ class ActivityDA(object):
             """
             INSERT INTO activity_trace
                 (event_key, headers, request_params, request_url_params,
-                request_data, response, http_status, session_key, 
+                request_data, response, http_status, session_key,
                 session_data, member_id, event_type, status, create_date,
                 topic, referer_url, url)
                 Values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
@@ -106,7 +107,7 @@ class ActivityDA(object):
                     job_title.name as job_title,
                     file_path(file_storage_engine.storage_engine_id, '/member/file') as s3_avatar_url,
                     contact.status AS contact_requested_status,
-                    CASE 
+                    CASE
                         WHEN add_group_membership.status IS NOT NULL THEN add_group_membership.status
                         WHEN create_group_membership.status IS NOT NULL THEN create_group_membership.status
                         ELSE NULL
@@ -268,19 +269,19 @@ class ActivityDA(object):
     def get_recent_activity_users(cls, get_all=False):
         users = list()
         query = f"""
-            SELECT 
+            SELECT
                 member_id,
                 member.first_name,
                 member.last_name
             FROM activity_trace
             LEFT OUTER JOIN member ON member.id = activity_trace.member_id
-            WHERE 
+            WHERE
                 activity_trace.member_id IS NOT NULL
             GROUP BY
-                member_id, 
+                member_id,
                 member.first_name,
                 member.last_name
-            ORDER BY 
+            ORDER BY
                 member.first_name,
                 member.last_name
         """
@@ -301,7 +302,7 @@ class ActivityDA(object):
                 users.append(user)
 
         return users
-    
+
     @classmethod
     def get_user_global_behaviour(cls, search_key, page_size=None, page_number=None, sort_params='', get_all=False, member_id=None):
         try:
@@ -329,14 +330,14 @@ class ActivityDA(object):
                     min(activity_trace.create_date) as create_date
                 FROM
                     activity_trace
-                LEFT OUTER JOIN member ON member.id = activity_trace.member_id 
+                LEFT OUTER JOIN member ON member.id = activity_trace.member_id
                 WHERE
                     {f"activity_trace.member_id = {member_id} AND " if member_id else ""}
                     activity_trace.event_type != 'attempt_validate_session'
                     AND activity_trace.referer_url IS NOT NULL
                     AND activity_trace.status = 'ended'
                     AND
-                    ( 
+                    (
                         activity_trace.referer_url LIKE %s
                         OR member.first_name LIKE %s
                         OR member.last_name LIKE %s
@@ -350,9 +351,9 @@ class ActivityDA(object):
             """)
 
             countQuery = (f"""
-                SELECT COUNT(*) 
+                SELECT COUNT(*)
                     FROM
-                        ( 
+                        (
                             SELECT
                                 activity_trace.member_id,
                                 member.first_name,
@@ -362,14 +363,14 @@ class ActivityDA(object):
                                 min(activity_trace.create_date) as create_date
                             FROM
                                 activity_trace
-                            LEFT OUTER JOIN member ON member.id = activity_trace.member_id 
+                            LEFT OUTER JOIN member ON member.id = activity_trace.member_id
                             WHERE
                                 {f"activity_trace.member_id = {member_id} AND " if member_id else ""}
                                 activity_trace.event_type != 'attempt_validate_session'
                                 AND activity_trace.referer_url IS NOT NULL
                                 AND activity_trace.status = 'ended'
                                 AND
-                                ( 
+                                (
                                     activity_trace.referer_url LIKE %s
                                     OR member.first_name LIKE %s
                                     OR member.last_name LIKE %s
@@ -444,3 +445,244 @@ class ActivityDA(object):
                     new_columns_list.append(column)
 
         return (',').join(column for column in new_columns_list)
+
+    def get_group_drive_activity(cls, group_id, search_key, page_size=None, page_number=None, sort_params=''):
+        try:
+            sort_columns_string = 'a.create_date DESC'
+            activities = list()
+            if sort_params:
+                activities_dict = {
+                    'member_id': 'a.member_id',
+                    'first_name': 'member.first_name',
+                    'last_name': 'member.last_name',
+                    # 'event_types': 'event_types', currently not sure how to sort by json_agg
+                    'create_date': 'a.create_date',
+                }
+                sort_columns_string = cls.formatSortingParams(
+                    sort_params, activities_dict) or sort_columns_string
+
+            event_types = [settings.get(f'kafka.event_types.{method}.group_file_cloud') for method in [
+                                'get', 'post', 'put', 'delete']]
+            event_types = ','.join([f"'{event}'" for event in event_types])
+            query = (f"""
+                WITH tmp_node AS (
+                        SELECT jsonb_array_elements(a2.request_data -> 'node_ids_list')::INTEGER AS node_id, a2.id AS key_id
+                        FROM activity_trace a2
+                        )
+                SELECT a.member_id,
+                    member.first_name,
+                    member.last_name,
+                    a.event_type,
+                    a.create_date,
+                    a.request_params,
+                    a.request_data,
+                    fti.display_name
+                FROM activity_trace a
+                LEFT JOIN tmp_node ON tmp_node.key_id = a.id
+                LEFT JOIN file_tree_item fti ON fti.id = tmp_node.node_id
+                LEFT JOIN member ON member.id = a.member_id
+                WHERE
+                    (
+                        a.event_type IN ({event_types})
+                    )
+                    AND a.request_url_params->>'group_id' = %s
+                    AND a.status = 'ended'
+                    AND
+                    (
+                        member.first_name LIKE %s
+                        OR member.last_name LIKE %s
+                    )
+                ORDER BY {sort_columns_string}
+            """)
+
+            countQuery = (f"""
+                SELECT COUNT(*)
+                    FROM
+                        (
+                            WITH tmp_node AS (
+                                    SELECT jsonb_array_elements(a2.request_data -> 'node_ids_list')::INTEGER AS node_id, a2.id AS key_id
+                                    FROM activity_trace a2
+                                    )
+                            SELECT a.member_id,
+                                member.first_name,
+                                member.last_name,
+                                a.event_type,
+                                a.create_date,
+                                a.request_params,
+                                a.request_data,
+                                fti.display_name
+                            FROM activity_trace a
+                            LEFT JOIN tmp_node ON tmp_node.key_id = a.id
+                            LEFT JOIN file_tree_item fti ON fti.id = tmp_node.node_id
+                            LEFT JOIN member ON member.id = a.member_id
+                            WHERE
+                                (
+                                    a.event_type IN ({event_types})
+                                )
+                                AND a.request_url_params->>'group_id' = %s
+                                AND a.status = 'ended'
+                                AND
+                                (
+                                    member.first_name LIKE %s
+                                    OR member.last_name LIKE %s
+                                )
+                        ) src;
+                """)
+
+            like_search_key = """%{}%""".format(search_key)
+            params = tuple([str(group_id),]) + tuple(2 * [like_search_key])
+
+            cls.source.execute(countQuery, params)
+
+            count = 0
+            if cls.source.has_results():
+                (count,) = cls.source.cursor.fetchone()
+
+            if page_size and page_number >= 0:
+                query += """LIMIT %s OFFSET %s"""
+                offset = 0
+                if page_number > 0:
+                    offset = page_number * page_size
+                params = params + (page_size, offset)
+
+
+            cls.source.execute(query, params)
+            if cls.source.has_results():
+                for (
+                        member_id,
+                        first_name,
+                        last_name,
+                        event_type,
+                        create_date,
+                        request_data,
+                        request_params,
+                        display_name
+                ) in cls.source.cursor:
+                    activity = {
+                        "member_id": member_id,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "event_type": event_type,
+                        "create_date": create_date,
+                        "request_data": request_data,
+                        "request_params": request_params,
+                        "display_name": display_name
+                    }
+                    activities.append(activity)
+            return {"activities": activities, "count": count }
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            return None
+
+    def get_group_calendar_activity(cls, group_id, search_key, page_size=None, page_number=None, sort_params=''):
+        try:
+            sort_columns_string = 'activity_trace.create_date DESC'
+            activities = list()
+            if sort_params:
+                activities_dict = {
+                    'member_id': 'activity_trace.member_id',
+                    'first_name': 'member.first_name',
+                    'last_name': 'member.last_name',
+                    # 'event_types': 'event_types', currently not sure how to sort by json_agg
+                    'create_date': 'activity_trace.create_date',
+                }
+                sort_columns_string = cls.formatSortingParams(
+                    sort_params, activities_dict) or sort_columns_string
+            event_types = [
+                'kafka.event_types.post.create_event',
+                'kafka.event_types.post.create_event_attachment',
+                'kafka.event_types.post.calendar_event_status_update',
+                'kafka.event_types.post.invite_users_to_event',
+                'kafka.event_types.post.invite_single_user_event',
+                'kafka.event_types.put.edit_event',
+                'kafka.event_types.delete.delete_event',
+                'kafka.event_types.delete.delete_event_attachment',
+                'kafka.event_types.get.event_invite_response',
+            ]
+            event_types = [settings.get(event) for event in event_types]
+            event_types = ','.join([f"'{event}'" for event in event_types])
+
+            query = (f"""
+                SELECT
+                    activity_trace.member_id,
+                    member.first_name,
+                    member.last_name,
+                    activity_trace.event_type as event_type,
+                    activity_trace.create_date,
+                    activity_trace.request_params
+                FROM
+                    activity_trace
+                    LEFT JOIN member ON member.id = activity_trace.member_id
+                WHERE
+                    activity_trace.event_type IN ({event_types})
+                    AND activity_trace.request_params ? 'event_data'
+                    AND (activity_trace.request_params->>'event_data')::jsonb->>'inviteMode' = 'group'
+                    AND (activity_trace.request_params->>'event_data')::jsonb->>'invitedGroup' = %s
+                    AND activity_trace.status = 'ended'
+                    AND
+                    (
+                        member.first_name LIKE %s
+                        OR member.last_name LIKE %s
+                    )
+                ORDER BY {sort_columns_string}
+            """)
+
+            countQuery = (f"""
+                SELECT
+                    count(*)
+                FROM
+                    activity_trace
+                    LEFT JOIN member ON member.id = activity_trace.member_id
+                WHERE
+                    activity_trace.event_type IN ({event_types})
+                    AND activity_trace.request_params ? 'event_data'
+                    AND (activity_trace.request_params->>'event_data')::jsonb->>'inviteMode' = 'group'
+                    AND (activity_trace.request_params->>'event_data')::jsonb->>'invitedGroup' = %s
+                    AND activity_trace.status = 'ended'
+                    AND
+                    (
+                        member.first_name LIKE %s
+                        OR member.last_name LIKE %s
+                    )
+                """)
+
+            like_search_key = """%{}%""".format(search_key)
+            params = tuple([str(group_id),]) + tuple(2 * [like_search_key])
+
+            cls.source.execute(countQuery, params)
+
+            count = 0
+            if cls.source.has_results():
+                (count,) = cls.source.cursor.fetchone()
+
+            if page_size and page_number >= 0:
+                query += """LIMIT %s OFFSET %s"""
+                offset = 0
+                if page_number > 0:
+                    offset = page_number * page_size
+                params = params + (page_size, offset)
+
+
+            cls.source.execute(query, params)
+            if cls.source.has_results():
+                for (
+                        member_id,
+                        first_name,
+                        last_name,
+                        event_type,
+                        create_date,
+                        request_params
+                ) in cls.source.cursor:
+                    activity = {
+                        "member_id": member_id,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "event_type": event_type,
+                        "create_date": create_date,
+                        "request_params": request_params
+                    }
+                    activities.append(activity)
+            return {"activities": activities, "count": count }
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            return None

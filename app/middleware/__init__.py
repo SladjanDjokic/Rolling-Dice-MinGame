@@ -267,6 +267,7 @@ class KafkaProducerMiddleware(object):
             u = str(uuid.uuid4())
             # Set event_key on headers so we can  link req/resp
             req.headers['event_key'] = u
+            req.headers['req_url_params'] = self._sanitize(params)
             topic_data.status = 'started'
             topic_data.event_key = u
             topic_data.headers = req.headers
@@ -317,7 +318,6 @@ class KafkaProducerMiddleware(object):
         # Topics determined by resource as http method
         r = topic_routes.get(resource.__class__.__name__)
         logger.debug(f"Route Topics: {r}")
-
         try:
             logger.debug(f"Attempt to get route method: {req.method}")
             if hasattr(resource, 'kafka_data'):
@@ -365,7 +365,7 @@ class KafkaProducerMiddleware(object):
             topic_data.event_key = u
             topic_data.headers = req.headers
             topic_data.req_params = req.params
-            # topic_data.req_url_params = params
+            topic_data.req_url_params = req.headers.get('req_url_params')
             topic_data.req_data = body
             topic_data.headers = self._sanitize(req.headers)
             topic_data.req_params = self._sanitize(req.params)

@@ -8,6 +8,10 @@ services:
      --log-queries
      --log-facility=-
      --address=/dev.amera.local/127.0.0.1
+    deploy:
+      resources:
+        limits:
+          memory: 16M
     ports:
       - "5380:53"
       - "5380:53/udp"
@@ -15,6 +19,8 @@ services:
       - NET_ADMIN
     networks:
       - amera-net
+    depends_on:
+      - socat
 
   socat:
     container_name: amera-dns-socat
@@ -67,8 +73,6 @@ services:
       amera-dns:
         condition: service_started
       amera-web-api:
-        condition: service_healthy
-      amera-web-db:
         condition: service_healthy
       # amera-eventserver:
       #   condition: service_healthy

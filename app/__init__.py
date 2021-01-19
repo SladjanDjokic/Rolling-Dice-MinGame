@@ -27,7 +27,8 @@ from app.resources.file_sharing import FileStorage, FileStorageDetail, ShareFile
     DownloadStorageFile, DownloadSharedFile, MemberFileCloud, MemberFileBin, MemberShareFile, GroupFileCloud, \
     GroupFileBin
 from app.resources.group import MemberGroupResource, GroupMembershipResource, GroupDetailResource, \
-    GroupMemberInviteResource, GroupMembersResource, MemberGroupSecurity, GroupMemberAccept
+    GroupMemberInviteResource, GroupMembersResource, MemberGroupSecurity, GroupMemberAccept, \
+    GroupActivityDriveResource, GroupActivityCalendarResource
 from app.resources.file_sharing import FileStorage, FileStorageDetail, \
     ShareFile, ShareFileDetail, DownloadStorageFile, DownloadSharedFile, \
     FileGroupResource
@@ -178,6 +179,8 @@ def _setup_routes(app):
     app.add_route("/group/{group_id}", GroupDetailResource())
     app.add_route("/groups", MemberGroupResource())
     app.add_route("/groups/membership", GroupMembershipResource())
+    app.add_route("/group/activity/calendar/{group_id}", GroupActivityCalendarResource())
+    app.add_route("/group/activity/drive/{group_id}", GroupActivityDriveResource())
     app.add_route("/member/group/invite", GroupMemberInviteResource())
     app.add_route("/member/group/membership/request/{group_id}", GroupMemberAccept())
     app.add_route("/member/group-members", GroupMembersResource())

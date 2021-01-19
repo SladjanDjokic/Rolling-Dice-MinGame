@@ -221,7 +221,7 @@ class MemberRegisterResource(object):
 
                     # invitee contact info for inviter
                     MemberContactDA.create_member_contact(member_id=inviter_member_id,
-                                                          contact_member_id=member_id, first_name=first_name, last_name=last_name, country=country,
+                                                          contact_member_id=member_id, status='active', first_name=first_name, last_name=last_name, country=country,
                                                           cell_phone=phone_number, office_phone='',  home_phone='', email=email,
                                                           personal_email='', company_name=company_name, company_phone='', company_web_site='',
                                                           company_email='', company_bio='', contact_role='', role_id=role_id)
@@ -235,7 +235,7 @@ class MemberRegisterResource(object):
 
                         # contact for invitee
                         MemberContactDA.create_member_contact(member_id=member_id,
-                                                              contact_member_id=inviter_member_id, first_name=inviter_first_name, last_name=inviter_last_name,
+                                                              contact_member_id=inviter_member_id, status='active', first_name=inviter_first_name, last_name=inviter_last_name,
                                                               country=inviter_country, cell_phone=inviter_phone_number, office_phone='',  home_phone='',
                                                               email=inviter_email, personal_email='', company_name=inviter_company_name, company_phone='',
                                                               company_web_site='', company_email='', company_bio='', contact_role='',

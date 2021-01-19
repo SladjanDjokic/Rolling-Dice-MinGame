@@ -13,6 +13,7 @@ from app.config import settings
 import app.util.email as sendmail
 
 from app.da.file_sharing import FileStorageDA
+from app.da.activity import ActivityDA
 from app.da.group import GroupDA, GroupMembershipDA, GroupMemberInviteDA
 from app.da.file_sharing import FileTreeDA
 from app.da.member import MemberDA
@@ -548,6 +549,59 @@ class MemberGroupSecurity(object):
             GroupDA().update_security(**security_params)
             resp.body = json.dumps({
                 "description": "Successfully saved",
+                "success": True
+            }, default_parser=json.parser)
+        except Exception as e:
+            resp.body = json.dumps({
+                "description": "Something went wrong",
+                "success": False
+            }, default_parser=json.parser)
+
+class GroupActivityDriveResource(object):
+   def on_get(self, req, resp, group_id=None):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            # groupMemberGroupSecurity_leader_id = session["member_id"]
+            member_id = session["member_id"]
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+
+        try:
+            search_key = req.get_param('search_key') or ''
+            page_size = req.get_param_as_int('page_size')
+            page_number = req.get_param_as_int('page_number')
+            sort_params = req.get_param('sort')
+            drive_activity = ActivityDA().get_group_drive_activity(group_id, search_key, page_size, page_number, sort_params)
+            resp.body = json.dumps({
+                "data": drive_activity,
+                "success": True
+            }, default_parser=json.parser)
+        except Exception as e:
+            resp.body = json.dumps({
+                "description": "Something went wrong",
+                "success": False
+            }, default_parser=json.parser)
+
+class GroupActivityCalendarResource(object):
+   def on_get(self, req, resp, group_id=None):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            # groupMemberGroupSecurity_leader_id = session["member_id"]
+            member_id = session["member_id"]
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+
+        try:
+
+            search_key = req.get_param('search_key') or ''
+            page_size = req.get_param_as_int('page_size')
+            page_number = req.get_param_as_int('page_number')
+            sort_params = req.get_param('sort')
+            calendar_activity = ActivityDA().get_group_calendar_activity(group_id, search_key, page_size, page_number, sort_params)
+            resp.body = json.dumps({
+                "data": calendar_activity,
                 "success": True
             }, default_parser=json.parser)
         except Exception as e:
