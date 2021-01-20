@@ -920,6 +920,22 @@ class SessionDA(object):
 
         return {"activities": sessions, "count": count}
 
+    @classmethod
+    def update(cls, session_id, expiration_date, commit=True):
+        query = """
+            UPDATE member_session SET
+                expiration_date = %s
+            WHERE session_id = %s
+        """
+        params = (expiration_date, session_id,)
+        try:
+            cls.source.execute(query, params)
+
+            if commit:
+                cls.source.commit()
+        except Exception as err:
+            raise err
+
 def formatSortingParams(sort_by, entity_dict):
     columns_list = sort_by.split(',')
     new_columns_list = list()

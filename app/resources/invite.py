@@ -35,35 +35,25 @@ class MemberInviteResource(object):
                                    },
                            }
 
-    def on_put(self, req, resp):
-        (id, first_name, invite_key, email) = request.get_json_or_form("id", "first_name", "invite_key", "email",
-                                                                       req=req)
-        try:
-            InviteDA.change_invite(id)
-            register_domain = req.env.get('HTTP_ORIGIN', req.forwarded_host)
-            register_url = f"/registration/{invite_key}"
-            register_url = urljoin(register_domain, register_url)
-
-            sendmail.send_mail(
-                to_email=email,
-                subject="Welcome to AMERA Share",
-                template="welcome",
-                data={
-                    "first_name": first_name,
-                    "invite_key": invite_key,
-                    "register_url": register_url
-                })
-        except:
-            logger.exception('Change invite due to unable \
-                             to auth to email system')
-
     def on_delete(self, req, resp):
-        invite_key = request.get_json_or_form("invite_key", req=req)
+        (invite_key, ) = request.get_json_or_form("invite_key", req=req)
         try:
-            InviteDA.delete_invite(invite_key)
-        except:
-            logger.exception('Change invite due to unable \
-                                         to auth to email system')
+            invite = InviteDA.delete_invite(invite_key)
+            if not invite:
+                raise InviteNotFound(invite_key)
+            resp.body = json.dumps({
+                "success": True
+            })
+
+        except InviteDataMissingError:
+            raise InviteDataMissing({
+                'invite_key': invite_key
+            })
+        except Exception as err:
+            logger.exception('Unknown error')
+            logger.debug(err)
+
+            raise err
 
     def on_post(self, req, resp):
         logger.debug("Content-Type: {}".format(req.content_type))
@@ -92,39 +82,7 @@ class MemberInviteResource(object):
         try:
             invite_id = InviteDA.create_invite(**invite_params)
 
-            # This section here overrides the `access-control-allow-origin`
-            # to be dynamic, this means that if the requests come from any
-            # domains defined in web.domains, then we allow the origin
-            # TODO: Remove this logic
-            # request_domain is the domain being used by the original requester
-            # we use forwarded_host because these API calls will be proxied in by
-            # a load balancer like AWS ELB or NGINX, thus we need to know how
-            # this is being requested as:
-            #  (e.g. https://ameraiot.com/api/valid-session)
-            request_domain = req.env.get('HTTP_ORIGIN', req.forwarded_host)
-
-            logger.debug(f"REQUEST Forwarded Host: {request_domain}")
-            logger.debug(f"REQUEST Host: {req.host}")
-            logger.debug(f"REQUEST Access Route: {req.access_route}")
-            logger.debug(f"REQUEST Netloc: {req.netloc}")
-            logger.debug(f"REQUEST Port: {req.port}")
-            # logger.debug(f"ENV: {pformat(req.env)}")
-
-            domains = settings.get("web.domains")
-            logger.debug(f"REQUEST_DOMAIN: {request_domain}")
-            logger.debug(f"ALLOWED_DOMAINS: {pformat(domains)}")
-            domains = next((d for d in domains if d in request_domain), None)
-            logger.debug(f"DOMAINS FOUND: {domains}")
-            register_domain = request_domain
-            logger.debug(f"REGISTER DOMAIN: {register_domain}")
-
-            register_url = settings.get(
-                "web.member_invite_register_url"
-            ).format(invite_key)
-
-            register_url = urljoin(request.get_url_base(req), register_url)
-            register_url = "/registration/{}".format(invite_key)
-            register_url = urljoin(register_domain, register_url)
+            register_url = self._get_register_url(req, invite_key)
 
             self._send_email(
                 email=email,
@@ -150,6 +108,56 @@ class MemberInviteResource(object):
             raise InviteDataMissing(invite_params)
         except InviteInvalidInviterError:
             raise InviteInvalidInviter(inviter_member_id)
+
+    def on_put(self, req, resp):
+        (id, first_name,
+         invite_key, email) = request.get_json_or_form(
+             "id", "first_name", "invite_key", "email", req=req
+        )
+        expiration_date = datetime.now() + relativedelta(months=+1)
+        try:
+            invite = InviteDA.update_invite_expiration_date(
+                id, expiration_date
+            )
+
+            if not invite:
+                raise InviteNotFound(invite_key)
+
+            register_url = self._get_register_url(req, invite_key)
+
+            self._send_email(
+                email=email,
+                first_name=first_name,
+                invite_key=invite_key,
+                register_url=register_url
+            )
+
+            resp.body = json.dumps({
+                "success": True,
+                "data": invite,
+                "message": 'Invite sent successfully.'
+            }, default_parser=json.parser)
+        except sendmail.EmailAuthError:
+            logger.exception('Deleting invite due to unable \
+                             to auth to email system')
+            InviteDA.delete_invite(invite_key)
+            raise InviteEmailSystemFailure(invite_key)
+        except InviteDataMissingError:
+            raise InviteDataMissing({
+                'invite_key': invite_key,
+                'expiration_date': expiration_date
+            })
+        except Exception as err:
+            logger.exception('Unknown error')
+            logger.debug(err)
+
+            # logger.exception('Change invite due to unable \
+            #                  to auth to email system')
+            # resp.body = json.dumps({
+            #     "success": False,
+            #     "message": 'Something went wrong when sending email.'
+            # }, default_parser=json.parser)
+            raise err
 
     def on_get(self, req, resp, invite_key):
         if not invite_key:
@@ -180,6 +188,15 @@ class MemberInviteResource(object):
             raise InviteExpired(invite_key)
 
         resp.body = json.dumps(invite, default_parser=str)
+
+    def _get_register_url(self, req, invite_key):
+        request_domain = req.env.get('HTTP_ORIGIN', req.forwarded_host)
+        register_domain = request_domain
+        logger.debug(f"REGISTER DOMAIN: {register_domain}")
+
+        register_url = "/registration/{}".format(invite_key)
+        register_url = urljoin(register_domain, register_url)
+        return register_url
 
     def _send_email(self, invite_key, email, first_name, register_url):
 

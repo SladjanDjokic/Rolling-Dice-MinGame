@@ -19,18 +19,18 @@ services:
       - NET_ADMIN
     networks:
       - amera-net
-    depends_on:
-      - socat
+    # depends_on:
+    #   - socat
 
-  socat:
-    container_name: amera-dns-socat
-    image: alpine/socat
-    command: tcp-listen:80,fork,reuseaddr tcp-connect:host.docker.internal:9000
-    environment:
-      - VIRTUAL_HOST=dev.amera.local
-      - VIRTUAL_PORT=80
-    expose:
-      - 80
+  # socat:
+  #   container_name: amera-dns-socat
+  #   image: alpine/socat
+  #   command: tcp-listen:80,fork,reuseaddr tcp-connect:host.docker.internal:9000
+  #   environment:
+  #     - VIRTUAL_HOST=dev.amera.local
+  #     - VIRTUAL_PORT=80
+  #   expose:
+  #     - 80
 
   amera-nginx:
     container_name: amera-nginx
@@ -59,7 +59,7 @@ services:
           - amera-web-auth
           - amera-web-main
           - amera-web-notifications
-          - amera-demo-signaling
+          - amera-signaling
           - amera-eventserver
     volumes:
       - ../web:/app/main:ro

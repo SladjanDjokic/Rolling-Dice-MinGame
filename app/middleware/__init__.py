@@ -57,14 +57,14 @@ class CrossDomain(object):
         access_control_allow_headers = settings.get(
             "ACCESS_CONTROL_ALLOW_HEADERS")
 
-        logger.debug("ACCESS_CONTROL_ALLOW_ORIGIN: {}".format(
-            access_control_allow_origin))
-        logger.debug("ACCESS_CONTROL_ALLOW_METHODS: {}".format(
-            access_control_allow_methods))
-        logger.debug("ACCESS_CONTROL_ALLOW_CREDENTIALS: {}".format(
-            access_control_allow_credentials))
-        logger.debug("ACCESS_CONTROL_ALLOW_HEADERS: {}".format(
-            access_control_allow_headers))
+        # logger.debug("ACCESS_CONTROL_ALLOW_ORIGIN: {}".format(
+        #     access_control_allow_origin))
+        # logger.debug("ACCESS_CONTROL_ALLOW_METHODS: {}".format(
+        #     access_control_allow_methods))
+        # logger.debug("ACCESS_CONTROL_ALLOW_CREDENTIALS: {}".format(
+        #     access_control_allow_credentials))
+        # logger.debug("ACCESS_CONTROL_ALLOW_HEADERS: {}".format(
+        #     access_control_allow_headers))
 
         # This section here overrides the `access-control-allow-origin`
         # to be dynamic, this means that if the requests come from any
@@ -83,26 +83,26 @@ class CrossDomain(object):
         # to the application
         default_domain = settings.get('web.domain')
 
-        logger.debug("SETTINGS Domain: {}".format(default_domain))
-        logger.debug("REQUEST Forwarded Host: {}".format(request_domain))
-        logger.debug("REQUEST Host: {}".format(req.host))
-        logger.debug("REQUEST Access Route: {}".format(req.access_route))
-        logger.debug("REQUEST Netloc: {}".format(req.netloc))
-        logger.debug("REQUEST Port: {}".format(req.port))
-        logger.debug("ENV: {}".format(pformat(req.env)))
+        # logger.debug("SETTINGS Domain: {}".format(default_domain))
+        # logger.debug("REQUEST Forwarded Host: {}".format(request_domain))
+        # logger.debug("REQUEST Host: {}".format(req.host))
+        # logger.debug("REQUEST Access Route: {}".format(req.access_route))
+        # logger.debug("REQUEST Netloc: {}".format(req.netloc))
+        # logger.debug("REQUEST Port: {}".format(req.port))
+        # logger.debug("ENV: {}".format(pformat(req.env)))
 
         if access_control_allow_origin == "auto":
             domains = settings.get("web.domains")
-            logger.debug("REQUEST_DOMAIN: {}".format(request_domain))
-            logger.debug("ALLOWED_DOMAINS: {}".format(pformat(domains)))
+            # logger.debug("REQUEST_DOMAIN: {}".format(request_domain))
+            # logger.debug("ALLOWED_DOMAINS: {}".format(pformat(domains)))
             domains = [d for d in domains if d in request_domain]
-            logger.debug("DOMAINS FOUND: {}".format(domains))
+            # logger.debug("DOMAINS FOUND: {}".format(domains))
             if len(domains) == 0:
                 access_control_allow_origin = default_domain
             else:
                 access_control_allow_origin = request_domain
-            logger.debug("OVERRIDE_ACCESS_CONTROL_ALLOW_ORIGIN: {}".format(
-                access_control_allow_origin))
+            # logger.debug("OVERRIDE_ACCESS_CONTROL_ALLOW_ORIGIN: {}".format(
+            #     access_control_allow_origin))
 
         resp.set_header("Access-Control-Allow-Origin",
                         access_control_allow_origin)

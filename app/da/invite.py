@@ -140,27 +140,60 @@ class InviteDA(object):
             raise InviteInvalidInviterError from err
 
     @classmethod
-    def delete_invite(cls, invite_key, commit=True):
+    def update_invite_expiration_date(cls, id, expiration_date, commit=True):
         query = ("""
-        DELETE FROM invite WHERE invite_key = %s
+            UPDATE invite
+            SET
+                update_date = CURRENT_TIMESTAMP,
+                expiration = %s
+            WHERE id = %s AND registered_member_id IS NULL
+            RETURNING update_date, expiration
         """)
+        params = (expiration_date, id,)
+        try:
+            cls.source.execute(query, params)
+            if commit:
+                cls.source.commit()
 
-        params = (invite_key)
-        res = cls.source.execute(query, params)
-        if commit:
-            cls.source.commit()
+            update_date = datetime.now()
 
-        return res
+            if cls.source.has_results():
+                (update_date, expiration_date) = cls.source.cursor.fetchone()
+            else:
+                return None
+
+            return {
+                "id": id,
+                "update_date": update_date,
+                "expiration_date": expiration_date
+            }
+        except DataMissingError as err:
+            raise InviteDataMissingError from err
 
     @classmethod
-    def change_invite(cls, id):
-        query = (f""" 
-        UPDATE invite SET expiration = '{datetime.now() + relativedelta(months=+1)}' 
-        WHERE invite.id = %s;
+    def delete_invite(cls, invite_key, commit=True):
+        query = ("""
+            DELETE FROM invite WHERE invite_key = %s
+                RETURNING id, email, invite_key
         """)
-        params = (id)
-        cls.source.execute(query, params)
-        cls.source.commit()
+
+        params = (invite_key,)
+        try:
+            cls.source.execute(query, params)
+            if commit:
+                cls.source.commit()
+
+            if cls.source.has_results():
+                (id, email, expiration_date) = cls.source.cursor.fetchone()
+            else:
+                return None
+            return {
+                'id': id,
+                'email': email,
+                'expiration_date': expiration_date,
+            }
+        except DataMissingError as err:
+            raise InviteDataMissingError from err
 
     @classmethod
     def get_invites(cls, search_key, page_size=None, page_number=None, sort_params='', get_all=False, member_id=None):
@@ -193,7 +226,7 @@ class InviteDA(object):
                 sort_params, invite_dict) or sort_columns_string
 
         query = (f"""
-        SELECT 
+        SELECT
             invite.id,
             invite.invite_key,
             invite.email,
@@ -219,7 +252,7 @@ class InviteDA(object):
             LEFT OUTER JOIN member_group on invite.group_id = member_group.id
             LEFT OUTER JOIN member AS registered_member on invite.registered_member_id = registered_member.id
             LEFT OUTER JOIN member_location on member_location.member_id = registered_member.id AND member_location.location_type = 'home'
-        WHERE 
+        WHERE
             {f'inviter_member_id = {member_id} AND' if not get_all else ''}
             ( invite.email LIKE %s
             OR invite.first_name LIKE %s
@@ -237,7 +270,7 @@ class InviteDA(object):
         FROM invite
         LEFT JOIN member on invite.inviter_member_id = member.id
         LEFT OUTER JOIN member_group on invite.group_id = member_group.id
-        WHERE 
+        WHERE
             {f'inviter_member_id = {member_id} AND' if not get_all else ''}
             ( invite.email LIKE %s
             OR invite.first_name LIKE %s

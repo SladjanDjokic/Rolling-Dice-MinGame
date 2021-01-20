@@ -4,6 +4,9 @@ from app import settings
 from app.util.session import get_session_cookie, validate_session
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 from app.da.group import GroupMembershipDA, GroupDA
+from app.da.session import SessionDA
+from datetime import datetime, timedelta, timezone
+from app.util.session import set_session_cookie
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +51,33 @@ class ValidateSessionResource(object):
 
             resp.set_header('X-Auth-Session', session_id)
             resp.body = json.dumps(session, default_parser=json.parser)
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+
+    def on_put(self, req, resp):
+
+        logger.debug('Request Cookies: {}'.format(req.cookies))
+
+        session_id = get_session_cookie(req)
+
+        logger.debug('Session ID: {}'.format(session_id))
+
+        try:
+            session = validate_session(session_id)
+            room = req.get_param('room')
+            self.__validate_session(session, room)
+            expiration_seconds = settings.get("web.session_expiration")
+            expiration_date = datetime.now(timezone.utc) + timedelta(
+                seconds=int(expiration_seconds)
+            )
+
+            SessionDA.update(session_id, expiration_date)
+            session = validate_session(session_id)
+
+            set_session_cookie(req, resp, session_id, expiration_date)
+            resp.set_header('X-Auth-Session', session_id)
+            resp.body = json.dumps(session, default_parser=json.parser)
+
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
 

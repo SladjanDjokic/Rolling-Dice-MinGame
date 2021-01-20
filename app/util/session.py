@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def set_session_cookie(req, resp, session_id, expiration_datetime=None):
-    expiration_seconds = settings.get("web.session_expiratioN")
+    expiration_seconds = settings.get("web.session_expiration")
     if not expiration_datetime:
         expiration_datetime = datetime.now() + timedelta(seconds=expiration_seconds)  # noqa: E501
 

@@ -68,7 +68,7 @@ class MemberLoginResource(object):
 
         expiration_seconds = settings.get("web.session_expiration")
         expiration_datetime = datetime.now(timezone.utc) + timedelta(
-            seconds=expiration_seconds
+            seconds=int(expiration_seconds)
         )
 
         (client_ip, gateway_ip, original_url, query_string,
