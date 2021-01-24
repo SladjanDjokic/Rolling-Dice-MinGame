@@ -250,7 +250,7 @@ class SessionDA(object):
         LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
         LEFT OUTER JOIN member_profile ON member_session.member_id = member_profile.member_id
         LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
-        WHERE member_session.session_id = %s AND member_session.expiration_date >= current_timestamp AND member_session.status = 'online'
+        WHERE member_session.session_id = %s AND member_session.expiration_date >= current_timestamp AND member_session.status IN ('online', 'disconnected')
         """)
 
         params = (session_id,)
@@ -384,7 +384,7 @@ class SessionDA(object):
         LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
         LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id
         LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
-        WHERE member_session.session_id = %s AND member_session.expiration_date >= current_timestamp AND member_session.status = 'online'
+        WHERE member_session.session_id = %s AND member_session.expiration_date >= current_timestamp AND member_session.status IN ('online', 'disconnected')
         GROUP BY
             member_session.session_id,
             member_session.member_id,
@@ -587,7 +587,7 @@ class SessionDA(object):
     @classmethod
     def delete_session(cls, session_id):
         query = ("""
-        UPDATE member_session SET status = 'disconnected' WHERE session_id = %s
+        UPDATE member_session SET status = 'inactive' WHERE session_id = %s
         """)
 
         params = (session_id,)

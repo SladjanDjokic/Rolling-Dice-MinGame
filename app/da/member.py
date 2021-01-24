@@ -884,7 +884,7 @@ class MemberContactDA(object):
                 CASE
                     WHEN member_session.status IS NOT NULL
                     THEN member_session.status
-                    ELSE 'disconnected'
+                    ELSE 'inactive'
                 END as online_status
             FROM contact
                 LEFT JOIN member ON member.id = contact.contact_member_id
@@ -899,7 +899,7 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
                 LEFT OUTER JOIN member_session ON
                     contact.contact_member_id = member_session.member_id AND
-                    member_session.status = 'online' AND
+                    member_session.status IN ('online', 'disconnected') AND
                     member_session.expiration_date >= current_timestamp
             WHERE
                 contact.member_id = %s {filter_conditions_query}
