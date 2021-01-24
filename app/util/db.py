@@ -10,6 +10,7 @@ from app.exceptions.data import DataMissingError, DuplicateKeyError, \
     RelationshipReferenceError
 
 logger = logging.getLogger(__name__)
+ds_logger = logging.getLogger(__name__ + '.DataSource')
 
 
 class DataSource (object):
@@ -25,20 +26,22 @@ class DataSource (object):
             self.conn = None
 
         def connect(self):
-            logging_level = settings.get("db.log_level")
+            logging_level = settings.get("database.log_level")
+            logger.debug(f"Database Logging Level: {logging_level}")
             if not logging_level:
                 logging_level = settings.get("log_level")
+                logger.debug(f"NO Database Logging Level - Using default: {logging_level}")
 
-            logger.setLevel(logging_level)
+            ds_logger.setLevel(logging_level)
 
             try:
-                logger.debug("DB.py Connection: {} ".format(
+                ds_logger.debug("DB.py Connection: {} ".format(
                     pformat(DataSource.get_connection_config())))
                 conn = connector.connect(
                     connection_factory=LoggingConnection,
                     **DataSource.get_connection_config()
                 )
-                conn.initialize(logger)
+                conn.initialize(ds_logger)
             except connector.Error as err:
                 if err.pgcode == errorcodes.INVALID_AUTHORIZATION_SPECIFICATION:  # noqa: E501
                     print("Something is wrong with your user name or password")
@@ -65,16 +68,17 @@ class DataSource (object):
 
         def get_last_row_id(self):
             result = self.cursor.fetchone()
-            logger.debug(f"QUERY RESULT: {result}")
+            ds_logger.debug(f"QUERY RESULT: {result}")
             return result[0]
 
-        def execute(self, query, params, bulk_insert=False):
+        def execute(self, query, params, bulk_insert=False, debug_query=True):
             try:
                 if not self.cursor:
                     self.connect()
-                logger.debug(f"BULK_INSERT: {bulk_insert}")
-                logger.debug(f"EXECUTE_QUERY: {query}")
-                logger.debug(f"EXECUTE_PARAMS: {params}")
+                if debug_query:
+                    logger.debug(f"BULK_INSERT: {bulk_insert}")
+                    logger.debug(f"EXECUTE_QUERY: {query}")
+                    logger.debug(f"EXECUTE_PARAMS: {params}")
                 if bulk_insert:
                     return extras.execute_values(self.cursor, query, params)
                 else:

@@ -838,7 +838,9 @@ class MemberContactDA(object):
             'role': 'role.name',
             'role_id': 'role.id',
             'create_date': 'contact.create_date',
-            'update_date': 'contact.update_date'
+            'update_date': 'contact.update_date',
+            'status': 'contact.status',
+            'online_status': 'member_session.status'
         }
 
         if sort_params:
@@ -878,7 +880,12 @@ class MemberContactDA(object):
                 COALESCE(json_agg(DISTINCT member_achievement.*) FILTER (WHERE member_achievement.id IS NOT NULL), '[]') AS achievement_information,
                 file_storage_engine.storage_engine_id as s3_avatar_url,
                 contact.security_exchange_option,
-                contact.status
+                contact.status,
+                CASE
+                    WHEN member_session.status IS NOT NULL
+                    THEN member_session.status
+                    ELSE 'disconnected'
+                END as online_status
             FROM contact
                 LEFT JOIN member ON member.id = contact.contact_member_id
                 LEFT OUTER JOIN role ON contact.role_id = role.id
@@ -890,9 +897,13 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN member_profile ON contact.contact_member_id = member_profile.member_id
                 LEFT OUTER JOIN member_achievement ON member_achievement.member_id = member.id
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+                LEFT OUTER JOIN member_session ON
+                    contact.contact_member_id = member_session.member_id AND
+                    member_session.status = 'online' AND
+                    member_session.expiration_date >= current_timestamp
             WHERE
                 contact.member_id = %s {filter_conditions_query}
-                AND 
+                AND
                 (
                     concat(contact.first_name, member.middle_name, contact.last_name) ILIKE %s
                     OR contact.email ILIKE %s
@@ -934,7 +945,9 @@ class MemberContactDA(object):
                 role.id,
                 contact.create_date,
                 contact.update_date,
-                file_storage_engine.storage_engine_id
+                file_storage_engine.storage_engine_id,
+                contact.status,
+                member_session.status
             ORDER BY {sort_columns_string}
             """)
 
@@ -942,9 +955,9 @@ class MemberContactDA(object):
         get_contacts_params = get_contacts_params + tuple(16 * [like_search_key])
 
         countQuery = (f"""
-            SELECT COUNT(*) 
+            SELECT COUNT(*)
                 FROM
-                    ( 
+                    (
                         {get_contacts_query}
                     ) src;
             """)
@@ -960,7 +973,7 @@ class MemberContactDA(object):
             if page_number > 0:
                 offset = page_number * page_size
             get_contacts_params = get_contacts_params + (page_size, offset)
-        
+
         cls.source.execute(get_contacts_query, get_contacts_params)
         if cls.source.has_results():
             for (
@@ -992,7 +1005,8 @@ class MemberContactDA(object):
                     achievement_information,
                     s3_avatar_url,
                     security_exchange_option,
-                    status
+                    status,
+                    online_status
             ) in cls.source.cursor:
                 contact = {
                     "id": id,
@@ -1025,7 +1039,8 @@ class MemberContactDA(object):
                     "amera_avatar_url": amerize_url(s3_avatar_url),
                     "security_exchange_option":
                         SECURITY_EXCHANGE_OPTIONS.get(security_exchange_option, 0),
-                    "status": status
+                    "status": status,
+                    "online_status": online_status
                     # "city": city,
                     # "state": state,
                     # "province": province,

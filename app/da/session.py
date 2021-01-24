@@ -448,7 +448,7 @@ class SessionDA(object):
         """)
 
         params = (session_id,)
-        cls.source.execute(query, params)
+        cls.source.execute(query, params, debug_query=False)
         if cls.source.has_results():
             (
                 session_id,

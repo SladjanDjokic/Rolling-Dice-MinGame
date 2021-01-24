@@ -35,7 +35,7 @@ class ActivityDA(object):
                     url
                 )
         try:
-            cls.source.execute(insert_activity_q, params)
+            cls.source.execute(insert_activity_q, params, debug_query=False)
             if commit:
                 cls.source.commit()
 
