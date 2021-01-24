@@ -472,7 +472,7 @@ class MemberEventInvitations(object):
 
         resp.body = json.dumps({
             "data": event_invitations,
-            "message": "Upcoming Events",
+            "message": "Invitations",
             "status": "success",
             "success": True
         }, default_parser=json.parser)

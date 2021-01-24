@@ -566,7 +566,7 @@ class MemberEventDA(object):
                                     FROM event_media
                                     LEFT JOIN member_file ON member_file.id = member_file_id
                                     LEFT JOIN file_storage_engine ON file_storage_engine.id = member_file.file_id
-                                    WHERE event_media.event_id = event_2.id
+                                    WHERE event_media.event_id = events.id
                                 ) as files
                             ),
                             (
@@ -579,14 +579,21 @@ class MemberEventDA(object):
                                         create_date,
                                         update_date
                                     FROM event_invite_2
-                                    WHERE event_invite_2.event_id = event_2.id
+                                    WHERE event_invite_2.event_id = events.id
                                 ) AS invitees
                             )
-                        FROM event_2
-                        WHERE {} host_member_id = %s AND event_status != 'Cancel'
+                        FROM (
+                            SELECT event_2.*, event_2.host_member_id AS viewer_member_id
+                            FROM event_2 WHERE event_2.host_member_id = %s
+                            UNION
+                            SELECT event_2.*, event_invite_2.invite_member_id AS viewer_member_id
+                            FROM event_2
+                            INNER JOIN event_invite_2 ON event_2.id=event_invite_2.event_id
+                            WHERE event_invite_2.invite_member_id = %s and event_2.event_status='Active' and event_invite_2.invite_status='Accepted'
+                        ) as events
                     ) AS sequence
         """.format(query_date))
-        params = (event_host_member_id,)
+        params = (event_host_member_id, event_host_member_id)
         cls.source.execute(query, params)
         if cls.source.has_results():
             return cls.source.cursor.fetchone()
@@ -645,69 +652,149 @@ class MemberEventDA(object):
     @classmethod
     def get_upcoming_events(cls, member_id, current, limit):
         query = ("""
-            SELECT
-                events.id as id,
-                events.event_name,
-                events.event_description,
-                events.start_datetime,
-                member.first_name as first_name,
-                member.last_name as last_name,
-                file_storage_engine.storage_engine_id,
-                role.name
-            FROM (
-                SELECT event_2.*, event_2.host_member_id AS viewer_member_id
-                FROM event_2 WHERE event_2.host_member_id = %s
-                UNION
-                SELECT event_2.*, event_invite_2.invite_member_id AS viewer_member_id
-                FROM event_2
-                INNER JOIN event_invite_2 ON event_2.id=event_invite_2.event_id
-                WHERE event_invite_2.invite_member_id = %s and event_2.event_status='Active' and event_invite_2.invite_status='Accepted'
-            ) as events
-            LEFT JOIN member ON member.id = events.host_member_id
-            LEFT JOIN member_profile ON member.id = member_profile.member_id
-            LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
-            LEFT OUTER JOIN contact ON
-                (   events.host_member_id = contact.contact_member_id
-                AND contact.member_id = viewer_member_id)
-            LEFT OUTER JOIN role ON (contact.role_id = role.id)
-            WHERE events.start_datetime >= %s and events.event_status='Active'
-            ORDER BY events.start_datetime
-            Limit %s
+            SELECT json_agg(sequence) as data
+                    FROM (
+                        SELECT
+                            events.id as event_id,
+                            sequence_id,
+                            group_id,
+                            event_color_id,
+                            event_name,
+                            event_type,
+                            event_description,
+                            host_member_id,
+                            is_full_day,
+                            event_status,
+                            event_tz,
+                            start_datetime as start,
+                            end_datetime as end,
+                            event_recurrence_freq,
+                            end_condition,
+                            repeat_times,
+                            repeat_weekdays,
+                            end_date_datetime,
+                            location_mode,
+                            location_id,
+                            location_address,
+                            member.first_name as first_name,
+                            member.last_name as last_name,
+                            file_storage_engine.storage_engine_id as amera_avatar_url,
+                            role.name as role,
+                            (
+                                SELECT json_agg(files) as attachments
+                                FROM (
+                                    SELECT
+                                        event_media.id as attachment_id,
+                                        member_file_id,
+                                        file_id,
+                                        member_file.file_name as file_name,
+                                        member_file.file_size_bytes as file_size_bytes,
+                                        file_path(file_storage_engine.storage_engine_id, '/member/file') as file_url
+                                    FROM event_media
+                                    LEFT JOIN member_file ON member_file.id = member_file_id
+                                    LEFT JOIN file_storage_engine ON file_storage_engine.id = member_file.file_id
+                                    WHERE event_media.event_id = events.id
+                                ) as files
+                            ),
+                            (
+                                SELECT json_agg(invitees) as invitations
+                                FROM (
+                                    SELECT
+                                        id as invite_id,
+                                        invite_member_id,
+                                        invite_status,
+                                        create_date,
+                                        update_date
+                                    FROM event_invite_2
+                                    WHERE event_invite_2.event_id = events.id
+                                ) AS invitees
+                            )
+                        FROM (
+                            SELECT event_2.*, event_2.host_member_id AS viewer_member_id
+                            FROM event_2 WHERE event_2.host_member_id = %s
+                            UNION
+                            SELECT event_2.*, event_invite_2.invite_member_id AS viewer_member_id
+                            FROM event_2
+                            INNER JOIN event_invite_2 ON event_2.id=event_invite_2.event_id
+                            WHERE event_invite_2.invite_member_id = %s and event_2.event_status='Active' and event_invite_2.invite_status='Accepted'
+                        ) as events
+                        LEFT JOIN member ON member.id = events.host_member_id
+                        LEFT JOIN member_profile ON member.id = member_profile.member_id
+                        LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+                        LEFT OUTER JOIN contact ON
+                            (   events.host_member_id = contact.contact_member_id
+                            AND events.viewer_member_id = contact.member_id)
+                        LEFT OUTER JOIN role ON (contact.role_id = role.id)
+                        WHERE events.start_datetime >= %s and events.event_status='Active'
+                    ORDER BY events.start_datetime
+                    Limit %s
+                ) AS sequence
         """)
         params = (member_id, member_id, current, limit)
         cls.source.execute(query, params)
         if cls.source.has_results():
-            entry = list()
-            for (row) in cls.source.cursor:
-                upcoming_events = {
-                    "id": row[0],
-                    "name": row[1],
-                    "message": row[2],
-                    "create_date": row[3],
-                    "first_name": row[4],
-                    "last_name": row[5],
-                    "amera_avatar_url": amerize_url(row[6]),
-                    "role": row[7],
-                    "type": "event-upcoming",
-                }
-                entry.append(upcoming_events)
-            return entry
-        return None
+            (data,) = cls.source.cursor.fetchone()
+
+            if data:
+                for row in data:
+                    row['amera_avatar_url'] = amerize_url(row['amera_avatar_url'])
+            return data
+        else:
+            return None
 
     @classmethod
     def get_event_invitations(cls, member_id):
         query = ("""
-            SELECT
-                event_invite_2.id as id,
-                event_2.event_name,
-                event_2.event_description,
-                event_2.start_datetime,
-                member.first_name as first_name,
-                member.last_name as last_name,
-                file_storage_engine.storage_engine_id,
-                role.name
-            FROM event_invite_2
-            LEFT JOIN event_2 ON event_invite_2.event_id = event_2.id
+            SELECT json_agg(SEQUENCE) AS data
+            FROM
+            (SELECT event_2.id AS event_id,
+                    sequence_id,
+                    group_id,
+                    event_color_id,
+                    event_name,
+                    event_type,
+                    event_description,
+                    host_member_id,
+                    is_full_day,
+                    event_status,
+                    event_tz,
+                    start_datetime AS START, 
+                    end_datetime AS END,
+                    event_recurrence_freq,
+                    end_condition,
+                    repeat_times,
+                    repeat_weekdays,
+                    end_date_datetime,
+                    location_mode,
+                    location_id,
+                    location_address,
+                    member.first_name as first_name,
+                    member.last_name as last_name,
+                    file_storage_engine.storage_engine_id as amera_avatar_url,
+                    role.name as role,
+                (SELECT json_agg(files) AS attachments
+                FROM
+                    (SELECT event_media.id AS attachment_id,
+                            member_file_id,
+                            file_id,
+                            member_file.file_name AS file_name,
+                            member_file.file_size_bytes AS file_size_bytes,
+                            file_path(file_storage_engine.storage_engine_id, '/member/file') AS file_url
+                    FROM event_media
+                    LEFT JOIN member_file ON member_file.id = member_file_id
+                    LEFT JOIN file_storage_engine ON file_storage_engine.id = member_file.file_id
+                    WHERE event_media.event_id = event_2.id ) AS files),
+                (SELECT json_agg(invitees) AS invitations
+                FROM
+                    (SELECT id AS invite_id,
+                            invite_member_id,
+                            invite_status,
+                            create_date,
+                            update_date
+                    FROM event_invite_2
+                    WHERE event_invite_2.event_id = event_2.id ) AS invitees)
+            FROM event_2
+            LEFT JOIN event_invite_2 ON event_invite_2.event_id = event_2.id
             LEFT JOIN member ON member.id = event_2.host_member_id
             LEFT JOIN member_profile ON member.id = member_profile.member_id
             LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
@@ -715,28 +802,22 @@ class MemberEventDA(object):
                 (   event_2.host_member_id = contact.contact_member_id
                 AND event_invite_2.invite_member_id = contact.member_id)
             LEFT OUTER JOIN role ON (contact.role_id = role.id)
-            WHERE event_invite_2.invite_member_id = %s and event_2.event_status='Active' and event_invite_2.invite_status='Tentative'
+            WHERE event_invite_2.invite_member_id = %s
+                AND event_2.event_status='Active'
+                AND event_invite_2.invite_status='Tentative'
             ORDER BY event_2.start_datetime
+            ) AS SEQUENCE
         """)
         params = (member_id,)
         cls.source.execute(query, params)
         if cls.source.has_results():
-            entry = list()
-            for (row) in cls.source.cursor:
-                upcoming_events = {
-                    "id": row[0],
-                    "name": row[1],
-                    "description": row[2],
-                    "create_date": row[3],
-                    "first_name": row[4],
-                    "last_name": row[5],
-                    "amera_avatar_url": amerize_url(row[6]),
-                    "role": row[7],
-                    "type": "event-invite",
-                }
-                entry.append(upcoming_events)
-            return entry
-        return None
+            (data,) = cls.source.cursor.fetchone()
+            if data:
+                for row in data:
+                    row['amera_avatar_url'] = amerize_url(row['amera_avatar_url'])
+            return data
+        else:
+            return None
 
     @classmethod
     def set_event_invitate_status(cls, member_id, event_invite_id, status):
