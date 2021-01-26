@@ -167,5 +167,7 @@ delete_contact = 'delete_contact'
 delete_event_attachment = 'delete_event_attachment'
 delete_event = 'delete_event'
 delete_mail = 'delete_mail'
+admin_member_disable_session = 'admin_member_disable_session'
+admin_member_disable = 'admin_member_disable'
 
 

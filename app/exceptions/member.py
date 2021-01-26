@@ -31,7 +31,16 @@ class MemberNotFound(falcon.HTTPNotFound):
         self._member = member
 
 
+# HTTP Response Error to throw when a user is disabled/deactivated
+class MemberDisabled(falcon.HTTPForbidden):
+    def __init__(self):
+        title = "403 Forbidden",
+        description = "Your account is disabled"
+        super().__init__(title=title, description=description)
+
 # HTTP Response Error to throw when an invite is duplicate
+
+
 class MemberExists(falcon.HTTPConflict):
 
     def __init__(self, email):

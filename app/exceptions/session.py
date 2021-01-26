@@ -18,12 +18,37 @@ class InvalidSessionError (Exception):
 # ------------
 # HTTP Errors
 # ------------
+# HTTP Response Error to throw when credentials supplied are invalid
+class InvalidLogin(falcon.HTTPBadRequest):
+    def __init__(self):
+        title = "Invalid sign in attempt"
+        description = "There was a problem processing your sign in information"
+        super().__init__(title=title, description=description)
+
+
+# HTTP Response Error to throw when credentials supplied are invalid
+class InvalidSession(falcon.HTTPBadRequest):
+    def __init__(self):
+        title = "Referenced session is invalid"
+        description = "There was a problem processing your request with the given session"
+        super().__init__(title=title, description=description)
+
+
+# HTTP Response Error to throw when a user is not found
+class UnauthorizedLogin(falcon.HTTPUnauthorized):
+    def __init__(self):
+        title = "Sign in is invalid"
+        description = "There was a problem validating your sign in credentials"
+        super().__init__(title=title, description=description)
+
+
 # HTTP Response Error to throw when a user is not found
 class UnauthorizedSession(falcon.HTTPUnauthorized):
     def __init__(self):
         title = "Session is invalid"
-        description = "This is no longer a valid session"
+        description = "Your session is no longer valid. Please sign in again"
         super().__init__(title=title, description=description)
+
 
 # ------------
 # HTTP Errors

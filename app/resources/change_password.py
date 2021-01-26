@@ -7,7 +7,7 @@ from app import settings
 from app.util.session import get_session_cookie, validate_session
 from app.da.member import MemberDA
 from app.da.session import SessionDA
-from app.exceptions.member import MemberNotFound, PasswordsConflict
+from app.exceptions.member import MemberNotFound, MemberDisabled, PasswordsConflict
 from app.exceptions.session import SessionExistsError
 
 logger = logging.getLogger(__name__)
@@ -42,6 +42,9 @@ class MemberChangePasswordResource(object):
         member = SessionDA.auth(username, current_password)
         if not member:
             raise MemberNotFound(member)
+        
+        if member['status'] == 'disabled':
+            raise MemberDisabled()
         
         member_id = member['id']
         MemberDA.update_member_password(member_id, new_password)

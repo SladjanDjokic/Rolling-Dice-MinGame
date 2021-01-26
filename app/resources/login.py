@@ -18,7 +18,8 @@ from app.util.session import set_session_cookie
 from app.da.session import SessionDA
 from app.da.member import MemberDA
 from app.da.file_sharing import FileTreeDA
-from app.exceptions.session import SessionExistsError
+from app.exceptions.session import InvalidLogin, SessionExistsError, UnauthorizedLogin
+from app.exceptions.member import MemberDisabled
 
 logger = logging.getLogger(__name__)
 
@@ -44,16 +45,16 @@ class MemberLoginResource(object):
             "username", "password", req=req)
 
         if not username or not password:
-            raise falcon.HTTPError("400",
-                                   title="Invalid Login",
-                                   description="No Login Data Sent")
+            raise InvalidLogin()
 
         member = SessionDA.auth(username, password)
         # TODO Do ip query and save to the database.
 
         if not member:
-            raise falcon.HTTPUnauthorized(title="Invalid Login",
-                                          description="Invalid credentials")
+            raise UnauthorizedLogin()
+
+        if member['status'] == 'disabled':
+            raise MemberDisabled()
 
         main_file_tree = member["main_file_tree"]
         bin_file_tree = member["bin_file_tree"]

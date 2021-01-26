@@ -11,7 +11,8 @@ from app.middleware import CrossDomain, KafkaProducerMiddleware  # , JSONTransla
 from app.resources.member import MemberRegisterResource, MemberResource, MemberSearchResource, \
     MemberGroupSearchResource, MemberContactResource, MemberContactAccept, ContactMembersResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms, MemberDepartments, MemberContactsRoles, \
-    MemberContactsCompanies, MemberContactsCountries, MemberTimezones, MemberInfoByIdResource, MemberContactSecurity
+    MemberContactsCompanies, MemberContactsCountries, MemberTimezones, MemberInfoByIdResource, \
+    MemberContactSecurity
 from app.resources.verification import Verification
 from app.resources.verifycell import VerifyCell
 from app.resources.promo_codes import PromoCodes
@@ -52,6 +53,8 @@ from app.resources.activity import ActivitiesResource
 from app.resources.notifications_setting import MemberNotificationsSetting
 # from app.resources.memberfile import
 # from app.resources.keygen import KeyGenResource, KeyGenFileUpload
+
+from app.resources.admin import AdminMemberResource
 
 from app.da.__init__ import check_trees
 
@@ -129,9 +132,9 @@ def _setup_routes(app):
     app.add_route("/member/info/{member_id}", MemberInfoByIdResource())
     app.add_route("/member/info", MemberInfoResource())
     app.add_route("/member/invite/{invite_key:uuid}", MemberInviteResource())
-    app.add_route("/valid-invite/{invite_key:uuid}", ValidInviteResource())
     app.add_route("/member/register/{invite_key:uuid}", MemberRegisterResource())  # noqa: E501
     app.add_route("/member/register", MemberRegisterResource())  # noqa: E501
+    app.add_route("/valid-invite/{invite_key:uuid}", ValidInviteResource())
     # get the job titles list
     app.add_route("/member/register/job-title", MemberJobTitles())
     app.add_route("/member/register/departments", MemberDepartments())
@@ -290,3 +293,11 @@ def _setup_routes(app):
     # Event Invitation Accept/Decline
     app.add_route("/member/event/invite/response", MemberEventInvitateStatus())
     app.add_route("/notify", IncomingCallView())
+
+    # Admin Resources
+
+    admin_resource = AdminMemberResource()
+    app.add_route("/admin/member/{member_id:int}/session/{session_id:uuid}",
+                  admin_resource, suffix="session")
+    app.add_route("/admin/member/{member_id:int}",
+                  admin_resource, suffix="member")

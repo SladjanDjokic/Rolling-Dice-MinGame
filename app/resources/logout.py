@@ -1,10 +1,11 @@
+from app.util.auth import inject_member
 import uuid
 import falcon
 import app.util.json as json
 import app.util.request as request
 from app import settings
 from app.da.session import SessionDA
-from app.exceptions.session import SessionExistsError
+from app.exceptions.session import ForbiddenSession, SessionExistsError
 
 
 class MemberLogoutResource(object):
@@ -19,20 +20,26 @@ class MemberLogoutResource(object):
         'exempt_methods': ['POST']
     }
 
-    def on_post(self, req, resp):
+    @inject_member
+    def on_post(self, req, resp, member):
 
-        (username, session_id) = request.get_json_or_form(
-            "username", "session_id", req=req)
+        (member_id, session_id) = request.get_json_or_form(
+            "member_id", "session_id", req=req)
 
-        if not username or not session_id:
-            raise falcon.HTTPError("400",
-                                   title="Unauthorized Actions",
-                                   description="You are not allowed to logout this session!")
+        if not member_id or not session_id:
+            raise ForbiddenSession()
+
+        if member_id != member['member_id']:
+            raise ForbiddenSession()
+
+        if session_id != req.context.auth['session']['session_id']:
+            raise ForbiddenSession()
 
         while True:
             try:
-                SessionDA.delete_session(
-                    session_id
+                SessionDA.disable_session(
+                    session_id,
+                    member['member_id']
                 )
                 break
             except SessionExistsError:

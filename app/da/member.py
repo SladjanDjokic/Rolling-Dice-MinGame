@@ -629,7 +629,8 @@ class MemberDA(object):
     def update_member_password(cls, member_id, password, commit=True):
         query = ("""
         UPDATE member SET
-            password = crypt(%s, gen_salt('bf'))
+            password = crypt(%s, gen_salt('bf')),
+            update_date = CURRENT_TIMESTAMP
         WHERE id = %s
         """)
         params = (
@@ -640,6 +641,31 @@ class MemberDA(object):
 
             if commit:
                 cls.source.commit()
+        except DataMissingError as err:
+            raise DataMissingError from err
+
+    @classmethod
+    def update_member_status(cls, member_id, status, commit=True):
+        try:
+            query = ("""
+                UPDATE member SET
+                    status = %s,
+                    update_date = CURRENT_TIMESTAMP
+                WHERE id = %s
+                RETURNING id
+            """)
+            params = (
+                status, member_id
+            )
+            cls.source.execute(query, params)
+            if commit:
+                cls.source.commit()
+
+            if cls.source.has_results():
+                (id, ) = cls.source.cursor.fetchone()
+                return id
+            return None
+
         except DataMissingError as err:
             raise DataMissingError from err
 
@@ -744,12 +770,14 @@ class MemberDA(object):
         '''
         main_query = ("""
             UPDATE member
-            SET main_file_tree = %s
+            SET main_file_tree = %s,
+                update_date = CURRENT_TIMESTAMP
             WHERE id = %s
         """)
         bin_query = ("""
             UPDATE member
-            SET bin_file_tree = %s
+            SET bin_file_tree = %s,
+                update_date = CURRENT_TIMESTAMP
             WHERE id = %s
         """)
         params = (tree_id, member_id)
@@ -952,7 +980,8 @@ class MemberContactDA(object):
             """)
 
         like_search_key = """%{}%""".format(search_key)
-        get_contacts_params = get_contacts_params + tuple(16 * [like_search_key])
+        get_contacts_params = get_contacts_params + \
+            tuple(16 * [like_search_key])
 
         countQuery = (f"""
             SELECT COUNT(*)
@@ -1038,7 +1067,8 @@ class MemberContactDA(object):
                     "achievement_information": achievement_information,
                     "amera_avatar_url": amerize_url(s3_avatar_url),
                     "security_exchange_option":
-                        SECURITY_EXCHANGE_OPTIONS.get(security_exchange_option, 0),
+                        SECURITY_EXCHANGE_OPTIONS.get(
+                            security_exchange_option, 0),
                     "status": status,
                     "online_status": online_status
                     # "city": city,
@@ -1050,7 +1080,7 @@ class MemberContactDA(object):
         return {
             "contacts": contacts,
             "count": count
-            }
+        }
 
     @classmethod
     def get_contacts_roles(cls, member_id):
@@ -1402,7 +1432,8 @@ class MemberContactDA(object):
                     "country_code": country_code,
                     "amera_avatar_url": amerize_url(s3_avatar_url),
                     "security_exchange_option":
-                        SECURITY_EXCHANGE_OPTIONS.get(security_exchange_option, 0),
+                        SECURITY_EXCHANGE_OPTIONS.get(
+                            security_exchange_option, 0),
                 }
 
                 return contact
@@ -1449,7 +1480,8 @@ class MemberContactDA(object):
         query = ("""
         UPDATE contact SET
             role_id = %s,
-            contact_role = %s
+            contact_role = %s,
+            update_date = CURRENT_TIMESTAMP
         WHERE id = %s
         """)
         params = (
@@ -1517,12 +1549,13 @@ class MemberContactDA(object):
                 security_exchange_status = %s,
                 security_exchange_option = %s,
                 security_pin = %s,
-                security_picture_storage_id = %s
-                WHERE
+                security_picture_storage_id = %s,
+                update_date = CURRENT_TIMESTAMP
+            WHERE
                 member_id = %s AND contact_member_id = %s;
         """
         params = ('requested', exchangeOption,
-            security_pin, security_picture_storage_id, member_id, contact_member_id)
+                  security_pin, security_picture_storage_id, member_id, contact_member_id)
 
         try:
             cls.source.execute(query, params)
@@ -1533,8 +1566,8 @@ class MemberContactDA(object):
             raise err
 
         params = ('pending', exchangeOption,
-            security_pin, security_picture_storage_id,
-            contact_member_id, member_id)
+                  security_pin, security_picture_storage_id,
+                  contact_member_id, member_id)
 
         try:
             cls.source.execute(query, params)
@@ -1548,7 +1581,8 @@ class MemberContactDA(object):
                           status, commit=True):
         query = """
             UPDATE contact SET
-                status = %s
+                status = %s,
+                update_date = CURRENT_TIMESTAMP
             WHERE
                 member_id = %s AND contact_member_id = %s;
         """
@@ -1685,7 +1719,8 @@ class MemberInfoDA(object):
                     last_name = %s,
                     company_name = %s,
                     job_title_id = %s,
-                    department_id = %s
+                    department_id = %s,
+                    update_date = CURRENT_TIMESTAMP
                 WHERE id = %s
             """)
 
@@ -1700,7 +1735,7 @@ class MemberInfoDA(object):
                 INSERT INTO member_profile (member_id, biography)
                 VALUES (%s, %s)
                 ON conflict(member_id) DO UPDATE
-                SET biography = %s
+                SET biography = %s, update_date = CURRENT_TIMESTAMP
             """)
 
             member_profile_params = (
@@ -1714,7 +1749,8 @@ class MemberInfoDA(object):
                 SET
                     entity = %s,
                     description = %s,
-                    display_order = %s
+                    display_order = %s,
+                    update_date = CURRENT_TIMESTAMP
                 WHERE id=%s AND member_id=%s;
             """)
             member_achievement_insert_query = ("""
@@ -1759,7 +1795,8 @@ class MemberInfoDA(object):
                     method_type = %s,
                     display_order = %s,
                     primary_contact = %s,
-                    device_confirm_date=CURRENT_TIMESTAMP
+                    device_confirm_date = CURRENT_TIMESTAMP,
+                    update_date = CURRENT_TIMESTAMP
                 WHERE id = %s AND member_id = %s;
             """)
             member_contact_2_insert_query = ("""
@@ -1806,7 +1843,8 @@ class MemberInfoDA(object):
                     postal = %s,
                     country = %s,
                     country_code_id = %s,
-                    location_type = %s
+                    location_type = %s,
+                    update_date = CURRENT_TIMESTAMP
                 WHERE id=%s AND member_id = %s;
             """)
             member_location_insert_query = ("""
@@ -1847,15 +1885,17 @@ class MemberInfoDA(object):
 
 class MemberNotificationsSettingDA(object):
     source = source
+
     @classmethod
     def update_notifications_setting(cls, member_id, notifications_setting):
         try:
             query = """
                 UPDATE member_profile
-                SET notification_settings = %s
+                SET notification_settings = %s,
+                    update_date = CURRENT_TIMESTAMP
                 WHERE member_id = %s
             """
-            params= (notifications_setting, member_id, )
+            params = (notifications_setting, member_id, )
 
             cls.source.execute(query, params)
             if cls.source.has_results():
@@ -1876,11 +1916,11 @@ class MemberNotificationsSettingDA(object):
                 FROM member_profile
                 WHERE member_id = %s
             """
-            params= (memberId, )
+            params = (memberId, )
             cls.source.execute(query, params)
             result = None
             if cls.source.has_results():
-                ( member_id, notification_settings) = cls.source.cursor.fetchone()
+                (member_id, notification_settings) = cls.source.cursor.fetchone()
                 result = {
                     "member_id": member_id,
                     "data": notification_settings

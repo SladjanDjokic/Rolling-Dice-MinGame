@@ -5,7 +5,7 @@ import app.util.json as json
 
 from app.util.db import source
 from app.exceptions.data import DuplicateKeyError
-from app.exceptions.session import SessionExistsError
+from app.exceptions.session import InvalidSessionError, SessionExistsError
 from app.util.filestorage import amerize_url
 
 logger = logging.getLogger(__name__)
@@ -168,20 +168,28 @@ class SessionDA(object):
             ip_info.get('location').get("remote_continent_code"),
             gateway_ip_name,
             ip_info.get("gateway_country_code_id"),
-            ip_info.get('location').get('country').get('name'),  # remote_country_name
-            ip_info.get('location').get('country').get('code'),  # remote_country_code_2,
+            ip_info.get('location').get('country').get(
+                'name'),  # remote_country_name
+            ip_info.get('location').get('country').get(
+                'code'),  # remote_country_code_2,
             None,  # remote_country_code_3,
-            ip_info.get('location').get('country').get('area'),  # remote_country_code_id,
-            ip_info.get('location').get('country').get('calling_code'),  # remote_country_phone,
-            ip_info.get('location').get('region').get('name'),  # remote_region_name,
-            ip_info.get('location').get('region').get('code'),  # remote_region_code,
+            ip_info.get('location').get('country').get(
+                'area'),  # remote_country_code_id,
+            ip_info.get('location').get('country').get(
+                'calling_code'),  # remote_country_phone,
+            ip_info.get('location').get('region').get(
+                'name'),  # remote_region_name,
+            ip_info.get('location').get('region').get(
+                'code'),  # remote_region_code,
             ip_info.get('location').get('city'),  # remote_city_name,
             ip_info.get('location').get('postal'),  # remote_postal_code,
             ip_info.get('location').get('latitude'),  # remote_latitude,
             ip_info.get('location').get('longitude'),  # remote_longitude,
             ip_info.get('time_zone').get('name'),  # remote_timezone_name,
-            ip_info.get('time_zone').get('offset'),  # remote_timezone_utc_offset,
-            None,  # ip_info.get('location').get('language').get('code'),  # remote_language_id,
+            # remote_timezone_utc_offset,
+            ip_info.get('time_zone').get('offset'),
+            # ip_info.get('location').get('language').get('code'),  # remote_language_id,
+            None,
             server_ip,  # server_ip_address,
             server_name,  # server_name,
             None,  # server_country_code_id,
@@ -194,12 +202,16 @@ class SessionDA(object):
             ip_info.get('carrier').get('mcc'),  # carrier_mcc,
             ip_info.get('carrier').get('mnc'),  # carrier_mnc,
             ip_info.get('user_agent').get('header'),  # user_agent,
-            ip_info.get('user_agent').get('device').get('brand'),  # user_device,
-            ip_info.get('user_agent').get('device').get('type'),  # user_device_type,
-            ip_info.get('user_agent').get('device').get('name'),  # user_device_name,
+            ip_info.get('user_agent').get(
+                'device').get('brand'),  # user_device,
+            ip_info.get('user_agent').get('device').get(
+                'type'),  # user_device_type,
+            ip_info.get('user_agent').get('device').get(
+                'name'),  # user_device_name,
             ip_info.get('user_agent').get('os').get('name'),  # user_os,
             ip_info.get('user_agent').get('os').get('type'),  # user_os_type,
-            ip_info.get('user_agent').get('os').get('version'),  # user_os_version,
+            ip_info.get('user_agent').get('os').get(
+                'version'),  # user_os_version,
             ip_info.get('user_agent').get('name'),  # user_browser,
             ip_info.get('user_agent').get('type'),  # user_browser_type,
             ip_info.get('user_agent').get('version'),  # user_browser_version,
@@ -585,16 +597,68 @@ class SessionDA(object):
         return None
 
     @classmethod
-    def delete_session(cls, session_id):
-        query = ("""
-        UPDATE member_session SET status = 'inactive' WHERE session_id = %s
-        """)
+    def disable_session(cls, session_id, member_id, commit=True):
+        query = """
+            UPDATE member_session
+            SET
+                status = 'inactive',
+                update_date = CURRENT_TIMESTAMP
+            WHERE
+                session_id = %s
+                AND
+                member_id = %s
+                AND
+                status = 'online'
+            RETURNING
+                session_id, member_id
+        """
+        params = (session_id, member_id,)
+        try:
+            cls.source.execute(query, params)
 
-        params = (session_id,)
-        cls.source.execute(query, params)
-        cls.source.commit()
+            if commit:
+                cls.source.commit()
+            if cls.source.has_results():
+                (session_id, member_id) = cls.source.cursor.fetchone()
+                return session_id, member_id
+            raise InvalidSessionError
+        except Exception as err:
+            raise err
 
-        return None
+    @classmethod
+    def disable_online_session(cls, member_id, commit=True):
+        query = """
+            UPDATE member_session
+            SET
+                status = 'inactive',
+                update_date = CURRENT_TIMESTAMP
+            WHERE
+                member_id = %s
+                AND
+                status = 'online'
+            RETURNING
+                session_id, member_id
+        """
+        params = (member_id,)
+        try:
+            cls.source.execute(query, params)
+
+            if commit:
+                cls.source.commit()
+            if cls.source.has_results():
+                sessions = []
+                for (
+                    session_id,
+                    member_id
+                ) in cls.source.cursor:
+                    sessions.append({
+                        "session_id": session_id,
+                        "member_id": member_id,
+                    })
+                return sessions
+            raise InvalidSessionError
+        except Exception as err:
+            raise err
 
     @classmethod
     def get_sessions(cls, search_key, page_size=None, page_number=None, sort_params='', get_all=False, member_id=None):
@@ -924,7 +988,8 @@ class SessionDA(object):
     def update(cls, session_id, expiration_date, commit=True):
         query = """
             UPDATE member_session SET
-                expiration_date = %s
+                expiration_date = %s,
+                update_date = CURRENT_TIMESTAMP
             WHERE session_id = %s
         """
         params = (expiration_date, session_id,)
@@ -935,6 +1000,7 @@ class SessionDA(object):
                 cls.source.commit()
         except Exception as err:
             raise err
+
 
 def formatSortingParams(sort_by, entity_dict):
     columns_list = sort_by.split(',')

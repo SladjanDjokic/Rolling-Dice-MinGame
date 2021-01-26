@@ -246,14 +246,15 @@ class InviteDA(object):
             registered_member.create_date as registered_date,
             member_location.city AS remote_city_name,
             CASE WHEN member_location.province IS NOT NULL THEN member_location.province ELSE member_location.state END as remote_region_name,
-            member_location.country AS remote_country_name
+            member_location.country AS remote_country_name,
+            registered_member.status AS member_status
         FROM invite
             LEFT JOIN member on invite.inviter_member_id = member.id
             LEFT OUTER JOIN member_group on invite.group_id = member_group.id
             LEFT OUTER JOIN member AS registered_member on invite.registered_member_id = registered_member.id
             LEFT OUTER JOIN member_location on member_location.member_id = registered_member.id AND member_location.location_type = 'home'
         WHERE
-            {f'inviter_member_id = {member_id} AND' if not get_all else ''}
+            {f'inviter_member_id = %s AND' if not get_all else ''}
             ( invite.email LIKE %s
             OR invite.first_name LIKE %s
             OR invite.last_name LIKE %s
@@ -268,10 +269,11 @@ class InviteDA(object):
         SELECT
             COUNT(*)
         FROM invite
-        LEFT JOIN member on invite.inviter_member_id = member.id
-        LEFT OUTER JOIN member_group on invite.group_id = member_group.id
+            LEFT JOIN member on invite.inviter_member_id = member.id
+            LEFT OUTER JOIN member_group on invite.group_id = member_group.id
+            LEFT OUTER JOIN member AS registered_member on invite.registered_member_id = registered_member.id
         WHERE
-            {f'inviter_member_id = {member_id} AND' if not get_all else ''}
+            {f'inviter_member_id = %s AND' if not get_all else ''}
             ( invite.email LIKE %s
             OR invite.first_name LIKE %s
             OR invite.last_name LIKE %s
@@ -283,6 +285,8 @@ class InviteDA(object):
 
         like_search_key = """%{}%""".format(search_key)
         params = tuple(7 * [like_search_key])
+        if not get_all:
+            params = (member_id, ) + params
 
         cls.source.execute(countQuery, params)
 
@@ -321,7 +325,8 @@ class InviteDA(object):
                     registered_date,
                     remote_city_name,
                     remote_region_name,
-                    remote_country_name
+                    remote_country_name,
+                    member_status
             ) in cls.source.cursor:
                 invite = {
                     "id": id,
@@ -344,7 +349,8 @@ class InviteDA(object):
                     "city":  remote_city_name,
                     "company_name": company_name,
                     "region": remote_region_name,
-                    "country": remote_country_name
+                    "country": remote_country_name,
+                    'member_status': member_status
                 }
                 invites.append(invite)
 

@@ -16,7 +16,6 @@ def set_session_cookie(req, resp, session_id, expiration_datetime=None):
     if not expiration_datetime:
         expiration_datetime = datetime.now() + timedelta(seconds=expiration_seconds)  # noqa: E501
 
-
     # This section here overrides the `access-control-allow-origin`
     # to be dynamic, this means that if the requests come from any
     # domains defined in web.domains, then we allow the origin
@@ -54,7 +53,6 @@ def set_session_cookie(req, resp, session_id, expiration_datetime=None):
     if cookie_domain == "localhost":
         cookie_domain = ""
 
-
     logger.debug(f"COOKIE_DOMAIN: {cookie_domain}")
     # TODO: This needs to be more secure
     resp.set_cookie(settings.get("web.cookie_name"), session_id,
@@ -63,7 +61,6 @@ def set_session_cookie(req, resp, session_id, expiration_datetime=None):
                     expires=expiration_datetime,
                     path=settings.get("web.cookie_path"),
                     domain=f"{cookie_domain}")
-
 
 
 def get_session_cookie(req):
