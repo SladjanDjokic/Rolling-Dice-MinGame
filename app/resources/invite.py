@@ -110,15 +110,15 @@ class MemberInviteResource(object):
             raise InviteInvalidInviter(inviter_member_id)
 
     def on_put(self, req, resp):
-        (id, first_name,
-         invite_key, email) = request.get_json_or_form(
-             "id", "first_name", "invite_key", "email", req=req
-        )
+        (id, ) = request.get_json_or_form("id", req=req)
         expiration_date = datetime.now() + relativedelta(months=+1)
         try:
             invite = InviteDA.update_invite_expiration_date(
                 id, expiration_date
             )
+            first_name = invite["first_name"]
+            invite_key = invite["invite_key"]
+            email = invite["email"]
 
             if not invite:
                 raise InviteNotFound(invite_key)
@@ -137,26 +137,14 @@ class MemberInviteResource(object):
                 "data": invite,
                 "message": 'Invite sent successfully.'
             }, default_parser=json.parser)
-        except sendmail.EmailAuthError:
-            logger.exception('Deleting invite due to unable \
-                             to auth to email system')
-            InviteDA.delete_invite(invite_key)
-            raise InviteEmailSystemFailure(invite_key)
         except InviteDataMissingError:
             raise InviteDataMissing({
-                'invite_key': invite_key,
+                'invite_id': id,
                 'expiration_date': expiration_date
             })
         except Exception as err:
             logger.exception('Unknown error')
             logger.debug(err)
-
-            # logger.exception('Change invite due to unable \
-            #                  to auth to email system')
-            # resp.body = json.dumps({
-            #     "success": False,
-            #     "message": 'Something went wrong when sending email.'
-            # }, default_parser=json.parser)
             raise err
 
     def on_get(self, req, resp, invite_key):

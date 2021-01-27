@@ -28,7 +28,7 @@ class SessionDA(object):
             main_file_tree,
             bin_file_tree
         FROM member
-        WHERE lower(username) = %s AND password = crypt(%s, password)
+        WHERE lower(username) = %s AND password = crypt(%s, password) and status = 'active'
         """)
 
         params = (username.lower(), password)

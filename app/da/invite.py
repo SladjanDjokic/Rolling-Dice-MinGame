@@ -147,7 +147,13 @@ class InviteDA(object):
                 update_date = CURRENT_TIMESTAMP,
                 expiration = %s
             WHERE id = %s AND registered_member_id IS NULL
-            RETURNING update_date, expiration
+            RETURNING 
+                update_date,
+                expiration,
+                first_name,
+                last_name,
+                invite_key,
+                email
         """)
         params = (expiration_date, id,)
         try:
@@ -158,13 +164,18 @@ class InviteDA(object):
             update_date = datetime.now()
 
             if cls.source.has_results():
-                (update_date, expiration_date) = cls.source.cursor.fetchone()
+                (update_date, expiration_date, first_name, last_name,
+                 invite_key, email) = cls.source.cursor.fetchone()
             else:
                 return None
 
             return {
                 "id": id,
+                "first_name": first_name,
+                "last_name": last_name,
+                "invite_key": invite_key,
                 "update_date": update_date,
+                "email": email,
                 "expiration_date": expiration_date
             }
         except DataMissingError as err:
