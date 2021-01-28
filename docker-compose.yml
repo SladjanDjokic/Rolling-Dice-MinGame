@@ -355,10 +355,10 @@ services:
       - ../web-api/datasource/postgresql/schema-updates-2021-01-04_member_session_status.sql:/docker-entrypoint-initdb.d/h-7-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-01-08_event_invite_group.sql:/docker-entrypoint-initdb.d/h-8-schema-updates.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-01-05_file_path_function.sql:/docker-entrypoint-initdb.d/h-9-schema-updates.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-01-04.sql:/docker-entrypoint-initdb.d/h-1a-schema-updates.group-1.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-01-09-activity_table.sql:/docker-entrypoint-initdb.d/h-1b-schema-updates.activity-table.sql
-      - ../web-api/datasource/postgresql/mail_thread.sql:/i-1-schema-updates.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-01-24_member-status.sql:/i-2-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-01-04.sql:/docker-entrypoint-initdb.d/h-a-schema-updates.group-1.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-01-09-activity_table.sql:/docker-entrypoint-initdb.d/h-a-schema-updates.activity-table.sql
+      - ../web-api/datasource/postgresql/mail_thread.sql:/docker-entrypoint-initdb.d/i-1-schema-updates.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-01-24_member-status.sql:/docker-entrypoint-initdb.d/i-2-schema-updates.sql
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/z-3-test-schedule.sql
