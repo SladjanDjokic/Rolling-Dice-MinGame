@@ -37,7 +37,7 @@ def create_trees(member):
 
 def create_default_folders(member, tree_id, file_tree_id):
     # Add default folders for Drive
-    default_drive_folders = ['Documents', 'Passwords', 'Pictures', 'PowerPoints', 'Spreadsheets', 'Videos']
+    default_drive_folders = settings.get('drive.default_folders')
     default_drive_folders.sort()
 
     for folder_name in default_drive_folders:

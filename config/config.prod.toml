@@ -168,3 +168,15 @@ delete_event = 'delete_event'
 delete_mail = 'delete_mail'
 admin_member_disable_session = 'admin_member_disable_session'
 admin_member_disable = 'admin_member_disable'
+
+[drive]
+default_folders = [
+    'Documents',
+    'Passwords',
+    'Pictures',
+    'Presentations',
+    'Spreadsheets',
+    'Videos',
+    'Existing',
+    'New groups'
+]
