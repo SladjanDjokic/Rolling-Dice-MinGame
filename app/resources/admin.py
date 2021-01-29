@@ -2,7 +2,7 @@ from app.exceptions.member import MemberNotFound
 from app.da.member import MemberDA
 from app.exceptions.session import InvalidSession, \
     InvalidSessionError
-from app.util.auth import check_role_administrator
+from app.util.auth import check_session_administrator
 import logging
 
 import app.util.json as json
@@ -31,7 +31,7 @@ class AdminMemberResource(object):
             },
         }
 
-    @check_role_administrator
+    @check_session_administrator
     def on_delete_session(self, req, resp, session_id, member_id):
 
         try:
@@ -49,7 +49,7 @@ class AdminMemberResource(object):
         except InvalidSessionError as err:
             raise InvalidSession() from err
 
-    @check_role_administrator
+    @check_session_administrator
     def on_delete_member(self, req, resp, member_id, full=False):
 
         try:

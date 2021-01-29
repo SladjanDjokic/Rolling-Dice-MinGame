@@ -15,6 +15,11 @@ class InvalidSessionError (Exception):
     pass
 
 
+# Application error to throw when the session is forbidden of access,
+class ForbiddenSessionError (Exception):
+    pass
+
+
 # ------------
 # HTTP Errors
 # ------------

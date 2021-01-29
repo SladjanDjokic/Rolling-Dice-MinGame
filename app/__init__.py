@@ -8,7 +8,7 @@ from app.calls.views import IncomingCallView
 from app.chat.views import ChatView
 from app.config import parser, settings
 from app.middleware import CrossDomain, KafkaProducerMiddleware  # , JSONTranslator
-from app.resources.member import MemberRegisterResource, MemberResource, MemberSearchResource, \
+from app.resources.member import MemberRegisterResource, MemberSearchResource, \
     MemberGroupSearchResource, MemberContactResource, MemberContactAccept, ContactMembersResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms, MemberDepartments, MemberContactsRoles, \
     MemberContactsCompanies, MemberContactsCountries, MemberTimezones, MemberInfoByIdResource, \
@@ -47,7 +47,7 @@ from app.resources.country import CountryCodeResource
 from app.resources.mail import MailDraftComposeResource, MailAttachmentResource, MailInboxResource, MailStaredResource, \
     MailTrashResource, MailArchiveResource, MailSettingsResource, MailSentResource, MailMemberFolderResource
 from app.resources.role import RolesResource
-from app.resources.avatar import AvatarResource
+from app.resources.avatar import MemberAvatarResource
 from app.resources.activity import ActivitiesResource
 
 from app.resources.notifications_setting import MemberNotificationsSetting
@@ -150,12 +150,11 @@ def _setup_routes(app):
     # app.add_route("/member/register", MemberRegistrationResource())  # noqa: E501
     app.add_route("/member/search", MemberSearchResource())
     app.add_route("/member/group/search", MemberGroupSearchResource())
-    member_resource = MemberResource()
-    app.add_route("/member/{username}", member_resource)
-
-    app.add_route("/member/contact/security/{contact_member_id}", MemberContactSecurity())
+    app.add_route(
+        "/member/contact/security/{contact_member_id}", MemberContactSecurity())
     app.add_route("/member/contact", MemberContactResource())
-    app.add_route("/member/contact/request/{contact_member_id}", MemberContactAccept())
+    app.add_route(
+        "/member/contact/request/{contact_member_id}", MemberContactAccept())
     app.add_route("/member/contacts/roles", MemberContactsRoles())
     app.add_route("/member/contacts/companies", MemberContactsCompanies())
     app.add_route("/member/contacts/countries", MemberContactsCountries())
@@ -182,16 +181,21 @@ def _setup_routes(app):
     app.add_route("/group/{group_id}", GroupDetailResource())
     app.add_route("/groups", MemberGroupResource())
     app.add_route("/groups/membership", GroupMembershipResource())
-    app.add_route("/group/activity/calendar/{group_id}", GroupActivityCalendarResource())
-    app.add_route("/group/activity/drive/{group_id}", GroupActivityDriveResource())
+    app.add_route(
+        "/group/activity/calendar/{group_id}", GroupActivityCalendarResource())
+    app.add_route(
+        "/group/activity/drive/{group_id}", GroupActivityDriveResource())
     app.add_route("/member/group/invite", GroupMemberInviteResource())
-    app.add_route("/member/group/membership/request/{group_id}", GroupMemberAccept())
+    app.add_route(
+        "/member/group/membership/request/{group_id}", GroupMemberAccept())
     app.add_route("/member/group-members", GroupMembersResource())
     app.add_route("/member/group/security/{group_id}", MemberGroupSecurity())
     app.add_route("/system/activity/invite", SystemActivityResource("invites"))
-    app.add_route("/system/activity/session", SystemActivityResource("sessions"))
+    app.add_route("/system/activity/session",
+                  SystemActivityResource("sessions"))
     app.add_route("/system/activity/threat", SystemActivityResource("threats"))
-    app.add_route("/system/activity/behaviour", SystemActivityResource("behaviour"))
+    app.add_route("/system/activity/behaviour",
+                  SystemActivityResource("behaviour"))
     app.add_route("/system/activity/users", SystemActivityUsersResource())
 
     app.add_route("/member/activity", ActivitiesResource())
@@ -213,17 +217,25 @@ def _setup_routes(app):
 
     app.add_route("/member/register/country", CountryCodeResource())
     app.add_route("/member/role", RolesResource())
-    app.add_route("/member/avatar", AvatarResource())
+
+    # Avatars
+    member_avatar_resource = MemberAvatarResource()
+    app.add_route("/member/avatar", member_avatar_resource,
+                  suffix="deprecated")
+    app.add_route("/member/{member_id:int}/avatar", member_avatar_resource)
 
     # Notifications setting
-    app.add_route("/member/notifications/setting", MemberNotificationsSetting())
+    app.add_route("/member/notifications/setting",
+                  MemberNotificationsSetting())
 
     # Draft
     draft_resource = MailDraftComposeResource()
     app.add_route("/mail/draft", draft_resource)  # POST
     app.add_route("/mail/draft/list", draft_resource, suffix="list")  # GET
-    app.add_route("/mail/draft/{mail_id}", draft_resource, suffix="draft")  # DELETE
-    app.add_route("/mail/draft/get/{mail_id}", draft_resource, suffix="detail")  # GET
+    app.add_route("/mail/draft/{mail_id}",
+                  draft_resource, suffix="draft")  # DELETE
+    app.add_route("/mail/draft/get/{mail_id}",
+                  draft_resource, suffix="detail")  # GET
     app.add_route("/mail/draft/send", draft_resource, suffix="send")  # POST
 
     # Attachment
@@ -235,7 +247,8 @@ def _setup_routes(app):
     # Inbox
     mail_inbox_resource = MailInboxResource()
     app.add_route("/mail/inbox", mail_inbox_resource, suffix="list")
-    app.add_route("/mail/inbox/threads", mail_inbox_resource, suffix="thread_mails")
+    app.add_route("/mail/inbox/threads",
+                  mail_inbox_resource, suffix="thread_mails")
     app.add_route("/mail/{mail_id}", mail_inbox_resource, suffix="detail")
     app.add_route("/mail/forward", mail_inbox_resource, suffix="forward")
 
@@ -243,43 +256,61 @@ def _setup_routes(app):
     mail_star_resource = MailStaredResource()
     app.add_route("/mail/star", mail_star_resource)  # POST
     app.add_route("/mail/star/list", mail_star_resource, suffix="list")  # GET
-    app.add_route("/mail/star/threads", mail_inbox_resource, suffix="thread_mails")
+    app.add_route("/mail/star/threads", mail_inbox_resource,
+                  suffix="thread_mails")
     app.add_route("/mail/star/{mail_id}", mail_star_resource, suffix="detail")
 
     # Trash
     mail_trash_resource = MailTrashResource()
     app.add_route("/mail/trash", mail_trash_resource)  # POST - Add to trash
-    app.add_route("/mail/trash/list", mail_trash_resource, suffix="list")  # GET - Trash list
-    app.add_route("/mail/trash/{mail_id}", mail_trash_resource, suffix="detail")  # GET - Trash mail detail
-    #                                                                                 DELETE - delete email for ever
-    app.add_route("/mail/trash/mv/origin", mail_trash_resource, suffix="remove")  # POST - move mail to origin
-    app.add_route("/mail/trash/mv/archive", mail_trash_resource, suffix="archive")  # POST - Add to archive
+    app.add_route("/mail/trash/list", mail_trash_resource,
+                  suffix="list")  # GET - Trash list
+    # GET - Trash mail detail
+    app.add_route("/mail/trash/{mail_id}",
+                  mail_trash_resource, suffix="detail")
+    # DELETE - delete email for ever
+    app.add_route("/mail/trash/mv/origin", mail_trash_resource,
+                  suffix="remove")  # POST - move mail to origin
+    app.add_route("/mail/trash/mv/archive", mail_trash_resource,
+                  suffix="archive")  # POST - Add to archive
 
     # Archive
     mail_archive_resource = MailArchiveResource()
-    app.add_route("/mail/archive", mail_archive_resource)  # POST - Add to trash
-    app.add_route("/mail/archive/list", mail_archive_resource, suffix="list")  # GET - Trash list
-    app.add_route("/mail/archive/threads", mail_inbox_resource, suffix="thread_mails")
-    app.add_route("/mail/archive/{mail_id}", mail_archive_resource, suffix="detail")  # GET - Trash mail detail
-    #                                                                                 DELETE - delete email for ever
-    app.add_route("/mail/archive/mv/origin", mail_archive_resource, suffix="remove")  # POST - move mail to origin
-    app.add_route("/mail/archive/mv/trash", mail_archive_resource, suffix="trash")  # POST - Add to archive
+    # POST - Add to trash
+    app.add_route("/mail/archive", mail_archive_resource)
+    app.add_route("/mail/archive/list", mail_archive_resource,
+                  suffix="list")  # GET - Trash list
+    app.add_route("/mail/archive/threads",
+                  mail_inbox_resource, suffix="thread_mails")
+    # GET - Trash mail detail
+    app.add_route("/mail/archive/{mail_id}",
+                  mail_archive_resource, suffix="detail")
+    # DELETE - delete email for ever
+    app.add_route("/mail/archive/mv/origin", mail_archive_resource,
+                  suffix="remove")  # POST - move mail to origin
+    app.add_route("/mail/archive/mv/trash", mail_archive_resource,
+                  suffix="trash")  # POST - Add to archive
 
     # Sent
     mail_sent_resource = MailSentResource()
     app.add_route("/mail/sent/list", mail_sent_resource, suffix="list")  # GET
-    app.add_route("/mail/sent/threads", mail_inbox_resource, suffix="thread_mails")
+    app.add_route("/mail/sent/threads", mail_inbox_resource,
+                  suffix="thread_mails")
     app.add_route("/mail/sent/{mail_id}", mail_sent_resource, suffix="detail")
 
     # Signature
     mail_sign_resource = MailSettingsResource()
-    app.add_route("/mail/settings", mail_sign_resource)  # POST - move mail to origin
-    app.add_route("/mail/sign", mail_sign_resource, suffix="sign")  # POST - move mail to origin
-    app.add_route("/mail/sign/list", mail_sign_resource, suffix="list")  # POST - Add to archive
+    # POST - move mail to origin
+    app.add_route("/mail/settings", mail_sign_resource)
+    app.add_route("/mail/sign", mail_sign_resource,
+                  suffix="sign")  # POST - move mail to origin
+    app.add_route("/mail/sign/list", mail_sign_resource,
+                  suffix="list")  # POST - Add to archive
 
     mail_member_folder_resource = MailMemberFolderResource()
     app.add_route("/mail/folders", mail_member_folder_resource)
-    app.add_route("/mail/folders/mv", mail_member_folder_resource, suffix="move")
+    app.add_route("/mail/folders/mv",
+                  mail_member_folder_resource, suffix="move")
 
     # Routes for Chat App
     app.add_route("/chat", ChatView())

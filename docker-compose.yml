@@ -4,6 +4,7 @@ services:
   amera-dns:
     container_name: amera-dns
     image: andyshinn/dnsmasq:latest
+    restart: always
     command: >
      --log-queries
      --log-facility=-
@@ -22,6 +23,7 @@ services:
     # depends_on:
     #   - socat
 
+  # Unsure if we still need this
   # socat:
   #   container_name: amera-dns-socat
   #   image: alpine/socat
@@ -78,6 +80,49 @@ services:
       #   condition: service_healthy
       # amera-web-auth:
       #   condition: service_healthy
+
+  # amera-web-auth:
+  #   container_name: amera-web-auth
+  #   image: amera-web-api:latest
+  #   restart: always
+  #   logging:
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "1"
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 512M
+  #       reservations:
+  #         memory: 128M
+  #   build:
+  #     context: ../web-api
+  #     dockerfile: Dockerfile.dev
+  #   depends_on:
+  #     amera-web-db:
+  #       condition: service_healthy
+  #     amera-web-api:
+  #       condition: service_healthy
+  #     # kafka:
+  #     #   condition: service_started
+  #   networks:
+  #     - amera-net
+  #   expose:
+  #     - 5000
+  #   ports:
+  #     - 5000:5000
+  #   environment: 
+  #     - AMERA_API_KAFKA.BOOTSTRAP_SERVERS=kafka:9092
+  #   volumes:
+  #     - ../web-api:/app
+  #     - web-api-python-packages:/root/.local/share
+  #   command: ["pipenv", "run", "local"]
+  #   healthcheck:
+  #     # test: CMD wget --no-verbose --tries=1 --spider http://localhost:5000/healthz || exit 1
+  #     test: ["CMD", "curl", "-f", "http://localhost:5000/healthz"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 22
 
   amera-web-main:
     container_name: amera-web-main
@@ -141,57 +186,14 @@ services:
       amera-web-api:
         condition: service_healthy
 
-  # amera-web-auth:
-  #   container_name: amera-web-auth
-  #   image: amera-web-api:latest
-  #   restart: always
-  #   logging:
-  #     options:
-  #       max-size: "10m"
-  #       max-file: "1"
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 512M
-  #       reservations:
-  #         memory: 128M
-  #   build:
-  #     context: ../web-api
-  #     dockerfile: Dockerfile.dev
-  #   depends_on:
-  #     amera-web-db:
-  #       condition: service_healthy
-  #     amera-web-api:
-  #       condition: service_healthy
-  #     # kafka:
-  #     #   condition: service_started
-  #   networks:
-  #     - amera-net
-  #   expose:
-  #     - 5000
-  #   ports:
-  #     - 5000:5000
-  #   environment: 
-  #     - AMERA_API_KAFKA.BOOTSTRAP_SERVERS=kafka:9092
-  #   volumes:
-  #     - ../web-api:/app
-  #     - web-api-python-packages:/root/.local/share
-  #   command: ["pipenv", "run", "local"]
-  #   healthcheck:
-  #     # test: CMD wget --no-verbose --tries=1 --spider http://localhost:5000/healthz || exit 1
-  #     test: ["CMD", "curl", "-f", "http://localhost:5000/healthz"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 22
-
   amera-web-api:
     container_name: amera-web-api
     image: amera-web-api:latest
     restart: always
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "1"
+    # logging:
+    #   options:
+    #     max-size: "10m"
+    #     max-file: "1"
     deploy:
       resources:
         limits:

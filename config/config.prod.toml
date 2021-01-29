@@ -176,7 +176,5 @@ default_folders = [
     'Pictures',
     'Presentations',
     'Spreadsheets',
-    'Videos',
-    'Existing',
-    'New groups'
+    'Videos'
 ]
