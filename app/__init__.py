@@ -39,7 +39,7 @@ from app.resources.language import LanguageResource
 from app.resources.static import StaticResource
 from app.resources.member_scheduler_setting import MemberSchedulerSettingResource
 from app.resources.member_schedule_event import MemberScheduleEventResource, MemberScheduleEventColors, \
-    EventAttachmentResorce, MemberUpcomingEvents, MemberEventInvitations, MemberEventInvitateStatus
+    EventAttachmentResorce, MemberUpcomingEvents, MemberEventInvitations
 from app.resources.member_schedule_holiday import MemberScheduleHolidayResource
 from app.resources.member_schedule_event_invite import MemberScheduleEventInviteResource, \
     MemberScheduleEventInviteAddSingleResource, MemberScheduleEventInviteSetStatusResource
@@ -288,10 +288,12 @@ def _setup_routes(app):
 
     # Upcoming Events
     app.add_route("/member/event/upcoming", MemberUpcomingEvents())
+
+    member_event_invitation_resource = MemberEventInvitations()
     # Event Invitations
-    app.add_route("/member/event/invite", MemberEventInvitations())
+    app.add_route("/member/event/invite", member_event_invitation_resource)
     # Event Invitation Accept/Decline
-    app.add_route("/member/event/invite/response", MemberEventInvitateStatus())
+    app.add_route("/member/event/invite/{event_invite_id}", member_event_invitation_resource)
     app.add_route("/notify", IncomingCallView())
 
     # Admin Resources

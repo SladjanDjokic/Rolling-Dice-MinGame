@@ -747,7 +747,8 @@ class MemberEventDA(object):
         query = ("""
             SELECT json_agg(SEQUENCE) AS data
             FROM
-            (SELECT event_2.id AS event_id,
+            (SELECT event_invite_2.id as id,
+                    event_2.id AS event_id,
                     sequence_id,
                     group_id,
                     event_color_id,
@@ -794,7 +795,7 @@ class MemberEventDA(object):
                     FROM event_invite_2
                     WHERE event_invite_2.event_id = event_2.id ) AS invitees)
             FROM event_2
-            LEFT JOIN event_invite_2 ON event_invite_2.event_id = event_2.id
+            INNER JOIN event_invite_2 ON event_invite_2.event_id = event_2.id
             LEFT JOIN member ON member.id = event_2.host_member_id
             LEFT JOIN member_profile ON member.id = member_profile.member_id
             LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id

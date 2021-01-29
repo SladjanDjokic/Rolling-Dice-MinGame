@@ -459,8 +459,16 @@ class MemberUpcomingEvents(object):
 
 
 class MemberEventInvitations(object):
-    @staticmethod
-    def on_get(req, resp):
+    def __init__(self):
+        self.kafka_data = { "GET": {"event_type": settings.get('kafka.event_types.get.event_invite_response'),
+                                   "topic": settings.get('kafka.topics.calendar')
+                                   },
+                            "PUT": {"event_type": settings.get('kafka.event_types.get.event_invite_response'),
+                                   "topic": settings.get('kafka.topics.calendar')
+                                   },
+                           }
+    
+    def on_get(self, req, resp):
         try:
             session_id = get_session_cookie(req)
             session = validate_session(session_id)
@@ -477,22 +485,12 @@ class MemberEventInvitations(object):
             "success": True
         }, default_parser=json.parser)
 
-
-class MemberEventInvitateStatus(object):
-    def __init__(self):
-        self.kafka_data = {"GET": {"event_type": settings.get('kafka.event_types.get.event_invite_response'),
-                                   "topic": settings.get('kafka.topics.calendar')
-                                   },
-                           }
-
-    @staticmethod
-    def on_get(req, resp):
+    def on_put(self, req, resp, event_invite_id):
         try:
             session_id = get_session_cookie(req)
             session = validate_session(session_id)
             member_id = session["member_id"]
-            event_invite_id = req.get_param('event_invite_id')
-            status = req.get_param('status')
+            (status,) = request.get_json_or_form("status", req=req)
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
 
@@ -518,3 +516,6 @@ class MemberEventInvitateStatus(object):
                 "description": "Invalid status",
                 "success": False
             }, default_parser=json.parser)
+
+
+    
