@@ -15,7 +15,7 @@ class ForgotInvalidMemberError (Exception):
     pass
 
 
-class ForgotDuplicateDataError ():
+class ForgotDuplicateDataError (Exception):
     pass
 
 
