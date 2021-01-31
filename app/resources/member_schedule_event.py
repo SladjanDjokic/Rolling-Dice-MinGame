@@ -45,8 +45,11 @@ class MemberScheduleEventResource(object):
 
         search_time_start = req.get_param('search_time_start')
         search_time_end = req.get_param('search_time_end')
-        schedule_events = MemberEventDA.get_events_by_range(event_host_member_id, search_time_start,
-                                                            search_time_end)
+        schedule_events = MemberEventDA.get_events_by_range(
+            event_host_member_id,
+            search_time_start,
+            search_time_end
+        )
 
         # If no events, it will return [None]
         if schedule_events and len(schedule_events) > 0 and schedule_events[0]:

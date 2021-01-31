@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 class MemberEventDA(object):
     source = source
 
-    @classmethod
-    def get_event_by_id(cls, id):
-        return cls.__get_data('id', id)
+    # @classmethod
+    # def get_event_by_id(cls, id):
+    #     return cls.__get_data('id', id)
 
     @classmethod
     def get_event_by_id_full(cls, id):
@@ -428,12 +428,21 @@ class MemberEventDA(object):
                             SELECT json_agg(invitees) as invitations
                             FROM (
                                 SELECT
-                                    id as invite_id,
-                                    invite_member_id,
-                                    invite_status,
-                                    create_date,
-                                    update_date
+                                    event_invite_2.id as invite_id,
+                                    event_invite_2.invite_member_id,
+                                    event_invite_2.invite_status,
+                                    event_invite_2.create_date,
+                                    event_invite_2.update_date,
+                                    member.company_name as company,
+                                    job_title.name as title,
+                                    member.first_name,
+                                    member.last_name,
+                                    file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url
                                 FROM event_invite_2
+                                    INNER JOIN member                   ON member.id = event_invite_2.invite_member_id
+                                    LEFT OUTER JOIN member_profile      ON member.id = member_profile.member_id
+                                    LEFT OUTER JOIN job_title           ON member.job_title_id = job_title.id
+                                    LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
                                 WHERE event_invite_2.event_id = event_2.id
                             ) AS invitees
                         )
@@ -496,12 +505,21 @@ class MemberEventDA(object):
                                 SELECT json_agg(invitees) as invitations
                                 FROM (
                                     SELECT
-                                        id as invite_id,
-                                        invite_member_id,
-                                        invite_status,
-                                        create_date,
-                                        update_date
+                                        event_invite_2.id as invite_id,
+                                        event_invite_2.invite_member_id,
+                                        event_invite_2.invite_status,
+                                        event_invite_2.create_date,
+                                        event_invite_2.update_date,
+                                        member.company_name as company,
+                                        job_title.name as title,
+                                        member.first_name,
+                                        member.last_name,
+                                        file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url
                                     FROM event_invite_2
+                                        INNER JOIN member                   ON member.id = event_invite_2.invite_member_id
+                                        LEFT OUTER JOIN member_profile      ON member.id = member_profile.member_id
+                                        LEFT OUTER JOIN job_title           ON member.job_title_id = job_title.id
+                                        LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
                                     WHERE event_invite_2.event_id = event_2.id
                                 ) AS invitees
                             )
@@ -573,12 +591,21 @@ class MemberEventDA(object):
                                 SELECT json_agg(invitees) as invitations
                                 FROM (
                                     SELECT
-                                        id as invite_id,
-                                        invite_member_id,
-                                        invite_status,
-                                        create_date,
-                                        update_date
+                                        event_invite_2.id as invite_id,
+                                        event_invite_2.invite_member_id,
+                                        event_invite_2.invite_status,
+                                        event_invite_2.create_date,
+                                        event_invite_2.update_date,
+                                        member.company_name as company,
+                                        job_title.name as title,
+                                        member.first_name,
+                                        member.last_name,
+                                        file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url
                                     FROM event_invite_2
+                                        INNER JOIN member                   ON member.id = event_invite_2.invite_member_id
+                                        LEFT OUTER JOIN member_profile      ON member.id = member_profile.member_id
+                                        LEFT OUTER JOIN job_title           ON member.job_title_id = job_title.id
+                                        LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
                                     WHERE event_invite_2.event_id = events.id
                                 ) AS invitees
                             )
@@ -700,12 +727,21 @@ class MemberEventDA(object):
                                 SELECT json_agg(invitees) as invitations
                                 FROM (
                                     SELECT
-                                        id as invite_id,
-                                        invite_member_id,
-                                        invite_status,
-                                        create_date,
-                                        update_date
+                                        event_invite_2.id as invite_id,
+                                        event_invite_2.invite_member_id,
+                                        event_invite_2.invite_status,
+                                        event_invite_2.create_date,
+                                        event_invite_2.update_date,
+                                        member.company_name as company,
+                                        job_title.name as title,
+                                        member.first_name,
+                                        member.last_name,
+                                        file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url
                                     FROM event_invite_2
+                                        INNER JOIN member                   ON member.id = event_invite_2.invite_member_id
+                                        LEFT OUTER JOIN member_profile      ON member.id = member_profile.member_id
+                                        LEFT OUTER JOIN job_title           ON member.job_title_id = job_title.id
+                                        LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
                                     WHERE event_invite_2.event_id = events.id
                                 ) AS invitees
                             )
@@ -759,7 +795,7 @@ class MemberEventDA(object):
                     is_full_day,
                     event_status,
                     event_tz,
-                    start_datetime AS START, 
+                    start_datetime AS START,
                     end_datetime AS END,
                     event_recurrence_freq,
                     end_condition,
@@ -787,13 +823,25 @@ class MemberEventDA(object):
                     WHERE event_media.event_id = event_2.id ) AS files),
                 (SELECT json_agg(invitees) AS invitations
                 FROM
-                    (SELECT id AS invite_id,
-                            invite_member_id,
-                            invite_status,
-                            create_date,
-                            update_date
-                    FROM event_invite_2
-                    WHERE event_invite_2.event_id = event_2.id ) AS invitees)
+                    (
+                        SELECT
+                            event_invite_2.id as invite_id,
+                            event_invite_2.invite_member_id,
+                            event_invite_2.invite_status,
+                            event_invite_2.create_date,
+                            event_invite_2.update_date,
+                            member.company_name as company,
+                            job_title.name as title,
+                            member.first_name,
+                            member.last_name,
+                            file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url
+                        FROM event_invite_2
+                            INNER JOIN member                   ON member.id = event_invite_2.invite_member_id
+                            LEFT OUTER JOIN member_profile      ON member.id = member_profile.member_id
+                            LEFT OUTER JOIN job_title           ON member.job_title_id = job_title.id
+                            LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+                        WHERE event_invite_2.event_id = event_2.id
+                     ) AS invitees)
             FROM event_2
             INNER JOIN event_invite_2 ON event_invite_2.event_id = event_2.id
             LEFT JOIN member ON member.id = event_2.host_member_id
