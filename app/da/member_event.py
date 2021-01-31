@@ -389,12 +389,34 @@ class MemberEventDA(object):
                     SELECT
                         id as event_id,
                         sequence_id,
-                        group_id,
+                        (
+							SELECT row_to_json(group_data) as group_info
+							FROM (
+								SELECT 
+									member_group.id as group_id,
+									group_name,
+									group_leader_id
+								FROM member_group
+								WHERE member_group.id = group_id
+							) as group_data
+						),
                         event_color_id,
                         event_name,
                         event_type,
                         event_description,
-                        host_member_id,
+                        (
+							SELECT row_to_json(member_data) as host_member_info
+							FROM (
+								SELECT
+									member.id as host_member_id,
+									member.first_name,
+									member.middle_name,
+									member.last_name,
+									member.company_name
+								FROM member
+								WHERE member.id = host_member_id
+							) as member_data
+						),
                         is_full_day,
                         event_status,
                         event_tz,
@@ -436,6 +458,7 @@ class MemberEventDA(object):
                                     member.company_name as company,
                                     job_title.name as title,
                                     member.first_name,
+                                    member.middle_name,
                                     member.last_name,
                                     file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url
                                 FROM event_invite_2
@@ -466,12 +489,34 @@ class MemberEventDA(object):
                         SELECT
                             id as event_id,
                             sequence_id,
-                            group_id,
+                            (
+                                SELECT row_to_json(group_data) as group_info
+                                FROM (
+                                    SELECT 
+                                        member_group.id as group_id,
+                                        group_name,
+                                        group_leader_id
+                                    FROM member_group
+                                    WHERE member_group.id = group_id
+                                ) as group_data
+                            ),
                             event_color_id,
                             event_name,
                             event_type,
                             event_description,
-                            host_member_id,
+                            (
+                                SELECT row_to_json(member_data) as host_member_info
+                                FROM (
+                                    SELECT
+                                        member.id as host_member_id,
+                                        member.first_name,
+                                        member.middle_name,
+                                        member.last_name,
+                                        member.company_name
+                                    FROM member
+                                    WHERE member.id = host_member_id
+                                ) as member_data
+                            ),
                             is_full_day,
                             event_status,
                             event_tz,
@@ -513,6 +558,7 @@ class MemberEventDA(object):
                                         member.company_name as company,
                                         job_title.name as title,
                                         member.first_name,
+                                        member.middle_name,
                                         member.last_name,
                                         file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url
                                     FROM event_invite_2
@@ -552,12 +598,34 @@ class MemberEventDA(object):
                         SELECT
                             id as event_id,
                             sequence_id,
-                            group_id,
+                            (
+                                SELECT row_to_json(group_data) as group_info
+                                FROM (
+                                    SELECT 
+                                        member_group.id as group_id,
+                                        group_name,
+                                        group_leader_id
+                                    FROM member_group
+                                    WHERE member_group.id = group_id
+                                ) as group_data
+                            ),
                             event_color_id,
                             event_name,
                             event_type,
                             event_description,
-                            host_member_id,
+                            (
+                                SELECT row_to_json(member_data) as host_member_info
+                                FROM (
+                                    SELECT
+                                        member.id as host_member_id,
+                                        member.first_name,
+                                        member.middle_name,
+                                        member.last_name,
+                                        member.company_name
+                                    FROM member
+                                    WHERE member.id = host_member_id
+                                ) as member_data
+                            ),
                             is_full_day,
                             event_status,
                             event_tz,
@@ -599,6 +667,7 @@ class MemberEventDA(object):
                                         member.company_name as company,
                                         job_title.name as title,
                                         member.first_name,
+                                        member.middle_name,
                                         member.last_name,
                                         file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url
                                     FROM event_invite_2
@@ -610,16 +679,22 @@ class MemberEventDA(object):
                                 ) AS invitees
                             )
                         FROM (
-                            SELECT event_2.*, event_2.host_member_id AS viewer_member_id
-                            FROM event_2 WHERE event_2.host_member_id = %s
+                            SELECT 
+                                event_2.*, 
+                                event_2.host_member_id AS viewer_member_id
+                            FROM event_2 WHERE {} event_2.host_member_id = %s
                             UNION
-                            SELECT event_2.*, event_invite_2.invite_member_id AS viewer_member_id
+                            SELECT 
+                                event_2.*, 
+                                event_invite_2.invite_member_id AS viewer_member_id
                             FROM event_2
                             INNER JOIN event_invite_2 ON event_2.id=event_invite_2.event_id
-                            WHERE event_invite_2.invite_member_id = %s and event_2.event_status='Active' and event_invite_2.invite_status='Accepted'
+                            WHERE {} event_invite_2.invite_member_id = %s AND 
+                                event_2.event_status='Active' AND 
+                                event_invite_2.invite_status='Accepted'
                         ) as events
                     ) AS sequence
-        """.format(query_date))
+        """.format(query_date, query_date))
         params = (event_host_member_id, event_host_member_id)
         cls.source.execute(query, params)
         if cls.source.has_results():
@@ -773,7 +848,8 @@ class MemberEventDA(object):
 
             if data:
                 for row in data:
-                    row['amera_avatar_url'] = amerize_url(row['amera_avatar_url'])
+                    row['amera_avatar_url'] = amerize_url(
+                        row['amera_avatar_url'])
             return data
         else:
             return None
@@ -863,7 +939,8 @@ class MemberEventDA(object):
             (data,) = cls.source.cursor.fetchone()
             if data:
                 for row in data:
-                    row['amera_avatar_url'] = amerize_url(row['amera_avatar_url'])
+                    row['amera_avatar_url'] = amerize_url(
+                        row['amera_avatar_url'])
             return data
         else:
             return None
