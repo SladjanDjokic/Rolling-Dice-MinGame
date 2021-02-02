@@ -476,7 +476,6 @@ class MemberEventDA(object):
         params = (event_id,)
         cls.source.execute(query, params)
         if cls.source.has_results():
-
             return cls.source.cursor.fetchone()[0]
         else:
             return None
@@ -682,7 +681,8 @@ class MemberEventDA(object):
                             SELECT 
                                 event_2.*, 
                                 event_2.host_member_id AS viewer_member_id
-                            FROM event_2 WHERE {} event_2.host_member_id = %s
+                            FROM event_2 WHERE {} event_2.host_member_id = %s AND 
+                                event_2.event_status='Active'
                             UNION
                             SELECT 
                                 event_2.*, 
@@ -759,12 +759,34 @@ class MemberEventDA(object):
                         SELECT
                             events.id as event_id,
                             sequence_id,
-                            group_id,
+                            (
+                                SELECT row_to_json(group_data) as group_info
+                                FROM (
+                                    SELECT 
+                                        member_group.id as group_id,
+                                        group_name,
+                                        group_leader_id
+                                    FROM member_group
+                                    WHERE member_group.id = group_id
+                                ) as group_data
+                            ),
                             event_color_id,
                             event_name,
                             event_type,
                             event_description,
-                            host_member_id,
+                            (
+                                SELECT row_to_json(member_data) as host_member_info
+                                FROM (
+                                    SELECT
+                                        member.id as host_member_id,
+                                        member.first_name,
+                                        member.middle_name,
+                                        member.last_name,
+                                        member.company_name
+                                    FROM member
+                                    WHERE member.id = host_member_id
+                                ) as member_data
+                            ),
                             is_full_day,
                             event_status,
                             event_tz,
@@ -780,7 +802,7 @@ class MemberEventDA(object):
                             location_address,
                             member.first_name as first_name,
                             member.last_name as last_name,
-                            file_storage_engine.storage_engine_id as amera_avatar_url,
+                            file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url,
                             role.name as role,
                             (
                                 SELECT json_agg(files) as attachments
@@ -810,6 +832,7 @@ class MemberEventDA(object):
                                         member.company_name as company,
                                         job_title.name as title,
                                         member.first_name,
+                                        member.middle_name,
                                         member.last_name,
                                         file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url
                                     FROM event_invite_2
@@ -822,7 +845,7 @@ class MemberEventDA(object):
                             )
                         FROM (
                             SELECT event_2.*, event_2.host_member_id AS viewer_member_id
-                            FROM event_2 WHERE event_2.host_member_id = %s
+                            FROM event_2 WHERE event_2.host_member_id = %s AND event_2.event_status='Active'
                             UNION
                             SELECT event_2.*, event_invite_2.invite_member_id AS viewer_member_id
                             FROM event_2
@@ -845,11 +868,6 @@ class MemberEventDA(object):
         cls.source.execute(query, params)
         if cls.source.has_results():
             (data,) = cls.source.cursor.fetchone()
-
-            if data:
-                for row in data:
-                    row['amera_avatar_url'] = amerize_url(
-                        row['amera_avatar_url'])
             return data
         else:
             return None
@@ -862,12 +880,34 @@ class MemberEventDA(object):
             (SELECT event_invite_2.id as id,
                     event_2.id AS event_id,
                     sequence_id,
-                    group_id,
+                    (
+                        SELECT row_to_json(group_data) as group_info
+                        FROM (
+                            SELECT 
+                                member_group.id as group_id,
+                                group_name,
+                                group_leader_id
+                            FROM member_group
+                            WHERE member_group.id = group_id
+                        ) as group_data
+                    ),
                     event_color_id,
                     event_name,
                     event_type,
                     event_description,
-                    host_member_id,
+                    (
+                        SELECT row_to_json(member_data) as host_member_info
+                        FROM (
+                            SELECT
+                                member.id as host_member_id,
+                                member.first_name,
+                                member.middle_name,
+                                member.last_name,
+                                member.company_name
+                            FROM member
+                            WHERE member.id = host_member_id
+                        ) as member_data
+                    ),
                     is_full_day,
                     event_status,
                     event_tz,
@@ -883,7 +923,7 @@ class MemberEventDA(object):
                     location_address,
                     member.first_name as first_name,
                     member.last_name as last_name,
-                    file_storage_engine.storage_engine_id as amera_avatar_url,
+                    file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url,
                     role.name as role,
                 (SELECT json_agg(files) AS attachments
                 FROM
@@ -909,6 +949,7 @@ class MemberEventDA(object):
                             member.company_name as company,
                             job_title.name as title,
                             member.first_name,
+                            member.middle_name,
                             member.last_name,
                             file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url
                         FROM event_invite_2
@@ -937,10 +978,6 @@ class MemberEventDA(object):
         cls.source.execute(query, params)
         if cls.source.has_results():
             (data,) = cls.source.cursor.fetchone()
-            if data:
-                for row in data:
-                    row['amera_avatar_url'] = amerize_url(
-                        row['amera_avatar_url'])
             return data
         else:
             return None

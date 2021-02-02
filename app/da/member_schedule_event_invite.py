@@ -11,13 +11,13 @@ class MemberScheduleEventInviteDA(object):
     source = source
 
     @classmethod
-    def create_invite(cls, invitee_id, event_id):
+    def create_invite(cls, invitee_id, event_id, status='Tentative'):
         query = ("""
-            INSERT INTO event_invite_2 (invite_member_id, event_id)
-            VALUES (%s, %s)
+            INSERT INTO event_invite_2 (invite_member_id, event_id, invite_status)
+            VALUES (%s, %s, %s)
             RETURNING id
         """)
-        params = (invitee_id, event_id)
+        params = (invitee_id, event_id, status)
         cls.source.execute(query, params)
         id = None
         if cls.source.has_results():

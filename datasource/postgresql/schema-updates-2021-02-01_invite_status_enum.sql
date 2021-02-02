@@ -1,0 +1,1 @@
+ALTER TYPE confirm_status ADD VALUE 'Recurring';

@@ -122,7 +122,7 @@ class MemberScheduleEventResource(object):
             location_mode == 'lookup' or location_mode == 'url') else None
 
         # This is the first event id
-        event_id = MemberEventDA().add_2(
+        main_event_id = MemberEventDA().add_2(
             sequence_id=sequence_id,
             event_color_id=color_id,
             event_name=event_name,
@@ -152,10 +152,10 @@ class MemberScheduleEventResource(object):
         '''
         if len(attachments) > 0:
             for file_id in attachments:
-                MemberEventDA().bind_attachment(event_id, file_id)
+                MemberEventDA().bind_attachment(main_event_id, file_id)
 
         # if recurring -> add events for each instance
-        all_event_ids = [event_id]
+        all_event_ids = [main_event_id]
 
         if event_recurrence_freq != 'No recurrence':
             if len(recurringCopies) > 0:
@@ -190,8 +190,12 @@ class MemberScheduleEventResource(object):
             if len(all_event_ids) > 0:
                 for invitee_id in invited_members:
                     for event_id in all_event_ids:
-                        MemberScheduleEventInviteDA().create_invite(
-                            invitee_id=invitee_id, event_id=event_id)
+                        if event_id == main_event_id:
+                            MemberScheduleEventInviteDA().create_invite(
+                                invitee_id=invitee_id, event_id=event_id)
+                        else:
+                            MemberScheduleEventInviteDA().create_invite(
+                                invitee_id=invitee_id, event_id=event_id, status="Recurring")
 
         '''
             Now get the sequence we've created and send it back to front end.
@@ -463,14 +467,14 @@ class MemberUpcomingEvents(object):
 
 class MemberEventInvitations(object):
     def __init__(self):
-        self.kafka_data = { "GET": {"event_type": settings.get('kafka.event_types.get.event_invite_response'),
+        self.kafka_data = {"GET": {"event_type": settings.get('kafka.event_types.get.event_invite_response'),
                                    "topic": settings.get('kafka.topics.calendar')
                                    },
-                            "PUT": {"event_type": settings.get('kafka.event_types.get.event_invite_response'),
+                           "PUT": {"event_type": settings.get('kafka.event_types.get.event_invite_response'),
                                    "topic": settings.get('kafka.topics.calendar')
                                    },
                            }
-    
+
     def on_get(self, req, resp):
         try:
             session_id = get_session_cookie(req)
@@ -519,6 +523,3 @@ class MemberEventInvitations(object):
                 "description": "Invalid status",
                 "success": False
             }, default_parser=json.parser)
-
-
-    
