@@ -1882,6 +1882,156 @@ class MemberInfoDA(object):
         except:
             pass
 
+class MemberSettingDA(object):
+    source = source
+
+    def get_member_setting(cls, member_id):
+        get_member_setting_query = ("""
+            SELECT
+                COALESCE(json_agg(DISTINCT member_location.*) FILTER (WHERE member_location.id IS NOT NULL), '[]') AS location_information,
+                member_profile.online_status,
+                member_profile.view_profile,
+                member_profile.add_contact,
+                member_profile.join_date,
+                member_profile.login_location,
+                member_profile.unit_of_measure,
+                member_profile.timezone_id,
+                member_profile.date_format,
+                member_profile.time_format,
+                member_profile.start_day
+            FROM member_profile
+                LEFT OUTER JOIN member_location ON member_location.member_id = member_profile.member_id
+            WHERE member_profile.member_id = %s
+            GROUP BY member_profile.member_id
+            """)
+        get_member_setting_params = (member_id,)
+        cls.source.execute(get_member_setting_query, get_member_setting_params)
+        if cls.source.has_results():
+            for (
+                    location_information,
+                    online_status,
+                    view_profile,
+                    add_contact,
+                    join_date,
+                    login_location,
+                    unit_of_measure,
+                    timezone_id,
+                    date_format,
+                    time_format,
+                    start_day
+            ) in cls.source.cursor:
+                member = {
+                    "location_information": location_information,
+                    "online_status": online_status,
+                    "view_profile": view_profile,
+                    "add_contact": add_contact,
+                    "join_date": join_date,
+                    "login_location": login_location,
+                    "unit_of_measure": unit_of_measure,
+                    "timezone_id": timezone_id,
+                    "date_format": date_format,
+                    "time_format": time_format,
+                    "start_day": start_day
+                }
+
+                return member
+
+    @classmethod
+    def update_member_setting(cls, member_id, member_profile, member_location):
+
+        try:
+            # TODO: - PERFORMANCE CHECK
+
+            # Member_profile
+            member_profile_query = ("""
+                INSERT INTO member_profile (
+                    member_id,
+                    online_status,
+                    view_profile,
+                    add_contact,
+                    join_date,
+                    login_location,
+                    unit_of_measure,
+                    timezone_id,
+                    date_format,
+                    time_format,
+                    start_day )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON conflict(member_id) DO UPDATE
+                SET online_status = %s, 
+                    view_profile = %s, 
+                    add_contact = %s, 
+                    join_date = %s,  
+                    login_location = %s, 
+                    unit_of_measure = %s, 
+                    timezone_id = %s, 
+                    date_format = %s, 
+                    time_format = %s, 
+                    start_day = %s
+            """)
+
+            member_profile_params = (
+                member_id,) + tuple(2 * [member_profile["online_status"], member_profile["view_profile"],
+                member_profile["add_contact"], member_profile["join_date"], member_profile["login_location"],
+                member_profile["unit_of_measure"], member_profile["timezone_id"], member_profile["date_format"],
+                member_profile["time_format"], member_profile["start_day"]])
+
+            cls.source.execute(member_profile_query, member_profile_params)
+            cls.source.commit()
+
+            # Member location
+            member_location_update_query = ("""
+                UPDATE member_location
+                SET
+                    description = %s,
+                    address_1 = %s,
+                    street = %s,
+                    address_2 = %s,
+                    city = %s,
+                    state = %s,
+                    province = %s,
+                    postal = %s,
+                    country = %s,
+                    country_code_id = %s,
+                    location_type = %s
+                WHERE id=%s AND member_id = %s;
+            """)
+            member_location_insert_query = ("""
+                INSERT INTO member_location (description, address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, member_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id;
+            """)
+            member_location_delete_query = ("""
+                DELETE FROM member_location
+                WHERE member_id = %s AND NOT id = ANY(%s) AND location_type IN ('other', 'billing');
+            """)
+
+            if member_location:
+                location_ids_to_stay = list()
+                for location in member_location:
+                    if location:
+                        id_, description, street, address_1, address_2, city, state, province, postal, country, country_code_id, location_type = [
+                            location[k] for k in ('id', 'description', 'street', 'address_1', 'address_2', 'city', 'state', 'province', 'postal', 'country', 'country_code_id', 'location_type')]
+
+                    if type(id_) == int:
+                        cls.source.execute(
+                            member_location_update_query, (description, address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, id_, member_id))
+                        location_ids_to_stay.append(id_)
+                    else:
+                        cls.source.execute(
+                            member_location_insert_query, (description, address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, member_id))
+                        location_ids_to_stay.append(
+                            cls.source.get_last_row_id())
+                    cls.source.commit()
+                # Track what was deleted in the UI and kill it in db as well
+                cls.source.execute(member_location_delete_query,
+                                   (member_id, location_ids_to_stay))
+                cls.source.commit()
+            return True
+        except Exception as e:
+            logger.debug("iss+++++ {}".format(e))
+            pass
+
 
 class MemberNotificationsSettingDA(object):
     source = source

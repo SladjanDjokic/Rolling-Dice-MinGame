@@ -12,7 +12,7 @@ from app.resources.member import MemberRegisterResource, MemberSearchResource, \
     MemberGroupSearchResource, MemberContactResource, MemberContactAccept, ContactMembersResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms, MemberDepartments, MemberContactsRoles, \
     MemberContactsCompanies, MemberContactsCountries, MemberTimezones, MemberInfoByIdResource, \
-    MemberContactSecurity
+    MemberContactSecurity, MemberSettingResource
 from app.resources.verification import Verification
 from app.resources.verifycell import VerifyCell
 from app.resources.promo_codes import PromoCodes
@@ -131,6 +131,7 @@ def _setup_routes(app):
     app.add_route("/member/invite", MemberInviteResource())
     app.add_route("/member/info/{member_id}", MemberInfoByIdResource())
     app.add_route("/member/info", MemberInfoResource())
+    app.add_route("/member/setting", MemberSettingResource())
     app.add_route("/member/invite/{invite_key:uuid}", MemberInviteResource())
     app.add_route("/member/register/{invite_key:uuid}", MemberRegisterResource())  # noqa: E501
     app.add_route("/member/register", MemberRegisterResource())  # noqa: E501

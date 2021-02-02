@@ -80,8 +80,20 @@ class MemberGroupResource(object):
                 pin = None
 
             # First we create empty file trees
-            main_file_tree_id = FileTreeDA().create_tree('main', 'group')
+            main_file_tree_id, file_tree_id = FileTreeDA().create_tree('main', 'group', True)
             bin_file_tree_id = FileTreeDA().create_tree('bin', 'group')
+
+            # Add default folders for Drive
+            default_drive_folders = settings.get('drive.default_folders')
+            default_drive_folders.sort()
+
+            for folder_name in default_drive_folders:
+                FileTreeDA().create_file_tree_entry(
+                    tree_id=main_file_tree_id,
+                    parent_id=file_tree_id,
+                    member_file_id=None,
+                    display_name=folder_name
+                )
 
             group_id = GroupDA().create_expanded_group(group_leader_id, name,
                                                        file_id, pin,

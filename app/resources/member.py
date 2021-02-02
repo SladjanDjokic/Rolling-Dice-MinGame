@@ -6,7 +6,7 @@ import app.util.json as json
 import app.util.request as request
 from app.util.auth import inject_member
 from app import settings
-from app.da.member import MemberDA, MemberContactDA, MemberInfoDA
+from app.da.member import MemberDA, MemberContactDA, MemberInfoDA, MemberSettingDA
 from app.da.file_sharing import FileStorageDA, FileTreeDA
 from app.da.invite import InviteDA
 from app.da.group import GroupMembershipDA, GroupDA
@@ -692,6 +692,59 @@ class MemberInfoResource(object):
                     "success": True
                 }, default_parser=json.parser)
 
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+
+class MemberSettingResource(object):
+
+    # def __init__(self):
+    #     self.kafka_data = {"PUT": {"event_type": settings.get('kafka.event_types.put.member_info_update'),
+    #                                "topic": settings.get('kafka.topics.member')
+    #                                },
+    #                        }
+
+    @staticmethod
+    def on_get(req, resp):
+
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+
+            member_info = MemberSettingDA().get_member_setting(member_id)
+
+            resp.body = json.dumps({
+                "data": member_info,
+                "success": True
+            }, default_parser=json.parser)
+
+        except InvalidSessionError as err:
+            #  resp.body = json.dumps({
+            #     "description": 'Unauthorized session',
+            #     "member": member_info,
+            #     "success": False
+            # }, default_parser=json.parser)
+            raise UnauthorizedSession() from err
+
+    @staticmethod
+    def on_put(req, resp):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+
+            (member_profile, member_location) = request.get_json_or_form(
+                "member_profile", "member_location", req=req)
+
+            logger.debug("member_profile_x: {}".format(member_profile))
+            updated = MemberSettingDA().update_member_setting(member_id, member_profile, member_location)
+
+            if updated:
+                member_info = MemberSettingDA().get_member_setting(member_id)
+                resp.body = json.dumps({
+                    "data": member_info,
+                    "success": True
+                }, default_parser=json.parser)
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
 
