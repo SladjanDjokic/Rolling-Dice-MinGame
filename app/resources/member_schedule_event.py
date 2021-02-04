@@ -475,47 +475,55 @@ class MemberEventInvitations(object):
                                    },
                            }
 
-    def on_get(self, req, resp):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
+    @inject_member
+    def on_get(self, req, resp, member):
 
-        event_invitations = MemberEventDA().get_event_invitations(member_id)
+        success = MemberEventDA().get_event_invitations(member["member_id"])
 
         resp.body = json.dumps({
-            "data": event_invitations,
+            "data": success,
             "message": "Invitations",
             "status": "success",
             "success": True
         }, default_parser=json.parser)
 
-    def on_put(self, req, resp, event_invite_id):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
-            (status,) = request.get_json_or_form("status", req=req)
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
-
+    @inject_member
+    def on_put(self, req, resp, member, event_invite_id):
         status_list = ['Accepted', 'Declined']
+        (status,) = request.get_json_or_form("status", req=req)
+        member_id = member["member_id"]
         if status in status_list:
-            event_invitations = MemberEventDA().set_event_invitate_status(
+
+            '''
+                Here comes the logic to handle recurring events:
+                If the invite refers to an event from a recurrent sequence =>
+                Find all instances having status 'Recurring' and make them 'Accepted'
+            '''
+            recurring_invite_ids = MemberEventDA().get_recurring_copies_invite_ids(
+                member_id, event_invite_id)
+
+            success = {}
+            if recurring_invite_ids and len(recurring_invite_ids) > 0:
+                for recurring_invite_id in recurring_invite_ids:
+                    success[recurring_invite_id] = MemberEventDA().set_event_invite_status(
+                        member_id, recurring_invite_id, status)
+
+            success[event_invite_id] = MemberEventDA().set_event_invite_status(
                 member_id, event_invite_id, status)
 
-            if event_invitations:
+            is_all_updated = all(value == True for value in success.values())
+            if is_all_updated:
                 resp.body = json.dumps({
-                    "data": event_invitations,
                     "message": "success to set event status",
                     "status": "success",
                     "success": True
                 }, default_parser=json.parser)
             else:
+                failed_event_ids = list(
+                    {k: v for (k, v) in success.items() if v != True}.keys())
+
                 resp.body = json.dumps({
-                    "description": "Did not set event status",
+                    "description": f"Could not set event status for invite ids {failed_event_ids}",
                     "success": False
                 }, default_parser=json.parser)
         else:

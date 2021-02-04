@@ -730,6 +730,33 @@ class MemberEventDA(object):
         except Exception as e:
             raise e
 
+    @classmethod
+    def get_recurring_copies_invite_ids(cls, member_id, original_event_id):
+        try:
+            query = ('''
+                SELECT event_invite_2.id 
+                    FROM event_invite_2
+                    LEFT JOIN event_2 ON event_invite_2.event_id = event_2.id
+                    LEFT JOIN event_sequence ON event_2.sequence_id = event_sequence.id
+                    WHERE event_invite_2.invite_member_id = %s
+                        AND event_invite_2.invite_status = 'Recurring' 
+                        AND event_sequence.id = (
+                            SELECT event_sequence.id
+                            FROM event_sequence
+                            LEFT JOIN event_2 ON event_2.sequence_id = event_sequence.id
+                            LEFT JOIN event_invite_2 ON event_2.id = event_invite_2.event_id
+                            WHERE event_invite_2.id = %s
+                        )
+            ''')
+            params = (member_id, original_event_id)
+            cls.source.execute(query, params)
+            if cls.source.has_results():
+                invite_ids = [r[0] for r in cls.source.cursor.fetchall()]
+                return invite_ids
+
+        except Exception as e:
+            raise e
+
     # @classmethod
     # def update_event_by_id(cls, key, value, id):
     #     try:
@@ -983,7 +1010,7 @@ class MemberEventDA(object):
             return None
 
     @classmethod
-    def set_event_invitate_status(cls, member_id, event_invite_id, status):
+    def set_event_invite_status(cls, member_id, event_invite_id, status):
         query = ("""
             UPDATE event_invite_2
             SET invite_status = %s
