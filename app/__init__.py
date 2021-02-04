@@ -54,6 +54,8 @@ from app.resources.notifications_setting import MemberNotificationsSetting
 # from app.resources.memberfile import
 # from app.resources.keygen import KeyGenResource, KeyGenFileUpload
 
+from app.resources.bug_report import BugReportResource
+
 from app.resources.admin import AdminMemberResource
 
 from app.da.__init__ import check_trees
@@ -327,6 +329,9 @@ def _setup_routes(app):
     # Event Invitation Accept/Decline
     app.add_route("/member/event/invite/{event_invite_id}", member_event_invitation_resource)
     app.add_route("/notify", IncomingCallView())
+
+    # Report Bugs
+    app.add_route("/member/report/bug", BugReportResource())
 
     # Admin Resources
 

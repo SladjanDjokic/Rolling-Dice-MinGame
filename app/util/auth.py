@@ -57,6 +57,18 @@ def get_session_member_data(request):
     return member
 
 
+def check_session(func):
+    def wrapper(cls, request, response, *args, **kwargs):
+        try:
+            validate_session_request(request)
+            func(cls, request, response, *args, **kwargs)
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+        except ForbiddenSessionError as err:
+            raise ForbiddenSession() from err
+    return wrapper
+
+
 def check_session_administrator(func):
     def wrapper(cls, request, response, *args, **kwargs):
         try:

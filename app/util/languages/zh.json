@@ -14,6 +14,7 @@
   "app.calendar.title": "Calendar",
   "app.communication.title": "IoT Device Control",
   "app.statistic.title": "History and Analytics",
+  "app.reportBugs.title": "Report Bugs",
   "app.header.menu.my-profile": "My Profile",
   "app.header.menu.invite-member": "Invite User",
   "app.header.menu.logout": "Log Out",

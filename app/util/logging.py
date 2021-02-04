@@ -25,6 +25,7 @@ def setup_logging():
         },
         "formatters": {
             "standard": {
+                "style": "{",
                 "format": settings.get("LOG_FORMAT"),
                 "datefmt": settings.get("LOG_DATE_FORMAT")
             }

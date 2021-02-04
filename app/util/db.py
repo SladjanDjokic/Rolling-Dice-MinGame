@@ -76,9 +76,9 @@ class DataSource (object):
                 if not self.cursor:
                     self.connect()
                 if debug_query:
-                    logger.debug(f"BULK_INSERT: {bulk_insert}")
-                    logger.debug(f"EXECUTE_QUERY: {query}")
-                    logger.debug(f"EXECUTE_PARAMS: {params}")
+                    ds_logger.debug(f"BULK_INSERT: {bulk_insert}")
+                    ds_logger.debug(f"EXECUTE_QUERY: {query}")
+                    ds_logger.debug(f"EXECUTE_PARAMS: {params}")
                 if bulk_insert:
                     return extras.execute_values(self.cursor, query, params)
                 else:
@@ -93,7 +93,9 @@ class DataSource (object):
                 self.rollback()
                 raise RelationshipReferenceError from err
             except Exception:
-                logger.exception("[FIXME]: Unknown Exception")
+                logger.exception("[FIXME]: Unknown Database Exception")
+                logger.debug(f"EXECUTE_QUERY: {query}")
+                logger.debug(f"EXECUTE_PARAMS: {params}")
                 try:
                     self.rollback()
                 except Exception:

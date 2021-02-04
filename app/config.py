@@ -64,7 +64,7 @@ m.add_argument("--access-control-allow-headers", type=str,
 
 # Logs
 l = p.add_argument_group("Logs")
-fmt = "[%(asctime)s] [%(process)d] [%(levelname)s] %(message)s"
+fmt = "[{levelname:^9}] [{asctime}] [{process}][{processName}] [{name:^9}] [{funcName:^9}] [Line: {lineno}] {message}"
 l.add_argument("--log-format", type=str, default=fmt,
                help="Log format (default %(default)s)")
 l.add_argument("--log-date-format", type=str, default="%Y-%m-%d %H:%M:%S %z",

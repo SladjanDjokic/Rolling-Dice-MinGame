@@ -22,6 +22,11 @@ from app.util.error import HTTPError
 from app.util.session import get_session_cookie, validate_session
 from app.da.activity import ActivityDA
 
+import copyreg
+from cgi import FieldStorage
+from falcon_multipart.parser import Parser
+
+
 logger = logging.getLogger(__name__)
 
 # Topic route table based on resource and method.
@@ -31,6 +36,13 @@ logger = logging.getLogger(__name__)
 ignore_routes = ['/healthz']
 
 
+def pickle_field_storage(c):
+    logger.debug(f"Pickling copy of {type(c)} ")
+    return "<byte-data>"
+
+
+copyreg.pickle(FieldStorage, pickle_field_storage)
+copyreg.pickle(Parser, pickle_field_storage)
 
 
 class CrossDomain(object):
