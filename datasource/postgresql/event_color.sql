@@ -9,5 +9,5 @@ VALUES
     ('#F686AE'),
     ('#F2BD2C'),
     ('#C7BBED'),
-    ('#7DAE7AB'),
+    ('#7DD8AE'),
     ('#F2F2F0');
