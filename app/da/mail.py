@@ -9,9 +9,11 @@ from falcon import HTTPInternalServerError
 
 from app.da.file_sharing import FileStorageDA
 from app.da.mail_folder import MailFolderDA
+from app.da.member import MemberContactDA
 from app.exceptions.data import DataMissingError, HTTPBadRequest, HTTPNotFound
 from app.util.db import source
 from app.util.filestorage import amerize_url
+from app.util.security import SECURITY_EXCHANGE_OPTIONS
 from app.util.validators import receiver_dict_validator
 
 logger = logging.getLogger(__name__)
@@ -70,11 +72,22 @@ class BaseMailDA(BaseDA):
             """
         if has_member_filter and cls.folder_name != "Sent":
             user_folders_query += """
-                AND xref.owner_member_id = %s
+                 AND (
+                    message_to->'amera' @> to_char(%s, '999')::jsonb
+                    OR 
+                    message_cc->'amera' @> to_char(%s, '999')::jsonb
+                    OR xref.owner_member_id = %s
+                )
             """
         if has_member_filter and cls.folder_name == "Sent":
             user_folders_query += """
-                AND message_to->'amera' @> to_char(%s, '999')::jsonb
+                AND (
+                    message_to->'amera' @> to_char(%s, '999')::jsonb
+                    OR
+                    message_cc->'amera' @> to_char(%s, '999')::jsonb
+                    OR
+                    message_bcc->'amera' @> to_char(%s, '999')::jsonb
+                )
             """
         return f"""
             SELECT
@@ -443,6 +456,8 @@ class BaseMailDA(BaseDA):
             folder_filter_data.append(filter_list["folder"] if filter_list and "folder" in filter_list else None)
         if filter_list and ("member_id" in filter_list):
             folder_filter_data.append(filter_list["member_id"])
+            folder_filter_data.append(filter_list["member_id"])
+            folder_filter_data.append(filter_list["member_id"])
         # # Get mail header
         cls.source.execute(header_query, (start, member_id, cls.message_locked, *folder_filter_data, *search_params,
                                           size))
@@ -650,6 +665,283 @@ class BaseMailDA(BaseDA):
         return {}
 
 
+    @classmethod
+    def get_selectable_contacts(cls, member_id, sort_params, filter_params, search_key='', page_size=None,
+                                page_number=None):
+        sort_columns_string = 'first_name ASC'
+        contact_dict = {
+            'id': 'contact.id',
+            'contact_member_id': 'contact.contact_member_id',
+            'first_name': 'contact.first_name',
+            'middle_name': 'member.middle_name',
+            'last_name': 'contact.last_name',
+            'biography': 'member_profile.biography',
+            'cell_phone': 'contact.cell_phone',
+            'office_phone': 'contact.office_phone',
+            'home_phone': 'contact.home_phone',
+            'email': 'contact.email',
+            'personal_email': 'contact.personal_email',
+            'company': 'member.company_name',
+            'title': 'job_title.name',
+            'country_code_id': 'member_location.country_code_id',
+            'company_name': 'member.company_name',
+            'company_phone': 'contact.company_phone',
+            'company_web_site': 'contact.company_web_site',
+            'company_email': 'contact.company_email',
+            'company_bio': 'contact.company_bio',
+            'role': 'role.name',
+            'role_id': 'role.id',
+            'create_date': 'contact.create_date',
+            'update_date': 'contact.update_date',
+            'status': 'contact.status',
+            'online_status': 'member_session.status'
+        }
+
+        if sort_params:
+            sort_columns_string = MemberContactDA.formatSortingParams(
+                sort_params, contact_dict) or sort_columns_string
+
+        (filter_conditions_query, filter_conditions_params) = MemberContactDA.formatFilterConditions(
+            filter_params, contact_dict)
+        get_contacts_params = (member_id, ) + filter_conditions_params
+        contacts = list()
+        get_contacts_query = (f"""
+            SELECT contact.id as id,
+                contact.contact_member_id as contact_member_id,
+                contact.first_name as first_name,
+                member.middle_name as middle_name,
+                contact.last_name as last_name,
+                member_profile.biography as biography,
+                contact.cell_phone as cell_phone,
+                contact.office_phone as office_phone,
+                contact.home_phone as home_phone,
+                contact.email as email,
+                contact.personal_email as personal_email,
+                member.company_name as company,
+                job_title.name as title,
+                contact.company_name as company_name,
+                contact.company_phone as company_phone,
+                contact.company_web_site as company_web_site,
+                contact.company_email as company_email,
+                contact.company_bio as company_bio,
+                role.name as role,
+                role.id as role_id,
+                contact.create_date as create_date,
+                contact.update_date as update_date,
+                COALESCE(json_agg(DISTINCT member_location.*) FILTER (WHERE member_location.id IS NOT NULL), '[]') AS location_information,
+                COALESCE(json_agg(DISTINCT member_contact_2.*) FILTER (WHERE member_contact_2.id IS NOT NULL), '[]') AS contact_information,
+                COALESCE(json_agg(DISTINCT country_code.*) FILTER (WHERE country_code.id IS NOT NULL), '[]') AS country_code,
+                COALESCE(json_agg(DISTINCT member_achievement.*) FILTER (WHERE member_achievement.id IS NOT NULL), '[]') AS achievement_information,
+                file_storage_engine.storage_engine_id as s3_avatar_url,
+                contact.security_exchange_option,
+                contact.status,
+                CASE
+                    WHEN member_session.status IS NOT NULL
+                    THEN member_session.status
+                    ELSE 'inactive'
+                END as online_status
+            FROM contact
+                LEFT JOIN member ON member.id = contact.contact_member_id
+                LEFT OUTER JOIN role ON contact.role_id = role.id
+                LEFT OUTER JOIN member_location ON member_location.member_id = contact.contact_member_id
+                LEFT OUTER JOIN member_contact ON member_contact.member_id = contact.contact_member_id
+                LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = contact.contact_member_id
+                LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
+                LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
+                LEFT OUTER JOIN member_profile ON contact.contact_member_id = member_profile.member_id
+                LEFT OUTER JOIN member_achievement ON member_achievement.member_id = member.id
+                LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+                LEFT OUTER JOIN member_session ON
+                    contact.contact_member_id = member_session.member_id AND
+                    member_session.status IN ('online', 'disconnected') AND
+                    member_session.expiration_date >= current_timestamp
+                INNER JOIN mail_xref mx on mx.member_id = contact.member_id
+                INNER JOIN mail_header mh on mx.mail_header_id = mh.id
+                INNER JOIN mail_folder_xref on mx.id = mail_folder_xref.mail_xref_id
+                INNER JOIN mail_folder mf on (
+                        mail_folder_xref.mail_folder_id = mf.id
+                        AND mf.name = '{str(cls.folder_name).upper()}'
+                    )
+            WHERE
+                contact.member_id = %s {filter_conditions_query}
+                AND
+                (
+                    (
+                        mf.name = 'SENT'
+                        AND mh.member_id = contact.member_id
+                        AND
+                        (
+                            mh.message_to->'amera' @> to_char(contact.contact_member_id, '999')::jsonb
+                            OR
+                            mh.message_cc->'amera' @> to_char(contact.contact_member_id, '999')::jsonb
+                            OR
+                            mh.message_bcc->'amera' @> to_char(contact.contact_member_id, '999')::jsonb
+                        )
+                    )
+                    OR
+                    (
+                        mf.name != 'SENT'
+                        AND
+                        (
+                            mh.message_to->'amera' @> to_char(contact.contact_member_id, '999')::jsonb
+                            OR
+                            mh.message_cc->'amera' @> to_char(contact.contact_member_id, '999')::jsonb
+                            OR mh.member_id = contact.contact_member_id
+                        )
+                    )
+                )
+                AND
+                (
+                    concat(contact.first_name, member.middle_name, contact.last_name) ILIKE %s
+                    OR contact.email ILIKE %s
+                    OR member_profile.biography LIKE %s
+                    OR contact.cell_phone LIKE %s
+                    OR contact.office_phone LIKE %s
+                    OR contact.home_phone LIKE %s
+                    OR contact.personal_email LIKE %s
+                    OR member.company_name LIKE %s
+                    OR job_title.name LIKE %s
+                    OR cast(member_location.country_code_id as varchar) LIKE %s
+                    OR member.company_name LIKE %s
+                    OR contact.company_phone LIKE %s
+                    OR contact.company_web_site LIKE %s
+                    OR contact.company_email LIKE %s
+                    OR contact.company_bio LIKE %s
+                    OR role.name LIKE %s
+                )
+            GROUP BY
+                contact.id,
+                contact.contact_member_id,
+                contact.first_name,
+                member.middle_name,
+                contact.last_name,
+                member_profile.biography,
+                contact.cell_phone,
+                contact.office_phone,
+                contact.home_phone,
+                contact.email,
+                contact.personal_email,
+                member.company_name,
+                job_title.name,
+                contact.company_name,
+                contact.company_phone,
+                contact.company_web_site,
+                contact.company_email,
+                contact.company_bio,
+                role.name,
+                role.id,
+                contact.create_date,
+                contact.update_date,
+                file_storage_engine.storage_engine_id,
+                contact.status,
+                member_session.status
+            ORDER BY {sort_columns_string}
+            """)
+
+        like_search_key = """%{}%""".format(search_key)
+        get_contacts_params = get_contacts_params + \
+            tuple(16 * [like_search_key])
+
+        countQuery = (f"""
+            SELECT COUNT(*)
+                FROM
+                    (
+                        {get_contacts_query}
+                    ) src;
+            """)
+
+        count = 0
+        cls.source.execute(countQuery, get_contacts_params)
+        if cls.source.has_results():
+            (count,) = cls.source.cursor.fetchone()
+
+        if page_size and page_number >= 0:
+            get_contacts_query += """LIMIT %s OFFSET %s"""
+            offset = 0
+            if page_number > 0:
+                offset = page_number * page_size
+            get_contacts_params = get_contacts_params + (page_size, offset)
+
+        cls.source.execute(get_contacts_query, get_contacts_params)
+        if cls.source.has_results():
+            for (
+                    id,
+                    contact_member_id,
+                    first_name,
+                    middle_name,
+                    last_name,
+                    biography,
+                    cell_phone,
+                    office_phone,
+                    home_phone,
+                    email,
+                    personal_email,
+                    company,
+                    title,
+                    company_name,
+                    company_phone,
+                    company_web_site,
+                    company_email,
+                    company_bio,
+                    role,
+                    role_id,
+                    create_date,
+                    update_date,
+                    location_information,
+                    contact_information,
+                    country_code,
+                    achievement_information,
+                    s3_avatar_url,
+                    security_exchange_option,
+                    status,
+                    online_status
+            ) in cls.source.cursor:
+                contact = {
+                    "id": id,
+                    "contact_member_id": contact_member_id,
+                    "first_name": first_name,
+                    "middle_name": middle_name,
+                    "last_name": last_name,
+                    "member_name": f'{first_name} {last_name}',
+                    "biography": biography,
+                    "cell_phone": cell_phone,
+                    "office_phone": office_phone,
+                    "home_phone": home_phone,
+                    "email": email,
+                    "personal_email": personal_email,
+                    "company": company,
+                    "title": title,
+                    "company_name": company_name,
+                    "company_phone": company_phone,
+                    "company_web_site": company_web_site,
+                    "company_email": company_email,
+                    "company_bio": company_bio,
+                    "role": role,
+                    "role_id": role_id,
+                    "create_date": create_date,
+                    "update_date": update_date,
+                    "location_information": location_information,
+                    "contact_information": contact_information,
+                    "country_code": country_code,
+                    "achievement_information": achievement_information,
+                    "amera_avatar_url": amerize_url(s3_avatar_url),
+                    "security_exchange_option":
+                        SECURITY_EXCHANGE_OPTIONS.get(
+                            security_exchange_option, 0),
+                    "status": status,
+                    "online_status": online_status
+                    # "city": city,
+                    # "state": state,
+                    # "province": province,
+                    # "country": country
+                }
+                contacts.append(contact)
+        return {
+            "contacts": contacts,
+            "count": count
+        }
+
+
 class InboxMailDa(BaseMailDA):
     folder_name = "INBOX"
     user_folders = True
@@ -665,7 +957,7 @@ class InboxMailDa(BaseMailDA):
         return True
 
     @classmethod
-    def forward_mail(cls, member_id, orig_mail_id, receivers_l, cc, bcc, user_folder_id):
+    def forward_mail(cls, member_id, orig_mail_id, receivers_l, cc, bcc, user_folder_id, body_note):
         folder_query, folder_join = cls.folder_query(member_id)
         if not cls.can_forward_mail(member_id, orig_mail_id):
             raise HTTPBadRequest("You don't have permission for forwarding this email")
@@ -689,14 +981,14 @@ class InboxMailDa(BaseMailDA):
             FROM mail_header as head
             INNER JOIN mail_xref xref on head.id = xref.mail_header_id
             INNER JOIN mail_body body on head.id = body.mail_header_id
-            {folder_join}
+            INNER JOIN mail_folder_xref mfx on xref.id = mfx.mail_xref_id
             WHERE (
                 head.id = %s
                 AND xref.recent_mail_folder_id {'=' if user_folder_id is not None else 'IS'} %s
                 AND xref.member_id = %s
                 AND head.message_locked = TRUE
                 AND xref.deleted = FALSE
-                {folder_query}
+                AND xref.archived = FALSE
             )
             LIMIT 1;
         """
@@ -744,7 +1036,7 @@ class InboxMailDa(BaseMailDA):
                 member_id, subject, json.dumps(receivers_l), 0
             )
             bod_query_data = (
-                member_id, str(body) + str(extra_text)
+                member_id, str(body) + (str(body_note) if body_note else "") + str(extra_text)
             )
 
             cls.source.execute(action_query, query_data)

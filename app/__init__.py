@@ -240,6 +240,7 @@ def _setup_routes(app):
     app.add_route("/mail/draft/get/{mail_id}",
                   draft_resource, suffix="detail")  # GET
     app.add_route("/mail/draft/send", draft_resource, suffix="send")  # POST
+    app.add_route("/mail/draft/members", draft_resource, suffix="members")
 
     # Attachment
     attach_resource = MailAttachmentResource()
@@ -252,6 +253,8 @@ def _setup_routes(app):
     app.add_route("/mail/inbox", mail_inbox_resource, suffix="list")
     app.add_route("/mail/inbox/threads",
                   mail_inbox_resource, suffix="thread_mails")
+    app.add_route("/mail/inbox/members", mail_inbox_resource, suffix="members")
+
     app.add_route("/mail/{mail_id}", mail_inbox_resource, suffix="detail")
     app.add_route("/mail/forward", mail_inbox_resource, suffix="forward")
 
@@ -262,6 +265,7 @@ def _setup_routes(app):
     app.add_route("/mail/star/threads", mail_inbox_resource,
                   suffix="thread_mails")
     app.add_route("/mail/star/{mail_id}", mail_star_resource, suffix="detail")
+    app.add_route("/mail/star/members", mail_star_resource, suffix="members")
 
     # Trash
     mail_trash_resource = MailTrashResource()
@@ -276,6 +280,7 @@ def _setup_routes(app):
                   suffix="remove")  # POST - move mail to origin
     app.add_route("/mail/trash/mv/archive", mail_trash_resource,
                   suffix="archive")  # POST - Add to archive
+    app.add_route("/mail/trash/members", mail_trash_resource, suffix="members")
 
     # Archive
     mail_archive_resource = MailArchiveResource()
@@ -293,6 +298,7 @@ def _setup_routes(app):
                   suffix="remove")  # POST - move mail to origin
     app.add_route("/mail/archive/mv/trash", mail_archive_resource,
                   suffix="trash")  # POST - Add to archive
+    app.add_route("/mail/archive/members", mail_archive_resource, suffix="members")
 
     # Sent
     mail_sent_resource = MailSentResource()
@@ -300,6 +306,7 @@ def _setup_routes(app):
     app.add_route("/mail/sent/threads", mail_inbox_resource,
                   suffix="thread_mails")
     app.add_route("/mail/sent/{mail_id}", mail_sent_resource, suffix="detail")
+    app.add_route("/mail/sent/members", mail_sent_resource, suffix="members")
 
     # Signature
     mail_sign_resource = MailSettingsResource()

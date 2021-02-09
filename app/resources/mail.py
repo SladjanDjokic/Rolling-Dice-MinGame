@@ -4,10 +4,12 @@ from app import settings
 from app.da.file_sharing import FileStorageDA
 from app.da.mail import DraftMailDA, InboxMailDa, StarMailDa, TrashMailDa, ArchiveMailDa, MailSettingsDA, SentMailDA
 from app.da.mail_folder import MailMemberFolder
+from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 from app.util import request, json
 from app.util.auth import inject_member
 from app.exceptions.data import HTTPBadRequest
 # from app.util.email import send_text_email_with_content_type
+from app.util.session import get_session_cookie, validate_session
 from app.util.validators import validate_mail, receiver_dict_validator
 
 logger = logging.getLogger(__name__)
@@ -130,8 +132,8 @@ class MailBaseResource(object):
 
     @inject_member
     def on_post_forward(self, req, response, member):
-        (receiver, mail_id, bcc, cc, folder_id) = request.get_json_or_form(
-            "receivers", "mail_id", "bcc", "cc", "folder_id", req=req)
+        (receiver, mail_id, bcc, cc, folder_id, body_note) = request.get_json_or_form(
+            "receivers", "mail_id", "bcc", "cc", "folder_id", "body_note", req=req)
         if not mail_id:
             raise HTTPBadRequest("Email is not specified")
         if receiver and not (type(receiver) == dict and ("amera" in receiver and "external" in receiver)):
@@ -162,8 +164,36 @@ class MailBaseResource(object):
             except ValueError:
                 raise HTTPBadRequest("Folder is not valid")
 
-        return_data = self.main_da_class.forward_mail(member["member_id"], mail_id, receiver, cc, bcc, folder_id)
+        return_data = self.main_da_class.forward_mail(member["member_id"], mail_id, receiver, cc, bcc, folder_id,
+                                                      body_note)
         response.body = json.dumps(return_data, default_parser=json.parser)
+
+    def on_get_members(self, req, resp):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+
+            # sort_by_params = 'first_name, last_name, -company' or '+first_name, +last_name, -company'
+            search_key = req.get_param('searchKey') or ''
+            page_size = req.get_param_as_int('pageSize')
+            page_number = req.get_param_as_int('pageNumber')
+            sort_params = req.get_param('sort')
+            filter_params = req.get_param('filter')
+
+            result = self.main_da_class.get_selectable_contacts(
+                member_id, sort_params, filter_params,
+                search_key, page_size, page_number
+            )
+
+            resp.body = json.dumps({
+                "contacts": result['contacts'],
+                "count": result['count'],
+                "success": True
+            }, default_parser=json.parser)
+
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
 
 
 class MailDraftComposeResource(MailBaseResource):
