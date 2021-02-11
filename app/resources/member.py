@@ -13,7 +13,7 @@ from app.da.group import GroupMembershipDA, GroupDA
 from app.da.promo_codes import PromoCodesDA
 from app.da.member import MemberInfoDA
 from app.util.session import get_session_cookie, validate_session
-from app.exceptions.member import MemberNotFound, MemberDataMissing, MemberExists, MemberContactExists, MemberPasswordMismatch
+from app.exceptions.member import MemberExistsError, MemberNotFound, MemberDataMissing, MemberExists, MemberContactExists, MemberPasswordMismatch
 from app.exceptions.invite import InviteNotFound, InviteExpired
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 import app.util.email as sendmail
@@ -125,15 +125,17 @@ class MemberRegisterResource(object):
 
     def on_post(self, req, resp, invite_key=None):
 
+
+        (city, state, province, pin, email, password, confirm_password, first_name, last_name, date_of_birth,
+         phone_number, country, postal, company_name, job_title_id, profilePicture,
+         cell_confrimation_ts, email_confrimation_ts, promo_code_id, department_id) = request.get_json_or_form(
+            "city", "state", "province", "pin", "email", "password", "confirm_password", "first_name", "last_name", "dob",
+            "cell", "country", "postal_code", "company_name", "job_title_id", "profilePicture",
+            "cellConfirmationTS", "emailConfirmationTS", "activatedPromoCode", "department_id", req=req)
+
         try:
             # We store the key in hex format in the database
 
-            (city, state, province, pin, email, password, confirm_password, first_name, last_name, date_of_birth,
-             phone_number, country, postal, company_name, job_title_id, profilePicture,
-             cell_confrimation_ts, email_confrimation_ts, promo_code_id, department_id) = request.get_json_or_form(
-                "city", "state", "province", "pin", "email", "password", "confirm_password", "first_name", "last_name", "dob",
-                "cell", "country", "postal_code", "company_name", "job_title_id", "profilePicture",
-                "cellConfirmationTS", "emailConfirmationTS", "activatedPromoCode", "department_id", req=req)
 
             if password != confirm_password:
                 raise MemberPasswordMismatch()
@@ -166,7 +168,7 @@ class MemberRegisterResource(object):
             member = MemberDA.get_member_by_email(email)
 
             if member:
-                raise MemberExists(email)
+                raise MemberExistsError
 
             # Upload image to aws and create an entry in db
             avatar_storage_id = None
@@ -268,7 +270,11 @@ class MemberRegisterResource(object):
                     "description": "Registered Successfully!",
                     "success": True
                 }, default_parser=json.parser)
-        except expression as e:
+        except MemberExistsError as err:
+            raise MemberExists(email) from err
+        except Exception as err:
+            logger.exception(f"Unknown exception creating member {email}")
+            logger.error(f"Error Creating Member: {err}")
             resp.body = json.dumps({
                 "description": "Something went wrong",
                 "success": False

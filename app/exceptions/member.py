@@ -19,6 +19,10 @@ class ForgotDuplicateDataError (Exception):
     pass
 
 
+class MemberExistsError(Exception):
+    pass
+
+
 # ------------
 # HTTP Errors
 # ------------
