@@ -453,6 +453,7 @@ class MemberEventDA(object):
                                     event_invite_2.id as invite_id,
                                     event_invite_2.invite_member_id,
                                     event_invite_2.invite_status,
+                                    event_invite_2.invitee_comment,
                                     event_invite_2.create_date,
                                     event_invite_2.update_date,
                                     member.company_name as company,
@@ -552,6 +553,7 @@ class MemberEventDA(object):
                                         event_invite_2.id as invite_id,
                                         event_invite_2.invite_member_id,
                                         event_invite_2.invite_status,
+                                        event_invite_2.invitee_comment,
                                         event_invite_2.create_date,
                                         event_invite_2.update_date,
                                         member.company_name as company,
@@ -661,6 +663,7 @@ class MemberEventDA(object):
                                         event_invite_2.id as invite_id,
                                         event_invite_2.invite_member_id,
                                         event_invite_2.invite_status,
+                                        event_invite_2.invitee_comment,
                                         event_invite_2.create_date,
                                         event_invite_2.update_date,
                                         member.company_name as company,
@@ -854,6 +857,7 @@ class MemberEventDA(object):
                                         event_invite_2.id as invite_id,
                                         event_invite_2.invite_member_id,
                                         event_invite_2.invite_status,
+                                        event_invite_2.invitee_comment,
                                         event_invite_2.create_date,
                                         event_invite_2.update_date,
                                         member.company_name as company,
@@ -971,6 +975,7 @@ class MemberEventDA(object):
                             event_invite_2.id as invite_id,
                             event_invite_2.invite_member_id,
                             event_invite_2.invite_status,
+                            event_invite_2.invitee_comment,
                             event_invite_2.create_date,
                             event_invite_2.update_date,
                             member.company_name as company,
@@ -1010,13 +1015,14 @@ class MemberEventDA(object):
             return None
 
     @classmethod
-    def set_event_invite_status(cls, member_id, event_invite_id, status):
+    def set_event_invite_status(cls, member_id, event_invite_id, status, comment):
         query = ("""
             UPDATE event_invite_2
-            SET invite_status = %s
+                SET invite_status = %s,
+                    invitee_comment = %s
             WHERE id = %s and invite_member_id=%s
         """)
-        params = (status, event_invite_id, member_id)
+        params = (status, comment, event_invite_id, member_id)
         cls.source.execute(query, params)
         cls.source.commit()
         return True

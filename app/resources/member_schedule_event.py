@@ -490,7 +490,8 @@ class MemberEventInvitations(object):
     @inject_member
     def on_put(self, req, resp, member, event_invite_id):
         status_list = ['Accepted', 'Declined']
-        (status,) = request.get_json_or_form("status", req=req)
+        (status, comment) = request.get_json_or_form(
+            "status", "comment", req=req)
         member_id = member["member_id"]
         if status in status_list:
 
@@ -506,10 +507,10 @@ class MemberEventInvitations(object):
             if recurring_invite_ids and len(recurring_invite_ids) > 0:
                 for recurring_invite_id in recurring_invite_ids:
                     success[recurring_invite_id] = MemberEventDA().set_event_invite_status(
-                        member_id, recurring_invite_id, status)
+                        member_id, recurring_invite_id, status, comment)
 
             success[event_invite_id] = MemberEventDA().set_event_invite_status(
-                member_id, event_invite_id, status)
+                member_id, event_invite_id, status, comment)
 
             is_all_updated = all(value == True for value in success.values())
             if is_all_updated:
