@@ -259,20 +259,20 @@ class MemberEventDA(object):
     @classmethod
     def add_2(cls, sequence_id, event_color_id, event_name, event_description, host_member_id,
               is_full_day, event_tz, start_datetime, end_datetime, event_type, event_recurrence_freq,
-              end_condition, repeat_weekdays, end_date_datetime, location_mode, location_id, location_address, repeat_times, group_id=None):
+              end_condition, repeat_weekdays, end_date_datetime, location_mode, location_id, location_address, repeat_times, cover_attachment_id, group_id=None):
         try:
             query = (
                 """ INSERT INTO event_2
                     (sequence_id, event_color_id, event_name, event_description, host_member_id,
                     is_full_day, event_tz, start_datetime, end_datetime, event_type,
                     event_recurrence_freq, end_condition, repeat_weekdays, end_date_datetime, location_mode,
-                    location_id, location_address, repeat_times, group_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    location_id, location_address, repeat_times, group_id, cover_attachment_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 """)
             params = (sequence_id, event_color_id, event_name, event_description, host_member_id,
                       is_full_day, event_tz, start_datetime, end_datetime, event_type, event_recurrence_freq,
-                      end_condition, json.dumps(repeat_weekdays), end_date_datetime, location_mode, location_id, location_address, repeat_times, group_id)
+                      end_condition, json.dumps(repeat_weekdays), end_date_datetime, location_mode, location_id, location_address, repeat_times, group_id, cover_attachment_id)
             cls.source.execute(query, params)
             id = None
             if cls.source.has_results():
@@ -439,6 +439,7 @@ class MemberEventDA(object):
                                     file_id,
                                     member_file.file_name as file_name,
                                     member_file.file_size_bytes as file_size_bytes,
+                                    file_storage_engine.mime_type as mime_type,
                                     file_path(file_storage_engine.storage_engine_id, '/member/file') as file_url
                                 FROM event_media
                                 LEFT JOIN member_file ON member_file.id = member_file_id
@@ -446,6 +447,7 @@ class MemberEventDA(object):
                                 WHERE event_media.event_id = event_2.id
                             ) as files
                         ),
+                        cover_attachment_id,
                         (
                             SELECT json_agg(invitees) as invitations
                             FROM (
@@ -539,6 +541,7 @@ class MemberEventDA(object):
                                         file_id,
                                         member_file.file_name as file_name,
                                         member_file.file_size_bytes as file_size_bytes,
+                                        file_storage_engine.mime_type as mime_type,
                                         file_path(file_storage_engine.storage_engine_id, '/member/file') as file_url
                                     FROM event_media
                                     LEFT JOIN member_file ON member_file.id = member_file_id
@@ -546,6 +549,7 @@ class MemberEventDA(object):
                                     WHERE event_media.event_id = event_2.id
                                 ) as files
                             ),
+                            cover_attachment_id,
                             (
                                 SELECT json_agg(invitees) as invitations
                                 FROM (
@@ -649,6 +653,7 @@ class MemberEventDA(object):
                                         file_id,
                                         member_file.file_name as file_name,
                                         member_file.file_size_bytes as file_size_bytes,
+                                        file_storage_engine.mime_type as mime_type,
                                         file_path(file_storage_engine.storage_engine_id, '/member/file') as file_url
                                     FROM event_media
                                     LEFT JOIN member_file ON member_file.id = member_file_id
@@ -656,6 +661,7 @@ class MemberEventDA(object):
                                     WHERE event_media.event_id = events.id
                                 ) as files
                             ),
+                            cover_attachment_id,
                             (
                                 SELECT json_agg(invitees) as invitations
                                 FROM (
@@ -843,6 +849,7 @@ class MemberEventDA(object):
                                         file_id,
                                         member_file.file_name as file_name,
                                         member_file.file_size_bytes as file_size_bytes,
+                                        file_storage_engine.mime_type as mime_type,
                                         file_path(file_storage_engine.storage_engine_id, '/member/file') as file_url
                                     FROM event_media
                                     LEFT JOIN member_file ON member_file.id = member_file_id
@@ -850,6 +857,7 @@ class MemberEventDA(object):
                                     WHERE event_media.event_id = events.id
                                 ) as files
                             ),
+                            cover_attachment_id,
                             (
                                 SELECT json_agg(invitees) as invitations
                                 FROM (
@@ -963,11 +971,13 @@ class MemberEventDA(object):
                             file_id,
                             member_file.file_name AS file_name,
                             member_file.file_size_bytes AS file_size_bytes,
+                            file_storage_engine.mime_type as mime_type,
                             file_path(file_storage_engine.storage_engine_id, '/member/file') AS file_url
                     FROM event_media
                     LEFT JOIN member_file ON member_file.id = member_file_id
                     LEFT JOIN file_storage_engine ON file_storage_engine.id = member_file.file_id
                     WHERE event_media.event_id = event_2.id ) AS files),
+                cover_attachment_id,
                 (SELECT json_agg(invitees) AS invitations
                 FROM
                     (

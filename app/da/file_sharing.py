@@ -29,7 +29,7 @@ class FileStorageDA(object):
         "/1/filenamex.ext"
     '''
     @classmethod
-    def put_file_to_storage(cls, file, member_id=None):
+    def put_file_to_storage(cls, file, file_size_bytes, mime_type, member_id=None):
         s3_location = settings.get("storage.s3.file_location_host")
         uniquestr = str(uuid.uuid4())[:8]
         (dirname, true_filename) = os.path.split(file.filename)
@@ -38,7 +38,8 @@ class FileStorageDA(object):
         #  'type file.file', type(file.file))
         uploaded = cls.stream_to_aws(file.file, s3_key)
         storage_url = urljoin(s3_location, s3_key)
-        file_id = cls.create_file_storage_entry(storage_url, 's3', "available")
+        file_id = cls.create_file_storage_entry(
+            storage_url, 's3', "available", file_size_bytes, mime_type)
         return file_id
 
     @classmethod
@@ -135,17 +136,18 @@ class FileStorageDA(object):
             return False
 
     @classmethod
-    def create_file_storage_entry(cls, file_path, storage_engine, status,
+    def create_file_storage_entry(cls, file_path, storage_engine, status, file_size_bytes, mime_type,
                                   commit=True):
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query = ("""
             INSERT INTO file_storage_engine
-            (storage_engine_id, storage_engine, status)
-            VALUES (%s, %s, %s)
+            (storage_engine_id, storage_engine, status, file_size_bytes, mime_type)
+            VALUES (%s, %s, %s, %s, %s)
             RETURNING id
         """)
 
-        params = (file_path, storage_engine, status, )
+        params = (file_path, storage_engine, status,
+                  file_size_bytes, mime_type)
         cls.source.execute(query, params)
 
         logger.debug(
@@ -186,6 +188,7 @@ class FileStorageDA(object):
 
     @classmethod
     def get_member_file(cls, member, file_id):
+        # FIXME: change to size from fs_engine
         query = ("""
             SELECT
                 member_file.id as member_file_id,
@@ -196,6 +199,7 @@ class FileStorageDA(object):
                 member_file.file_ivalue as file_ivalue,
                 file_storage_engine.storage_engine_id as file_link,
                 file_storage_engine.storage_engine as storage_engine,
+                file_storage_engine.mime_type as mime_type,
                 file_storage_engine.status as status,
                 file_storage_engine.create_date as created_date,
                 file_storage_engine.update_date as updated_date,
@@ -220,6 +224,7 @@ class FileStorageDA(object):
                 file_ivalue,
                 file_link,
                 storage_engine,
+                mime_type,
                 status,
                 created_date,
                 updated_date,
@@ -234,6 +239,7 @@ class FileStorageDA(object):
                     "file_ivalue": file_ivalue,
                     "file_url": amerize_url(file_link),
                     "storage_engine": storage_engine,
+                    "mime_type": mime_type,
                     "status": status,
                     "member": member["first_name"],
                     "created_date": created_date,
@@ -836,7 +842,8 @@ class FileTreeDA(object):
 
     @classmethod
     def bind_group_tree_with(cls, member_group_id, main_file_tree_id, bin_file_tree_id):
-        logger.debug(f'bind_group_tree_with group_id {member_group_id} with file_tree_id {main_file_tree_id} {bin_file_tree_id}')
+        logger.debug(
+            f'bind_group_tree_with group_id {member_group_id} with file_tree_id {main_file_tree_id} {bin_file_tree_id}')
         query = ("""
             UPDATE member_group 
             SET main_file_tree = %s,

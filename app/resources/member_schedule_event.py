@@ -91,7 +91,8 @@ class MemberScheduleEventResource(object):
             location_mode,  # enum
             location_data,  # is either and id of memeber location or a string
             attachments,  # [member_file ids]
-            recurringCopies  # [{start: utc, end: utc}] of obj
+            recurringCopies,  # [{start: utc, end: utc}] of obj
+            cover_attachment_id  # member_file_id
          ) = itemgetter('name',
                         'colorId',
                         'description',
@@ -110,7 +111,8 @@ class MemberScheduleEventResource(object):
                         'locationMode',
                         'locationData',
                         'attachments',
-                        'recurringCopies'
+                        'recurringCopies',
+                        'coverAttachmentId'
                         )(json.loads(event_data))
 
         # logger.debug(f'event name is {event_name}')
@@ -120,6 +122,8 @@ class MemberScheduleEventResource(object):
             location_mode == 'my_locations' and location_data != '' and (event_type == 'Meeting' or event_type == 'Personal')) else None
         location_address = location_data if (
             location_mode == 'lookup' or location_mode == 'url') else None
+        cover_attachment_id = cover_attachment_id if (
+            cover_attachment_id != 'null') else None
 
         # This is the first event id
         main_event_id = MemberEventDA().add_2(
@@ -141,6 +145,7 @@ class MemberScheduleEventResource(object):
             location_id=location_id,
             location_address=location_address,
             repeat_times=repeat_times,
+            cover_attachment_id=cover_attachment_id,
             group_id=invited_group
         )
 
@@ -179,6 +184,7 @@ class MemberScheduleEventResource(object):
                         location_id=location_id,
                         location_address=location_address,
                         repeat_times=repeat_times,
+                        cover_attachment_id=cover_attachment_id,
                         group_id=invited_group
                     )
                     all_event_ids.append(recurring_id)
@@ -257,6 +263,8 @@ class MemberScheduleEventResource(object):
             ) else None
             attachments = contents['attachments'] if 'attachments' in contents.keys(
             ) else None
+            cover_attachment_id = contents['coverAttachmentId'] if (
+                ('coverAttachmentId' in contents.keys()) and (contents['coverAttachmentId'] != 'null')) else None
 
             location_id = location_data if (
                 location_mode == 'my_locations' and location_data != '' and (event_type == 'Meeting' or event_type == 'Personal')) else None
@@ -274,7 +282,9 @@ class MemberScheduleEventResource(object):
                            event_type=event_type,
                            location_mode=location_mode,
                            location_id=location_id,
-                           location_address=location_address)
+                           location_address=location_address,
+                           cover_attachment_id=cover_attachment_id
+                           )
 
             updated_event_id = MemberEventDA().update_event_by_id(event_id, updates)
 
@@ -413,14 +423,16 @@ class EventAttachmentResorce(object):
         file = req.get_param("file")
         file_name = req.get_param("fileName")
         file_size_bytes = req.get_param("size")
+        mime_type = req.get_param("mime")
 
-        storage_file_id = FileStorageDA().put_file_to_storage(file)
+        storage_file_id = FileStorageDA().put_file_to_storage(
+            file, file_size_bytes, mime_type)
         member_file_id = FileTreeDA().create_member_file_entry(
             file_id=storage_file_id,
             file_name=file_name,
             member_id=member["member_id"],
             status="available",
-            file_size_bytes=file_size_bytes)
+            file_size_bytes=file_size_bytes)  # FIXME: change this after we migrate to storing file size in fs_storage
         if not member_file_id:
             raise FileUploadCreateException
 
