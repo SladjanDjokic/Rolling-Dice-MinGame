@@ -54,7 +54,7 @@ from app.resources.notifications_setting import MemberNotificationsSetting
 # from app.resources.memberfile import
 # from app.resources.keygen import KeyGenResource, KeyGenFileUpload
 
-from app.resources.bug_report import BugReportResource
+from app.resources.bug_report import BugReportResource, BugReportUsersResource
 
 from app.resources.admin import AdminMemberResource
 
@@ -339,6 +339,7 @@ def _setup_routes(app):
 
     # Report Bugs
     app.add_route("/member/report/bug", BugReportResource())
+    app.add_route("/member/report/bug/users", BugReportUsersResource())
 
     # Admin Resources
 

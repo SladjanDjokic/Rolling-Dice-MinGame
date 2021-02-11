@@ -29,15 +29,35 @@ class FileStorageDA(object):
         "/1/filenamex.ext"
     '''
     @classmethod
-    def put_file_to_storage(cls, file, file_size_bytes, mime_type, member_id=None):
+    def put_file_to_storage(cls, file, file_size_bytes=None, mime_type=None, member_id=None):
         s3_location = settings.get("storage.s3.file_location_host")
         uniquestr = str(uuid.uuid4())[:8]
         (dirname, true_filename) = os.path.split(file.filename)
         s3_key = f"{member_id}/{uniquestr}_{true_filename}" if member_id else f"{uniquestr}_{true_filename}"
         # logger.debug('file type', type(file),
         #  'type file.file', type(file.file))
+
+        # https://github.com/yohanboniface/falcon-multipart#dealing-with-files
+        # filename: the filename, if given
+        # value: the file content in bytes
+        # type: the content-type, or None if not specified
+        # disposition: content-disposition, or None if not specified
+        logger.debug(f"Filename: {file.filename}")
+        # logger.debug(f"Value: {file.value}")
+        logger.debug(f"Type: {file.type}")
+        logger.debug(f"Disposition: {file.disposition}")
+
+        if not file_size_bytes:
+            file_size_bytes = os.fstat(file.file.fileno()).st_size
+        if not mime_type:
+            mime_type = file.type
+        logger.debug(f"Type: {mime_type}")
+        logger.debug(f"Size: {file_size_bytes}")
+
         uploaded = cls.stream_to_aws(file.file, s3_key)
         storage_url = urljoin(s3_location, s3_key)
+
+
         file_id = cls.create_file_storage_entry(
             storage_url, 's3', "available", file_size_bytes, mime_type)
         return file_id
@@ -47,7 +67,7 @@ class FileStorageDA(object):
         try:
             s3 = cls.aws_s3_client()
             bucket = settings.get("storage.s3.bucket")
-            s3.upload_fileobj(io.BytesIO(file.read()), bucket, key)
+            s3.upload_fileobj(file, bucket, key)
             exists = cls.check_if_key_exists(key)
             if exists:
                 logger.debug("Upload Successful, Yoda")
@@ -76,6 +96,20 @@ class FileStorageDA(object):
         file_name = file_id + "-" + true_filename
         local_path = f"{cls.refile_path}/{file_name}"
         storage_key = f"{dirname}/{file_name}"
+        # https://github.com/yohanboniface/falcon-multipart#dealing-with-files
+        # filename: the filename, if given
+        # value: the file content in bytes
+        # type: the content-type, or None if not specified
+        # disposition: content-disposition, or None if not specified
+        # logger.debug(f"Value: {file.value}")
+        logger.debug(f"Type: {file.type}")
+        logger.debug(f"Disposition: {file.disposition}")
+
+        file_size_bytes = os.fstat(file.file.fileno()).st_size
+        mime_type = file.type
+
+        logger.debug(f"Type: {mime_type}")
+        logger.debug(f"Size: {file_size_bytes}")
 
         logger.debug("Filename: {}".format(file_name))
         logger.debug("Filepath: {}".format(local_path))
@@ -101,7 +135,8 @@ class FileStorageDA(object):
         s3_file_location = urljoin(s3_location, storage_key)
 
         file_id = cls.create_file_storage_entry(
-            s3_file_location, storage_engine, "available")
+            s3_file_location, storage_engine, "available",
+            file_size_bytes, mime_type)
 
         os.remove(local_path)
 
@@ -845,7 +880,7 @@ class FileTreeDA(object):
         logger.debug(
             f'bind_group_tree_with group_id {member_group_id} with file_tree_id {main_file_tree_id} {bin_file_tree_id}')
         query = ("""
-            UPDATE member_group 
+            UPDATE member_group
             SET main_file_tree = %s,
                 bin_file_tree = %s
             WHERE id = %s
@@ -1224,16 +1259,16 @@ class FileTreeDA(object):
 
     @classmethod
     def share_branch(cls, member_id, target_tree_id, branch_root_id):
-        ''' creates a new branch in target tree id by copying each child 
+        ''' creates a new branch in target tree id by copying each child
 
         '''
         get_branch_query = ('''
             WITH RECURSIVE tree AS (
-                SELECT 
-                    file_tree_item.id as original_node_id, 
-                    parent_id as original_parent_id, 
+                SELECT
+                    file_tree_item.id as original_node_id,
+                    parent_id as original_parent_id,
                     member_file_id,
-                    display_name, 
+                    display_name,
                     0 AS level
                 FROM member
                 LEFT JOIN file_tree_item ON member.main_file_tree = file_tree_item.file_tree_id
@@ -1268,8 +1303,8 @@ class FileTreeDA(object):
                 original_nodes.append(entry_element)
             # TODO: Check if all of this can be done in by a single query
             '''
-                Now we iterate over level starting from 0 to create new nodes in target tree. 
-                After each step 
+                Now we iterate over level starting from 0 to create new nodes in target tree.
+                After each step
             '''
             # This will look like {original_node_id: target_node_id, ...}
             original_target_node_xref = dict()
@@ -1305,7 +1340,7 @@ class FileTreeDA(object):
     def unshare_node(cls, share_id):
         ''' This will automatically delete file_shares entry due to ON DELETE CASCADE constraint'''
         query = ('''
-            DELETE FROM file_tree_item 
+            DELETE FROM file_tree_item
             WHERE id IN (SELECT target_node FROM file_share WHERE id = %s)
         ''')
         params = (share_id,)
@@ -1343,11 +1378,11 @@ class FileTreeDA(object):
     def claim_shared_branch(cls, member_id, target_tree_id, branch_root_id, current_folder_id):
         get_branch_query = ('''
              WITH RECURSIVE tree AS (
-                SELECT 
-                    file_tree_item.id as original_node_id, 
-                    parent_id as original_parent_id, 
+                SELECT
+                    file_tree_item.id as original_node_id,
+                    parent_id as original_parent_id,
                     member_file_id,
-                    display_name, 
+                    display_name,
                     0 AS level
                 FROM member
                 LEFT JOIN file_tree_item ON member.main_file_tree = file_tree_item.file_tree_id
@@ -1382,8 +1417,8 @@ class FileTreeDA(object):
                 original_nodes.append(entry_element)
             # TODO: Check if all of this can be done in by a single query
             '''
-                Now we iterate over level starting from 0 to create new nodes in target tree. 
-                After each step 
+                Now we iterate over level starting from 0 to create new nodes in target tree.
+                After each step
             '''
             # This will look like {original_node_id: target_node_id, ...}
             original_target_node_xref = dict()
@@ -1553,7 +1588,7 @@ class ShareFileDA(object):
         query = ("""
             SELECT
                 shared_file.file_id as file_id,
-                shared_file.shared_unique_key as shared_key, 
+                shared_file.shared_unique_key as shared_key,
                 member_file.file_name as file_name,
                 member_file.file_size_bytes as file_size_bytes,
                 CASE WHEN
