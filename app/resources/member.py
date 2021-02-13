@@ -12,6 +12,7 @@ from app.da.invite import InviteDA
 from app.da.group import GroupMembershipDA, GroupDA
 from app.da.promo_codes import PromoCodesDA
 from app.da.member import MemberInfoDA
+from app.da.company import CompanyDA
 from app.util.session import get_session_cookie, validate_session
 from app.exceptions.member import MemberExistsError, MemberNotFound, MemberDataMissing, MemberExists, MemberContactExists, MemberPasswordMismatch
 from app.exceptions.invite import InviteNotFound, InviteExpired
@@ -19,31 +20,6 @@ from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 import app.util.email as sendmail
 
 logger = logging.getLogger(__name__)
-
-
-class MemberResource(object):
-
-    def on_get(self, req, resp, username=None):
-        # We store the key in hex format in the database
-        member = MemberDA.get_member_by_username(username=username)
-
-        if not member:
-            raise MemberNotFound(username)
-
-        resp.body = json.dumps({
-            "username": username,
-            "success": True
-        })
-
-    def on_post(self, req, resp):
-        (search_key) = request.get_json_or_form('search_key', req=req)
-
-        members = MemberDA.get_members(search_key=search_key)
-
-        resp.body = json.dumps({
-            "members": members,
-            "success": True
-        })
 
 
 class MemberSearchResource(object):
@@ -125,14 +101,12 @@ class MemberRegisterResource(object):
 
     def on_post(self, req, resp, invite_key=None):
 
-
         (city, state, province, pin, email, password, confirm_password, first_name, last_name, date_of_birth,
          phone_number, country, postal, company_name, job_title_id, profilePicture,
-         cell_confrimation_ts, email_confrimation_ts, promo_code_id, department_id) = request.get_json_or_form(
+         cell_confrimation_ts, email_confrimation_ts, promo_code_id, department_id, company_id, ) = request.get_json_or_form(
             "city", "state", "province", "pin", "email", "password", "confirm_password", "first_name", "last_name", "dob",
             "cell", "country", "postal_code", "company_name", "job_title_id", "profilePicture",
-            "cellConfirmationTS", "emailConfirmationTS", "activatedPromoCode", "department_id", req=req)
-
+            "cellConfirmationTS", "emailConfirmationTS", "activatedPromoCode", "department_id", "company_id", req=req)
         try:
             # We store the key in hex format in the database
 
@@ -147,6 +121,8 @@ class MemberRegisterResource(object):
             department_id = None if department_id == 'not_applicable' else department_id
             company_name = None if company_name == 'null' else company_name
 
+            if company_id is not None:
+                company_name = None
             if (not email or not password or
                     not first_name or not last_name):  # or
                 #            not date_of_birth or not phone_number or
@@ -263,6 +239,9 @@ class MemberRegisterResource(object):
                 # Update the promo code reference for the newly created member_id
                 if promo_code_id != "null":
                     PromoCodesDA().create_activation_entry(member_id, promo_code_id)
+
+                if company_id is not None:
+                    CompanyDA.add_member(company_id, member_id, 'standard')
 
                 resp.body = json.dumps({
                     "member_id": member_id,

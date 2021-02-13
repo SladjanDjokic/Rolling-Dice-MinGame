@@ -49,6 +49,7 @@ from app.resources.mail import MailDraftComposeResource, MailAttachmentResource,
 from app.resources.role import RolesResource
 from app.resources.avatar import MemberAvatarResource
 from app.resources.activity import ActivitiesResource
+from app.resources.company import CompanyResource, CompanyUnregisteredResource
 
 from app.resources.notifications_setting import MemberNotificationsSetting
 # from app.resources.memberfile import
@@ -341,10 +342,21 @@ def _setup_routes(app):
     app.add_route("/member/report/bug", BugReportResource())
     app.add_route("/member/report/bug/users", BugReportUsersResource())
 
+    # Company
+
+    company_resource = CompanyResource()
+
+    app.add_route("/company", company_resource)
+    app.add_route("/company/{company_id:int}", company_resource, suffix="detail")
+    app.add_route("/company/member", company_resource, suffix="member")
+    
+    app.add_route("/company/unregistered", CompanyUnregisteredResource())
     # Admin Resources
 
+    # Admin Resources
     admin_resource = AdminMemberResource()
     app.add_route("/admin/member/{member_id:int}/session/{session_id:uuid}",
                   admin_resource, suffix="session")
     app.add_route("/admin/member/{member_id:int}",
                   admin_resource, suffix="member")
+    

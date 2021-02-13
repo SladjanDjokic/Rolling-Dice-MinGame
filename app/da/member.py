@@ -134,7 +134,7 @@ class MemberDA(object):
                 member.middle_name as middle_name,
                 member.last_name as last_name,
                 member.company_name as company_name,
-                job_title.name as job_title
+                job_title.name as title
             FROM member
             LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
             WHERE ( email LIKE %s OR username LIKE %s OR first_name LIKE %s OR last_name LIKE %s ) AND member.id <> %s
@@ -163,7 +163,7 @@ class MemberDA(object):
                     middle_name,
                     last_name,
                     company_name,
-                    job_title
+                    title
             ) in cls.source.cursor:
                 member = {
                     "member_id": member_id,
@@ -176,7 +176,7 @@ class MemberDA(object):
                     "middle_name": middle_name,
                     "last_name": last_name,
                     "member_name": f'{first_name}{middle_name}{last_name}',
-                    "job_title": job_title
+                    "title": title
                 }
 
                 members.append(member)
@@ -846,29 +846,30 @@ class MemberContactDA(object):
         contact_dict = {
             'id': 'contact.id',
             'contact_member_id': 'contact.contact_member_id',
-            'first_name': 'contact.first_name',
+            'first_name': 'member.first_name',
             'middle_name': 'member.middle_name',
-            'last_name': 'contact.last_name',
+            'last_name': 'member.last_name',
             'biography': 'member_profile.biography',
-            'cell_phone': 'contact.cell_phone',
-            'office_phone': 'contact.office_phone',
-            'home_phone': 'contact.home_phone',
-            'email': 'contact.email',
-            'personal_email': 'contact.personal_email',
+            # 'cell_phone': 'contact.cell_phone',
+            # 'office_phone': 'contact.office_phone',
+            # 'home_phone': 'contact.home_phone',
+            # 'email': 'contact.email',
+            # 'personal_email': 'contact.personal_email',
             'company': 'member.company_name',
             'title': 'job_title.name',
             'country_code_id': 'member_location.country_code_id',
             'company_name': 'member.company_name',
-            'company_phone': 'contact.company_phone',
-            'company_web_site': 'contact.company_web_site',
-            'company_email': 'contact.company_email',
-            'company_bio': 'contact.company_bio',
+            # 'company_phone': 'contact.company_phone',
+            # 'company_web_site': 'contact.company_web_site',
+            # 'company_email': 'contact.company_email',
+            # 'company_bio': 'contact.company_bio',
             'role': 'role.name',
             'role_id': 'role.id',
             'create_date': 'contact.create_date',
             'update_date': 'contact.update_date',
             'status': 'contact.status',
-            'online_status': 'member_session.status'
+            'online_status': 'member_session.status',
+            'company_id': ''
         }
 
         if sort_params:
@@ -879,25 +880,100 @@ class MemberContactDA(object):
             filter_params, contact_dict)
         get_contacts_params = (member_id, ) + filter_conditions_params
         contacts = list()
+
+        get_contacts_search_query = """
+        AND
+        (
+            lower(member.first_name) LIKE %s
+            OR lower(member.middle_name) LIKE %s
+            OR lower(member.last_name) LIKE %s
+            OR lower(member_profile.biography) LIKE %s
+            OR lower(member_contact_2.device) LIKE %s
+            OR lower(job_title.name) LIKE %s
+            OR lower(member.company_name) LIKE %s
+            OR lower(company.name) LIKE %s
+            OR lower(company.primary_url) LIKE %s
+            OR lower(company.main_phone) LIKE %s
+            OR lower(role.name) LIKE %s
+        )
+        """
+
+        get_contacts_base_query = (f"""
+            FROM contact
+                LEFT JOIN member ON member.id = contact.contact_member_id
+                LEFT OUTER JOIN role ON contact.role_id = role.id
+                LEFT OUTER JOIN member_location ON member_location.member_id = contact.contact_member_id
+                -- LEFT OUTER JOIN member_contact ON member_contact.member_id = contact.contact_member_id
+                LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = contact.contact_member_id
+                LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
+                LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
+                LEFT OUTER JOIN member_profile ON contact.contact_member_id = member_profile.member_id
+                LEFT OUTER JOIN member_achievement ON member_achievement.member_id = member.id
+                LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+                LEFT OUTER JOIN member_session ON
+                    contact.contact_member_id = member_session.member_id AND
+                    member_session.status IN ('online', 'disconnected') AND
+                    member_session.expiration_date >= current_timestamp
+                LEFT OUTER JOIN company_role_xref ON company_role_xref.member_id = member.id
+                LEFT OUTER JOIN company ON company_role_xref.company_id = company.id
+            WHERE
+                contact.member_id = %s {filter_conditions_query}
+                {get_contacts_search_query if search_key != "" else ''}
+            GROUP BY
+                contact.id,
+                contact.contact_member_id,
+                member.first_name,
+                member.middle_name,
+                member.last_name,
+                member_profile.biography,
+                -- contact.cell_phone,
+                -- contact.office_phone,
+                -- contact.home_phone,
+                -- contact.email,
+                -- contact.personal_email,
+                member.company_name,
+                job_title.name,
+                -- contact.company_name,
+                -- contact.company_phone,
+                -- contact.company_web_site,
+                -- contact.company_email,
+                -- contact.company_bio,
+                role.name,
+                role.id,
+                contact.create_date,
+                contact.update_date,
+                file_storage_engine.storage_engine_id,
+                contact.status,
+                member_session.status,
+                company.id,
+                company.name
+            """)
+
+        if search_key != '':
+            like_search_key = """%{}%""".format(search_key.lower())
+            get_contacts_params = get_contacts_params + \
+                tuple(11 * [like_search_key])
+
         get_contacts_query = (f"""
-            SELECT contact.id as id,
+            SELECT 
+                contact.id as id,
                 contact.contact_member_id as contact_member_id,
-                contact.first_name as first_name,
+                member.first_name as first_name,
                 member.middle_name as middle_name,
-                contact.last_name as last_name,
+                member.last_name as last_name,
                 member_profile.biography as biography,
-                contact.cell_phone as cell_phone,
-                contact.office_phone as office_phone,
-                contact.home_phone as home_phone,
-                contact.email as email,
-                contact.personal_email as personal_email,
+                -- contact.cell_phone as cell_phone,
+                -- contact.office_phone as office_phone,
+                -- contact.home_phone as home_phone,
+                -- contact.email as email,
+                -- contact.personal_email as personal_email,
                 member.company_name as company,
                 job_title.name as title,
-                contact.company_name as company_name,
-                contact.company_phone as company_phone,
-                contact.company_web_site as company_web_site,
-                contact.company_email as company_email,
-                contact.company_bio as company_bio,
+                -- contact.company_name as company_name,
+                -- contact.company_phone as company_phone,
+                -- contact.company_web_site as company_web_site,
+                -- contact.company_email as company_email,
+                -- contact.company_bio as company_bio,
                 role.name as role,
                 role.id as role_id,
                 contact.create_date as create_date,
@@ -913,170 +989,116 @@ class MemberContactDA(object):
                     WHEN member_session.status IS NOT NULL
                     THEN member_session.status
                     ELSE 'inactive'
-                END as online_status
-            FROM contact
-                LEFT JOIN member ON member.id = contact.contact_member_id
-                LEFT OUTER JOIN role ON contact.role_id = role.id
-                LEFT OUTER JOIN member_location ON member_location.member_id = contact.contact_member_id
-                LEFT OUTER JOIN member_contact ON member_contact.member_id = contact.contact_member_id
-                LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = contact.contact_member_id
-                LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
-                LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
-                LEFT OUTER JOIN member_profile ON contact.contact_member_id = member_profile.member_id
-                LEFT OUTER JOIN member_achievement ON member_achievement.member_id = member.id
-                LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
-                LEFT OUTER JOIN member_session ON
-                    contact.contact_member_id = member_session.member_id AND
-                    member_session.status IN ('online', 'disconnected') AND
-                    member_session.expiration_date >= current_timestamp
-            WHERE
-                contact.member_id = %s {filter_conditions_query}
-                AND
-                (
-                    concat(contact.first_name, member.middle_name, contact.last_name) ILIKE %s
-                    OR contact.email ILIKE %s
-                    OR member_profile.biography LIKE %s
-                    OR contact.cell_phone LIKE %s
-                    OR contact.office_phone LIKE %s
-                    OR contact.home_phone LIKE %s
-                    OR contact.personal_email LIKE %s
-                    OR member.company_name LIKE %s
-                    OR job_title.name LIKE %s
-                    OR cast(member_location.country_code_id as varchar) LIKE %s
-                    OR member.company_name LIKE %s
-                    OR contact.company_phone LIKE %s
-                    OR contact.company_web_site LIKE %s
-                    OR contact.company_email LIKE %s
-                    OR contact.company_bio LIKE %s
-                    OR role.name LIKE %s
-                )
-            GROUP BY
-                contact.id,
-                contact.contact_member_id,
-                contact.first_name,
-                member.middle_name,
-                contact.last_name,
-                member_profile.biography,
-                contact.cell_phone,
-                contact.office_phone,
-                contact.home_phone,
-                contact.email,
-                contact.personal_email,
-                member.company_name,
-                job_title.name,
-                contact.company_name,
-                contact.company_phone,
-                contact.company_web_site,
-                contact.company_email,
-                contact.company_bio,
-                role.name,
-                role.id,
-                contact.create_date,
-                contact.update_date,
-                file_storage_engine.storage_engine_id,
-                contact.status,
-                member_session.status
+                END as online_status,
+                company.id as company_id,
+                company.name as member_company_name
+                {get_contacts_base_query}
             ORDER BY {sort_columns_string}
-            """)
+        """)
 
-        like_search_key = """%{}%""".format(search_key)
-        get_contacts_params = get_contacts_params + \
-            tuple(16 * [like_search_key])
-
-        countQuery = (f"""
+        get_contacts_count_query = (f"""
             SELECT COUNT(*)
-                FROM
-                    (
-                        {get_contacts_query}
-                    ) src;
-            """)
+                FROM (SELECT COUNT(DISTINCT contact.contact_member_id)
+                {get_contacts_base_query}) as sq
+        """)
 
         count = 0
-        cls.source.execute(countQuery, get_contacts_params)
+        cls.source.execute(get_contacts_count_query, get_contacts_params)
+        logger.debug(get_contacts_count_query)
+        logger.debug(get_contacts_params)
         if cls.source.has_results():
-            (count,) = cls.source.cursor.fetchone()
+            result = cls.source.cursor.fetchone()
+            logger.debug(f"Result: {result}")
+            (count, ) = result
+            logger.debug(f"Count: {count}")
+        if count > 0:
+            if page_size and page_number >= 0:
+                get_contacts_query += """LIMIT %s OFFSET %s"""
+                offset = 0
+                if page_number > 0:
+                    offset = page_number * page_size
+                get_contacts_params = get_contacts_params + (page_size, offset)
 
-        if page_size and page_number >= 0:
-            get_contacts_query += """LIMIT %s OFFSET %s"""
-            offset = 0
-            if page_number > 0:
-                offset = page_number * page_size
-            get_contacts_params = get_contacts_params + (page_size, offset)
+            logger.debug(get_contacts_query)
+            cls.source.execute(get_contacts_query, get_contacts_params)
+            if cls.source.has_results():
+                for (
+                        id,
+                        contact_member_id,
+                        first_name,
+                        middle_name,
+                        last_name,
+                        biography,
+                        # cell_phone,
+                        # office_phone,
+                        # home_phone,
+                        # email,
+                        # personal_email,
+                        company,
+                        title,
+                        # company_name,
+                        # company_phone,
+                        # company_web_site,
+                        # company_email,
+                        # company_bio,
+                        role,
+                        role_id,
+                        create_date,
+                        update_date,
+                        location_information,
+                        contact_information,
+                        country_code,
+                        achievement_information,
+                        s3_avatar_url,
+                        security_exchange_option,
+                        status,
+                        online_status,
+                        company_id,
+                        member_company_name
+                ) in cls.source.cursor:
+                    contact = {
+                        "id": id,
+                        "contact_member_id": contact_member_id,
+                        "first_name": first_name,
+                        "middle_name": middle_name,
+                        "last_name": last_name,
+                        "member_name": f'{first_name} {last_name}',
+                        "biography": biography,
+                        # "cell_phone": cell_phone,
+                        # "office_phone": office_phone,
+                        # "home_phone": home_phone,
+                        # "email": email,
+                        # "personal_email": personal_email,
+                        "company": company,
+                        "title": title,
+                        # "company_name": company_name,
+                        # "company_phone": company_phone,
+                        # "company_web_site": company_web_site,
+                        # "company_email": company_email,
+                        # "company_bio": company_bio,
+                        "role": role,
+                        "role_id": role_id,
+                        "create_date": create_date,
+                        "update_date": update_date,
+                        "location_information": location_information,
+                        "contact_information": contact_information,
+                        "country_code": country_code,
+                        "achievement_information": achievement_information,
+                        "amera_avatar_url": amerize_url(s3_avatar_url),
+                        "security_exchange_option":
+                            SECURITY_EXCHANGE_OPTIONS.get(
+                                security_exchange_option, 0),
+                        "status": status,
+                        "online_status": online_status,
+                        "company_id": company_id,
+                        "member_company_name": member_company_name
 
-        cls.source.execute(get_contacts_query, get_contacts_params)
-        if cls.source.has_results():
-            for (
-                    id,
-                    contact_member_id,
-                    first_name,
-                    middle_name,
-                    last_name,
-                    biography,
-                    cell_phone,
-                    office_phone,
-                    home_phone,
-                    email,
-                    personal_email,
-                    company,
-                    title,
-                    company_name,
-                    company_phone,
-                    company_web_site,
-                    company_email,
-                    company_bio,
-                    role,
-                    role_id,
-                    create_date,
-                    update_date,
-                    location_information,
-                    contact_information,
-                    country_code,
-                    achievement_information,
-                    s3_avatar_url,
-                    security_exchange_option,
-                    status,
-                    online_status
-            ) in cls.source.cursor:
-                contact = {
-                    "id": id,
-                    "contact_member_id": contact_member_id,
-                    "first_name": first_name,
-                    "middle_name": middle_name,
-                    "last_name": last_name,
-                    "member_name": f'{first_name} {last_name}',
-                    "biography": biography,
-                    "cell_phone": cell_phone,
-                    "office_phone": office_phone,
-                    "home_phone": home_phone,
-                    "email": email,
-                    "personal_email": personal_email,
-                    "company": company,
-                    "title": title,
-                    "company_name": company_name,
-                    "company_phone": company_phone,
-                    "company_web_site": company_web_site,
-                    "company_email": company_email,
-                    "company_bio": company_bio,
-                    "role": role,
-                    "role_id": role_id,
-                    "create_date": create_date,
-                    "update_date": update_date,
-                    "location_information": location_information,
-                    "contact_information": contact_information,
-                    "country_code": country_code,
-                    "achievement_information": achievement_information,
-                    "amera_avatar_url": amerize_url(s3_avatar_url),
-                    "security_exchange_option":
-                        SECURITY_EXCHANGE_OPTIONS.get(
-                            security_exchange_option, 0),
-                    "status": status,
-                    "online_status": online_status
-                    # "city": city,
-                    # "state": state,
-                    # "province": province,
-                    # "country": country
-                }
-                contacts.append(contact)
+                        # "city": city,
+                        # "state": state,
+                        # "province": province,
+                        # "country": country
+                    }
+                    contacts.append(contact)
         return {
             "contacts": contacts,
             "count": count
