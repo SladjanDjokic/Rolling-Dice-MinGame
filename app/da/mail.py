@@ -1,9 +1,6 @@
 import datetime
-import io
 import json
 import logging
-import os
-import sys
 
 from falcon import HTTPInternalServerError
 
@@ -1220,7 +1217,8 @@ class DraftMailDA(BaseMailDA):
         raise HTTPNotFound(title="Draft not found or failed to create draft", description="")
 
     @classmethod
-    def save_file_for_mail(cls, file_id, file, mail_id, member_id):
+    def save_file_for_mail(cls, file_id, filename, filesize, filetype,
+                           file_extension, mail_id, member_id):
         check_query = """
             SELECT id , number_attachments FROM mail_header
             WHERE id = %s AND member_id = %s AND message_locked = FALSE
@@ -1239,19 +1237,11 @@ class DraftMailDA(BaseMailDA):
                 INSERT INTO mail_attachment (mail_header_id, file_id, filename, filesize, filetype)
                 VALUES (%s, %s, %s, %s, %s);
             """
-            if type(file.file) == io.BufferedRandom:
-                size = os.fstat(file.file.fileno()).st_size
-            elif type(file.file) == io.BytesIO:
-                size = sys.getsizeof(file.file)
-            else:
-                logger.error(f"FAILED TO ALLOCATE FILE SIZE WITH TYPE {type(file.file)}")
-                logger.debug(f"{file.file}")
-                raise HTTPInternalServerError
-            tmp, file_extension = os.path.splitext(file.filename)
-            tmp, filename = os.path.split(file.filename)
-            cls.source.execute(insert, (mail_id, file_id, filename, size, file_extension[1:]))
-
-            cls.source.execute(update_query, (number_attachments + 1 if number_attachments else 1, mail_id, member_id))
+            params = (mail_id, file_id, filename, filesize, file_extension)
+            cls.source.execute(insert, params)
+            header_params = (number_attachments + 1 if number_attachments
+                                else 1, mail_id, member_id)
+            cls.source.execute(update_query, header_params)
             if cls.source.has_results():
                 cls.source.commit()
                 return filename + file_extension, file_extension

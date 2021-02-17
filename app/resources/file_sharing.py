@@ -60,7 +60,7 @@ class FileStorage(object):
                 if iv == 'undefined':
                     iv = None
                 file_id = FileStorageDA(
-                ).store_file_to_storage(file)
+                ).put_file_to_storage(file)
                 status = 'available'
                 logger.debug(f'FILE STORAGE IDENTIFIER: {file_id}')
 
@@ -263,7 +263,6 @@ class MemberFileCloud(object):
                 if not isDir:
                     # upload and insert file first
                     file = req.get_param(f"file_{node_temp_id}")
-                    # storage_file_id = FileStorageDA().store_file_to_storage(file)
                     storage_file_id = FileStorageDA().put_file_to_storage(file)
                     # Create member file entry
                     member_file_id = FileTreeDA().create_member_file_entry(
@@ -735,7 +734,6 @@ class GroupFileCloud(object):
                         # upload and insert file first
                         file = req.get_param(f"file_{node_temp_id}")
                         logger.error('file: ' + str(file))
-                        # storage_file_id = FileStorageDA().store_file_to_storage(file)
                         storage_file_id = FileStorageDA().put_file_to_storage(file)
                         # Create member file entry
                         member_file_id = FileTreeDA().create_member_file_entry(

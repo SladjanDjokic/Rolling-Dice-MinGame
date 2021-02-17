@@ -84,65 +84,6 @@ class FileStorageDA(object):
             return False
 
     @classmethod
-    def store_file_to_storage(cls, file):
-        '''
-        We are saving nested "some_folder/some-file.ext" and unnested "some-file.ext" files.
-        Since we do this file-by-file - we ignore the file path during disk save, i.e. "some_folder/some-file.ext" => "some-file.ext"
-        But we keep that structure in aws
-        '''
-        file_id = str(int(datetime.datetime.now().timestamp() * 1000))
-        # file_name = file_id + "." + file.filename.split(".")[-1]
-        (dirname, true_filename) = os.path.split(file.filename)
-        file_name = file_id + "-" + true_filename
-        local_path = f"{cls.refile_path}/{file_name}"
-        storage_key = f"{dirname}/{file_name}"
-        # https://github.com/yohanboniface/falcon-multipart#dealing-with-files
-        # filename: the filename, if given
-        # value: the file content in bytes
-        # type: the content-type, or None if not specified
-        # disposition: content-disposition, or None if not specified
-        # logger.debug(f"Value: {file.value}")
-        logger.debug(f"Type: {file.type}")
-        logger.debug(f"Disposition: {file.disposition}")
-
-        file_size_bytes = os.fstat(file.file.fileno()).st_size
-        mime_type = file.type
-
-        logger.debug(f"Type: {mime_type}")
-        logger.debug(f"Size: {file_size_bytes}")
-
-        logger.debug("Filename: {}".format(file_name))
-        logger.debug("Filepath: {}".format(local_path))
-
-        # Use utility to create folder if it doesn't exist'
-        temp_file_path = local_path + "~"
-        with safe_open(temp_file_path, "wb") as f:
-            f.write(file.file.read())
-        # file has been fully saved to disk move it into place
-        os.rename(temp_file_path, local_path)
-
-        storage_engine = "S3"
-        bucket = settings.get("storage.s3.bucket")
-        s3_location = settings.get("storage.s3.file_location_host")
-
-        uploaded = cls.upload_to_aws(
-            local_path, bucket, s3fy_filekey(storage_key))
-
-        if not uploaded:
-            raise FileStorageUploadError
-
-        # Handle keyed filenames here
-        s3_file_location = urljoin(s3_location, storage_key)
-
-        file_id = cls.create_file_storage_entry(
-            s3_file_location, storage_engine, "available",
-            file_size_bytes, mime_type)
-
-        os.remove(local_path)
-
-        return file_id
-
-    @classmethod
     def upload_to_aws(cls, local_file, bucket, s3_file):
         s3 = cls.aws_s3_client()
 

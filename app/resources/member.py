@@ -154,7 +154,6 @@ class MemberRegisterResource(object):
 
             if profilePicture is not None:
                 avatar_storage_id = FileStorageDA().put_file_to_storage(profilePicture)
-                # avatar_storage_id = FileStorageDA().store_file_to_storage(profilePicture)
 
             # logger.debug(
                 # f"Job Title ID: {job_title_id} and {type(job_title_id)}")

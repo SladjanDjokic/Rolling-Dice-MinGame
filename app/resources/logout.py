@@ -1,53 +1,62 @@
-from app.util.auth import inject_member
-import uuid
-import falcon
-import app.util.json as json
-import app.util.request as request
+from app.util.session import invalidate_session_cookie
+from falcon.status_codes import HTTP_200
+from app.util.auth import check_session
 from app import settings
 from app.da.session import SessionDA
-from app.exceptions.session import ForbiddenSession, SessionExistsError
+from app.exceptions.session import ForbiddenSession, InvalidSession, \
+    InvalidSessionError
+from falcon import HTTP_OK
+
+
+post_event_type = settings.get('kafka.event_types.post.member_logout')
+get_event_type = settings.get('kafka.event_types.post.member_logout')
 
 
 class MemberLogoutResource(object):
 
     def __init__(self):
-        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.member_logout'),
-                                    "topic": settings.get('kafka.topics.auth')
-                                    }
-                           }
+        self.kafka_data = {
+            "POST": {
+                "event_type": post_event_type,
+                "topic": settings.get('kafka.topics.auth')
+            },
+            "GET": {
+                "event_type": get_event_type,
+                "topic": settings.get('kafka.topics.auth')
+            }
+        }
 
     auth = {
         'exempt_methods': ['POST']
     }
 
-    @inject_member
-    def on_post(self, req, resp, member):
+    @check_session
+    def on_post(self, req, resp, member_id, session_id):
+        self._logout(req, resp, member_id, session_id)
 
-        (member_id, session_id) = request.get_json_or_form(
-            "member_id", "session_id", req=req)
+    @check_session
+    def on_get(self, req, resp, member_id, session_id):
+        self._logout(req, resp, member_id, session_id)
 
+    @staticmethod
+    def _logout(req, resp, member_id=None, session_id=None):
         if not member_id or not session_id:
             raise ForbiddenSession()
 
-        if member_id != member['member_id']:
+        if member_id != req.context.auth['session']['member_id']:
             raise ForbiddenSession()
 
-        if session_id != req.context.auth['session']['session_id']:
+        if session_id.hex != req.context.auth['session']['session_id']:
             raise ForbiddenSession()
 
-        while True:
-            try:
-                SessionDA.disable_session(
-                    session_id,
-                    member['member_id']
-                )
-                break
-            except SessionExistsError:
-                continue
+        try:
+            SessionDA.disable_session(
+                session_id.hex,
+                member_id
+            )
+            invalidate_session_cookie(req, resp)
+        except InvalidSessionError as err:
+            raise InvalidSession from err
 
-        resp.body = json.dumps({
-        })
-
-    def on_get(self, req, resp):
-        resp.body = json.dumps({
-        })
+        resp.body = None
+        resp.status = HTTP_OK

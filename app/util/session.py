@@ -63,6 +63,44 @@ def set_session_cookie(req, resp, session_id, expiration_datetime=None):
                     domain=f"{cookie_domain}")
 
 
+def invalidate_session_cookie(req, resp):
+    # This section here overrides the `access-control-allow-origin`
+    # to be dynamic, this means that if the requests come from any
+    # domains defined in web.domains, then we allow the origin
+    # TODO: Remove this logic
+    # request_domain is the domain being used by the original requester
+    # we use forwarded_host because these API calls will be proxied in by
+    # a load balancer like AWS ELB or NGINX, thus we need to know how
+    # this is being requested as:
+    #  (e.g. https://ameraiot.com/api/valid-session)
+    request_domain = req.env.get('HTTP_ORIGIN', req.forwarded_host)
+
+    # default_domain is the domain as configured in the [web] part of the
+    # this domain is the expected domain the application will run in
+    # where SSL is terminated, before requests are proxied
+    # to the application
+    default_domain = settings.get('web.cookie_domain')
+
+    # logger.debug(f"ENV: {pformat(req.env)}")
+
+    domains = settings.get("web.domains")
+    domains = next((d for d in domains if d in request_domain), None)
+    cookie_domain = default_domain
+    if domains:
+        cookie_domain = domains
+
+    if cookie_domain == "localhost":
+        cookie_domain = ""
+
+    # TODO: This needs to be more secure
+    resp.set_cookie(settings.get("web.cookie_name"), 'deleted',
+                    secure=settings.get("web.cookie_secure"),
+                    max_age=0,
+                    expires=datetime(1970, 1, 1),
+                    path=settings.get("web.cookie_path"),
+                    domain=f"{cookie_domain}")
+
+
 def get_session_cookie(req):
     cookies = req.cookies
     return cookies.get(settings.get("web.cookie_name"))

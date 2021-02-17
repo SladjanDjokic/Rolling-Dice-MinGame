@@ -1,3 +1,4 @@
+from app.util.auth import check_session
 import logging
 import app.util.json as json
 from app import settings
@@ -9,19 +10,6 @@ from datetime import datetime, timedelta, timezone
 from app.util.session import set_session_cookie
 
 logger = logging.getLogger(__name__)
-
-
-class SessionResource(object):
-
-    # This call needs to only be allowed from the web presentation layer
-    def on_get(self, req, resp, session_id):
-
-        try:
-            session = validate_session(session_id)
-            resp.set_header('X-Auth-Session', session_id)
-            resp.body = json.dumps(session, default_parser=json.parser)
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
 
 
 class ValidateSessionResource(object):
@@ -36,16 +24,15 @@ class ValidateSessionResource(object):
         'exempt_methods': ['GET']
     }
 
+    @check_session
     def on_get(self, req, resp):
 
         logger.debug('Request Cookies: {}'.format(req.cookies))
-
-        session_id = get_session_cookie(req)
-
+        session = req.context.auth['session']
+        session_id = session['session_id']
         logger.debug('Session ID: {}'.format(session_id))
 
         try:
-            session = validate_session(session_id)
             room = req.get_param('room')
             self.__validate_session(session, room)
 
@@ -54,18 +41,18 @@ class ValidateSessionResource(object):
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
 
+    @check_session
     def on_put(self, req, resp):
 
         logger.debug('Request Cookies: {}'.format(req.cookies))
-
-        session_id = get_session_cookie(req)
-
+        session = req.context.auth['session']
+        session_id = session['session_id']
         logger.debug('Session ID: {}'.format(session_id))
 
         try:
-            session = validate_session(session_id)
             room = req.get_param('room')
             self.__validate_session(session, room)
+
             expiration_seconds = settings.get("web.session_expiration")
             expiration_date = datetime.now(timezone.utc) + timedelta(
                 seconds=int(expiration_seconds)

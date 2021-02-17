@@ -614,7 +614,7 @@ class SessionDA(object):
                 AND
                 member_id = %s
                 AND
-                status = 'online'
+                (status = 'online' OR status = 'disconnected')
             RETURNING
                 session_id, member_id
         """

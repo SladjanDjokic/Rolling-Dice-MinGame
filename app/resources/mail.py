@@ -1,4 +1,6 @@
 import logging
+import os
+import pathlib
 
 from app import settings
 from app.da.file_sharing import FileStorageDA
@@ -30,8 +32,21 @@ class MailAttachmentResource(object):
         if not mail_id:
             raise HTTPBadRequest("Email is not specified")
 
-        file_storage_id = FileStorageDA().store_file_to_storage(file)
-        filename, filetype = DraftMailDA.save_file_for_mail(file_storage_id, file, mail_id, member["member_id"])
+        file_size = os.fstat(file.file.fileno()).st_size
+        mime_type = file.type
+
+        file_path = pathlib.Path(file.filename)
+        file_storage_id = FileStorageDA().put_file_to_storage(file)
+
+        filename, filetype = DraftMailDA.save_file_for_mail(
+            file_id=file_storage_id,
+            filename=file_path.name,
+            filesize=file_size,
+            filetype=mime_type,
+            file_extension=file_path.suffix[1:],
+            mail_id=mail_id,
+            member_id=member["member_id"]
+        )
         response.body = json.dumps({
             "file_name": str(filename),
             "file_type": str(filetype),

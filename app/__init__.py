@@ -22,7 +22,7 @@ from app.resources.forgot_password import MemberForgotPasswordResource
 from app.resources.reset_password import MemberResetPasswordResource
 from app.resources.change_password import MemberChangePasswordResource
 from app.resources.logout import MemberLogoutResource
-from app.resources.session import SessionResource, ValidateSessionResource
+from app.resources.session import ValidateSessionResource
 from app.resources.file_download import FileDownloadResource
 from app.resources.file_sharing import FileStorage, FileStorageDetail, ShareFile, ShareFileDetail, \
     DownloadStorageFile, DownloadSharedFile, MemberFileCloud, MemberFileBin, MemberShareFile, GroupFileCloud, \
@@ -130,7 +130,8 @@ def _setup_routes(app):
     app.add_route(
         "/member/reset-password/{forgot_key:uuid}", MemberResetPasswordResource())
     app.add_route("/member/change-password", MemberChangePasswordResource())
-    app.add_route("/member/logout", MemberLogoutResource())
+    app.add_route(
+        "/member/{member_id:int}/logout/{session_id:uuid}", MemberLogoutResource())
     app.add_route("/member/invite", MemberInviteResource())
     app.add_route("/member/info/{member_id}", MemberInfoByIdResource())
     app.add_route("/member/info", MemberInfoResource())
@@ -164,7 +165,7 @@ def _setup_routes(app):
     app.add_route("/member/contacts/countries", MemberContactsCountries())
     app.add_route("/member/file/{file_path}", FileDownloadResource())
     app.add_route("/member-contacts", ContactMembersResource())
-    app.add_route('/session/{session_id}', SessionResource)
+
     app.add_route("/valid-session", ValidateSessionResource())
     # app.add_route("/cloud/files", MemberFile())
     app.add_route("/cloud/files", FileStorage())
@@ -349,7 +350,7 @@ def _setup_routes(app):
     app.add_route("/company", company_resource)
     app.add_route("/company/{company_id:int}", company_resource, suffix="detail")
     app.add_route("/company/member", company_resource, suffix="member")
-    
+
     app.add_route("/company/unregistered", CompanyUnregisteredResource())
     # Admin Resources
 
@@ -359,4 +360,3 @@ def _setup_routes(app):
                   admin_resource, suffix="session")
     app.add_route("/admin/member/{member_id:int}",
                   admin_resource, suffix="member")
-    
