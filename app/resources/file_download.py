@@ -1,9 +1,9 @@
 import logging
-import mimetypes
+import pathlib
 import falcon
-import app.util.json as json
-import app.util.request as request
+
 from app import settings
+from app.util.auth import check_session
 from app.da.file_sharing import FileStorageDA
 
 logger = logging.getLogger(__name__)
@@ -17,10 +17,25 @@ class FileDownloadResource():
                                    },
                            }
 
-    @staticmethod
-    def on_get(req, resp, file_path):
-        type = mimetypes.MimeTypes().guess_type(file_path)[0]
+    @check_session
+    def on_get(self, req, resp, file_path):
+        logger.debug(f'Downloading file: {file_path}')
+        # file_pathlib = pathlib.Path(file_path)
+        # logger.debug(f"Filename: {file_pathlib.name}")
+
+        # storage_engine_id = FileStorageDA().get_storage_engine_id_from_key(file_path)
+        # file_info = FileStorageDA().get_file_detail_by_storage_engine_id(
+        #     req.context.auth['session']['member_id'],
+        #     storage_engine_id
+        # )
         s3_resp = FileStorageDA().stream_s3_file(file_path)
-        resp.content_type = type
+        # logger.debug(f"SE Key: {storage_engine_id}")
+        # logger.debug(f"File Info: {file_info}")
+        # logger.debug(f"S3 Resp: {s3_resp}")
+        # Content-Disposition: attachment; filename=quot.pdf;
+        # resp.set_header("Content-Disposition",
+        #                 f"attachment; filename=\"{file_info['file_name']}\"")
+        resp.content_type = s3_resp['ContentType']
+        resp.content_length = s3_resp['ContentLength']
         resp.status = falcon.HTTP_200
-        resp.body = s3_resp['Body'].read()
+        resp.stream = s3_resp['Body']

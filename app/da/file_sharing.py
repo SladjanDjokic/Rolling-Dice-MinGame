@@ -1,7 +1,7 @@
 import os
-import io
 import uuid
 import datetime
+import mimetypes
 from operator import itemgetter
 
 from urllib.parse import urlparse, urljoin
@@ -49,13 +49,26 @@ class FileStorageDA(object):
 
         if not file_size_bytes:
             file_size_bytes = os.fstat(file.file.fileno()).st_size
-        if not mime_type:
-            mime_type = file.type
-        logger.debug(f"Type: {mime_type}")
-        logger.debug(f"Size: {file_size_bytes}")
+
+        mime_types = [
+            file.type,
+            mimetypes.MimeTypes().guess_type(file.filename)[0]
+        ]
+
+        logger.debug(f"Mime Types Part 1: {mime_types}")
 
         uploaded = cls.stream_to_aws(file.file, s3_key)
         storage_url = urljoin(s3_location, s3_key)
+
+        mime_types.append(uploaded["ContentType"])
+
+        logger.debug(f"Mime Types Part 2: {mime_types}")
+
+        mime_types = [mime for mime in mime_types if mime]
+        mime_type = next(iter(mime_types or []), None)
+
+        logger.debug(f"Type: {mime_type}")
+        logger.debug(f"Size: {file_size_bytes}")
 
 
         file_id = cls.create_file_storage_entry(
@@ -67,11 +80,11 @@ class FileStorageDA(object):
         try:
             s3 = cls.aws_s3_client()
             bucket = settings.get("storage.s3.bucket")
-            s3.upload_fileobj(file, bucket, key)
+            upload = s3.upload_fileobj(file, bucket, key)
             exists = cls.check_if_key_exists(key)
             if exists:
                 logger.debug("Upload Successful, Yoda")
-                return True
+                return exists
             else:
                 raise FileStorageUploadError
                 logger.debug("Key doesnt exist, Yoda")
@@ -324,6 +337,59 @@ class FileStorageDA(object):
         return None
 
     @classmethod
+    def get_file_detail_by_storage_engine_id(cls, member, storage_engine_id):
+        query = ("""
+            SELECT
+                file_storage_engine.id as file_id,
+                file_storage_engine.storage_engine_id as file_location,
+                file_storage_engine.storage_engine as storage_engine,
+                file_storage_engine.status as status,
+                file_storage_engine.create_date as created_date,
+                file_storage_engine.update_date as updated_date,
+                member_file.file_name as file_name,
+                member_file.file_size_bytes as file_size_bytes,
+                member_file.file_ivalue as file_ivalue,
+                member_file.categories as categories
+            FROM file_storage_engine
+            LEFT JOIN member_file ON file_storage_engine.id = member_file.file_id
+            WHERE file_storage_engine.storage_engine_id = %s
+            ORDER BY file_storage_engine.create_date DESC
+        """)
+        params = (storage_engine_id,)
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            for (
+                file_id,
+                file_location,
+                storage_engine,
+                status,
+                created_date,
+                updated_date,
+                file_name,
+                file_size_bytes,
+                file_ivalue,
+                categories
+            ) in cls.source.cursor:
+                file_detail = {
+                    "file_id": file_id,
+                    "file_location": file_location,
+                    "storage_engine": storage_engine,
+                    "status": status,
+                    "created_date": created_date,
+                    "updated_date": updated_date,
+                    "file_name": file_name,
+                    "file_size_bytes": file_size_bytes,
+                    "file_ivalue": file_ivalue,
+                    "categories": categories,
+                    "member_first_name": member.get("first_name"),
+                    "member_last_name": member.get("last_name"),
+                    "member_email": member.get("email"),
+                    "member_username": member.get("username"),
+                }
+                return file_detail
+        return None
+
+    @classmethod
     def delete_file(cls, file_id, commit=True):
         # delete object from aws
         # query = ("""
@@ -485,6 +551,17 @@ class FileStorageDA(object):
                 'Key': file_key
             }
         )
+        return url
+
+    @classmethod
+    def get_storage_engine_id_from_key(cls, file_key, bucket=None):
+        if not bucket:
+            bucket = settings.get("storage.s3.bucket")
+
+        s3 = cls.aws_s3_client()
+        location = s3.get_bucket_location(Bucket=bucket)['LocationConstraint']
+        url = f"https://{bucket}.s3.{location}.amazonaws.com/{file_key}"
+        logger.debug(f"SE_ID: {url}")
         return url
 
 

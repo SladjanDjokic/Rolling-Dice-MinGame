@@ -24,15 +24,12 @@ from app.resources.change_password import MemberChangePasswordResource
 from app.resources.logout import MemberLogoutResource
 from app.resources.session import ValidateSessionResource
 from app.resources.file_download import FileDownloadResource
-from app.resources.file_sharing import FileStorage, FileStorageDetail, ShareFile, ShareFileDetail, \
+from app.resources.file_sharing import  FileStorageDetail, ShareFile, ShareFileDetail, \
     DownloadStorageFile, DownloadSharedFile, MemberFileCloud, MemberFileBin, MemberShareFile, GroupFileCloud, \
-    GroupFileBin
+    GroupFileBin, FileGroupResource
 from app.resources.group import MemberGroupResource, GroupMembershipResource, GroupDetailResource, \
     GroupMemberInviteResource, GroupMembersResource, MemberGroupSecurity, GroupMemberAccept, \
     GroupActivityDriveResource, GroupActivityCalendarResource
-from app.resources.file_sharing import FileStorage, FileStorageDetail, \
-    ShareFile, ShareFileDetail, DownloadStorageFile, DownloadSharedFile, \
-    FileGroupResource
 from app.resources.system import SystemActivityResource
 from app.resources.system import SystemActivityUsersResource
 from app.resources.language import LanguageResource
@@ -167,21 +164,17 @@ def _setup_routes(app):
     app.add_route("/member-contacts", ContactMembersResource())
 
     app.add_route("/valid-session", ValidateSessionResource())
-    # app.add_route("/cloud/files", MemberFile())
-    app.add_route("/cloud/files", FileStorage())
-    app.add_route("/cloud/files/new", MemberFileCloud())
-    app.add_route("/cloud/files/bin", MemberFileBin())
-    app.add_route("/cloud/files/sharing", MemberShareFile())
-    app.add_route("/cloud/files/group/{group_id}", GroupFileCloud())
-    app.add_route("/cloud/files/group/bin/{group_id}", GroupFileBin())
-    app.add_route("/cloud/files/groups", FileGroupResource())
-    app.add_route("/cloud/files/details/{file_id}", FileStorageDetail())
-    app.add_route("/cloud/files/download/{file_id}", DownloadStorageFile())
-    app.add_route("/cloud/files/share", ShareFile())
-    app.add_route("/cloud/files/share/details/{shared_key}", ShareFileDetail())
-    app.add_route(
-        "/cloud/files/share/download/{shared_key}", DownloadSharedFile())
-    app.add_route("/static/{file_name}", StaticResource())
+    
+    # member drive 
+    app.add_route("/drive/member/files", MemberFileCloud())
+    app.add_route("/drive/member/files/bin", MemberFileBin())
+    app.add_route("/drive/member/files/sharing", MemberShareFile())
+
+    # group drive 
+    app.add_route("/drive/group/{group_id}/files", GroupFileCloud())
+    app.add_route("/drive/group/{group_id}/files/bin", GroupFileBin())
+    app.add_route("/drive/groups", FileGroupResource())
+
     app.add_route("/group", MemberGroupResource())
     app.add_route("/group/{group_id}", GroupDetailResource())
     app.add_route("/groups", MemberGroupResource())
