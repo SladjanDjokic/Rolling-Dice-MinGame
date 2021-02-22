@@ -325,8 +325,6 @@ def _setup_routes(app):
 
     # Call Notificaitons
 
-    # Companies
-    app.add_route("/company", CompanyResource())
 
     # Project
     project_resource = ProjectResource()

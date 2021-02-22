@@ -3,10 +3,6 @@ import logging
 # import uuid
 # from dateutil.relativedelta import relativedelta
 from app.util.db import source
-from app.exceptions.data import DuplicateKeyError, DataMissingError, \
-    RelationshipReferenceError
-from app.util.filestorage import amerize_url
-from app.util.security import SECURITY_EXCHANGE_OPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +38,10 @@ class CompanyDA(object):
                     member.last_name,
                     job_title.name as title
                 FROM member
-                LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id 
+                LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
             ) as t1 ON t1.id = crx.member_id
             WHERE company.id = %s
-            GROUP BY 
+            GROUP BY
                 company.id,
                 company.name,
                 company.address_1,
@@ -59,7 +55,7 @@ class CompanyDA(object):
                 file_storage_engine.storage_engine_id,
                 company.create_date
         """)
-    
+
         params = (company_id, )
 
         cls.source.execute(query, params)
@@ -98,8 +94,8 @@ class CompanyDA(object):
         return None
 
     @classmethod
-    def get_all_companies(cls):
-        query = ("""
+    def get_companies(cls, get_all, member_id):
+        query = (f"""
             SELECT
                 company.id,
                 company.name,
@@ -113,6 +109,7 @@ class CompanyDA(object):
                 company.logo_storage_id,
                 file_path(file_storage_engine.storage_engine_id, '/member/file') as s3_logo_url,
                 company.create_date,
+                company.update_date,
                 COALESCE(json_agg(DISTINCT t1.*) FILTER (WHERE t1.id IS NOT NULL), '[]') AS members
             FROM company
             LEFT JOIN country_code on country_code.id = company.country_code_id
@@ -120,14 +117,25 @@ class CompanyDA(object):
             LEFT OUTER JOIN company_role_xref crx on crx.company_id = company.id
             LEFT OUTER JOIN (
                 SELECT
+                    crxref.company_id,
                     member.id,
                     member.first_name,
+                    member.middle_name,
                     member.last_name,
-                    job_title.name as title
-                FROM member
-                LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id 
-            ) as t1 ON t1.id = crx.member_id
-            GROUP BY 
+                    member.email,
+                    crxref.company_role,
+                    job_title.name as title,
+                    department.name as department,
+                    file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url
+                FROM company_role_xref as crxref
+                LEFT JOIN member ON crxref.member_id = member.id
+                LEFT JOIN job_title ON job_title_id = job_title.id
+                LEFT JOIN department ON department_id = department.id
+                LEFT JOIN member_profile ON member.id = member_profile.member_id
+                LEFT JOIN file_storage_engine ON file_storage_engine.id = member_profile.profile_picture_storage_id
+            ) as t1 ON t1.company_id = crx.company_id
+            {"WHERE crx.member_id = %s" if not get_all else ""}
+            GROUP BY
                 company.id,
                 company.name,
                 company.address_1,
@@ -139,11 +147,15 @@ class CompanyDA(object):
                 company.primary_url,
                 company.logo_storage_id,
                 file_storage_engine.storage_engine_id,
-                company.create_date
+                company.create_date,
+                company.update_date
         """)
         companies = []
+        params = None
+        if not get_all:
+            params = (member_id,)
 
-        cls.source.execute(query, None)
+        cls.source.execute(query, params)
         if cls.source.has_results():
             for (
                 id,
@@ -158,6 +170,7 @@ class CompanyDA(object):
                 logo_storage_id,
                 s3_logo_url,
                 create_date,
+                update_date,
                 members
             ) in cls.source.cursor:
                 company = {
@@ -173,13 +186,14 @@ class CompanyDA(object):
                     "logo_storage_id": logo_storage_id,
                     "s3_logo_url": s3_logo_url,
                     "create_date": create_date,
+                    "update_date": update_date,
                     "members": members
                 }
 
                 companies.append(company)
 
         return companies
-    
+
     @classmethod
     def create_company(cls, name, address_1, address_2, city, country_code_id, main_phone, primary_url, logo_storage_id, commit=True):
         query = ("""
@@ -251,7 +265,7 @@ class CompanyDA(object):
             return None
 
     @classmethod
-    def delete_member(cls, company_id, member_id):
+    def delete_member(cls, company_id, member_id, commit=True):
         try:
             query = ("""
                 DELETE
@@ -259,7 +273,7 @@ class CompanyDA(object):
                 WHERE company_id = %s and member_id = %s
             """)
 
-            params = (company_id, member_id )
+            params = (company_id, member_id)
             cls.source.execute(query, params)
 
             if commit:
@@ -270,7 +284,7 @@ class CompanyDA(object):
 
     @classmethod
     def get_unregistered_company(cls):
-        try: 
+        try:
             query = ("""
                 SELECT member.company_name, count(distinct (member.company_name)) as total_members
                 FROM member
@@ -317,7 +331,7 @@ class CompanyDA(object):
                 INSERT INTO company_role_xref (company_id, member_id)
                 SELECT %s as company_id, member.id as member_id
                 FROM member
-                WHERE member.company_name = %s              
+                WHERE member.company_name = %s
             """)
 
             params = (id, company_name, )
@@ -339,7 +353,7 @@ class CompanyDA(object):
 
             return cls.get_company(id)
         except Exception as e:
-            raise e 
+            raise e
 
     @classmethod
     def update_unregistered_company(cls, company_name, new_company_name, commit=True):
@@ -367,6 +381,7 @@ class CompanyDA(object):
 
         if commit:
             cls.source.commit()
+
 
 def formatSortingParams(sort_by, entity_dict):
     columns_list = sort_by.split(',')
