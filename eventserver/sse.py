@@ -1,6 +1,7 @@
 import json
 import time
-from app.config import settings
+
+from app import settings
 from app import configure
 
 from loguru import logger
@@ -55,6 +56,7 @@ async def consumer_call_event(request):
             logger.debug("SENDING GROUP CALL")
             member_id = data.get('callee_id')
             CALL_NOTIFICATIONS[int(member_id)] = data
+        # TODO wht about accept. Maybe any reply type should be sent to caller_id
 
     response = {"data": "call notification message stored"}
     return JSONResponse(response, status_code=201)

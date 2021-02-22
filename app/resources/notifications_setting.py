@@ -8,6 +8,7 @@ from app.da.member import MemberNotificationsSettingDA
 
 logger = logging.getLogger(__name__)
 
+
 class MemberNotificationsSetting(object):
     @staticmethod
     def on_put(req, resp):

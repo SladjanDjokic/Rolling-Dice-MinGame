@@ -1,0 +1,2 @@
+{{first_name}} has invited you to join the group {{group_name}}
+Thank you for choosing AMERA Share!

@@ -192,21 +192,21 @@ INSERT INTO member_location
             (8, 'home', 'Melle', 'Ochsenweg', 'OS', '49324', 'Germany', 'Melle', 'Apt #16', 49),
             (9, 'home', 'faizabad Terminal', 'Rawalpindi', 'RW', '12345', 'Pakistan', 'Faisal Movers Bus Terminal', 'Apt #2', 92);
 
-INSERT INTO member_contact_2
-        (member_id, description, device, device_type, device_country, method_type, display_order, primary_contact)
-        VALUES 
-                (1, 'Cell phone', '9721713771', 'cell',840,'voice',2,TRUE),
-                (1, 'Office phone', '9723343333', 'landline',840,'voice',3,FALSE),
-                (1, 'Office email', 'test@email.com', 'email',840,'html',1,TRUE),
-                (2, 'Cell phone', '9721713771', 'cell',840,'voice',2,TRUE),
-                (2, 'Office phone', '9723343333', 'landline',840,'voice',3,FALSE),
-                (2, 'Office email', 'test@email.com', 'email',840,'html',1,TRUE),
-                (3, 'Cell phone', '9721713771', 'cell',840,'voice',2,TRUE),
-                (3, 'Office phone', '9723343333', 'landline',840,'voice',3,FALSE),
-                (3, 'Office email', 'test@email.com', 'email',840,'html',1,TRUE),
-                (4, 'Cell phone', '9721713771', 'cell',840,'voice',2,TRUE),
-                (4, 'Office phone', '9723343333', 'landline',840,'voice',3,FALSE),
-                (4, 'Office email', 'test@email.com', 'email',840,'html',1,TRUE);
+-- INSERT INTO member_contact_2
+--         (member_id, description, device, device_type, device_country, method_type, display_order, primary_contact)
+--         VALUES
+--                 (1, 'Cell phone', '9721713771', 'cell',840,'voice',2,TRUE),
+--                 (1, 'Office phone', '9723343333', 'landline',840,'voice',3,FALSE),
+--                 (1, 'Office email', 'test@email.com', 'email',840,'html',1,TRUE),
+--                 (2, 'Cell phone', '9721713771', 'cell',840,'voice',2,TRUE),
+--                 (2, 'Office phone', '9723343333', 'landline',840,'voice',3,FALSE),
+--                 (2, 'Office email', 'test@email.com', 'email',840,'html',1,TRUE),
+--                 (3, 'Cell phone', '9721713771', 'cell',840,'voice',2,TRUE),
+--                 (3, 'Office phone', '9723343333', 'landline',840,'voice',3,FALSE),
+--                 (3, 'Office email', 'test@email.com', 'email',840,'html',1,TRUE),
+--                 (4, 'Cell phone', '9721713771', 'cell',840,'voice',2,TRUE),
+--                 (4, 'Office phone', '9723343333', 'landline',840,'voice',3,FALSE),
+--                 (4, 'Office email', 'test@email.com', 'email',840,'html',1,TRUE);
 
 INSERT INTO file_storage_engine (storage_engine_id,storage_engine,status) VALUES 
         ('https://file-testing.s3.us-east-2.amazonaws.com/jen.jpg', 'S3', 'available'),
@@ -288,3 +288,42 @@ INSERT INTO member_profile
                 (69, 5,  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent cursus ornare diam in tincidunt. Fusce quis mattis ipsum. Suspendisse eget ligula in augue elementum facilisis quis at lectus. Curabitur at dignissim dolor. Integer eget libero scelerisque, bibendum nunc et, blandit augue. Sed mattis massa sit amet pulvinar tristique. Cras ut dapibus arcu, quis varius arcu. Fusce a gravida eros, nec varius est. Maecenas sagittis risus efficitur tristique facilisis.'),
                 (70, 2,  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent cursus ornare diam in tincidunt. Fusce quis mattis ipsum. Suspendisse eget ligula in augue elementum facilisis quis at lectus. Curabitur at dignissim dolor. Integer eget libero scelerisque, bibendum nunc et, blandit augue. Sed mattis massa sit amet pulvinar tristique. Cras ut dapibus arcu, quis varius arcu. Fusce a gravida eros, nec varius est. Maecenas sagittis risus efficitur tristique facilisis.'),
                 (71, 3, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent cursus ornare diam in tincidunt. Fusce quis mattis ipsum. Suspendisse eget ligula in augue elementum facilisis quis at lectus. Curabitur at dignissim dolor. Integer eget libero scelerisque, bibendum nunc et, blandit augue. Sed mattis massa sit amet pulvinar tristique. Cras ut dapibus arcu, quis varius arcu. Fusce a gravida eros, nec varius est. Maecenas sagittis risus efficitur tristique facilisis.');
+
+do $$
+    begin
+        for r in 1..71 loop
+            UPDATE member_profile
+            SET notification_settings = '{"sms": {
+                            "Contact": true,
+                            "Invoice": true,
+                            "Message": true,
+                            "Payment": true,
+                            "AmeraMail": true,
+                            "GroupJoin": true,
+                            "ChatMessage": true,
+                            "AcceptFriend": true,
+                            "EventReminder": true,
+                            "RequestContact": true,
+                            "RequestFriendship": true,
+                            "RequestToJoinGroup": true
+                        },
+                            "email": {
+                                "Contact": true,
+                                "Invoice": true,
+                                "Message": true,
+                                "Payment": true,
+                                "AmeraMail": true,
+                                "GroupJoin": true,
+                                "ChatMessage": true,
+                                "AcceptFriend": true,
+                                "EventReminder": true,
+                                "RequestContact": true,
+                                "RequestFriendship": true,
+                                "RequestToJoinGroup": true
+                            }
+                        }'
+            WHERE member_id = r;
+            end loop;
+    end;
+
+    $$

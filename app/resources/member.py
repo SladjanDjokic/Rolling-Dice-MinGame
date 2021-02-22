@@ -311,6 +311,7 @@ class ContactMembersResource(object):
 
         contacts = list()
         contact_member_id_list = req.get_param('member_id_list').split(',')
+        req.headers['kafka_contact_id_list'] = json.dumps(contact_member_id_list)
         for contact_member_id in contact_member_id_list:
             contact_member = MemberDA().get_contact_member(contact_member_id)
 
@@ -334,7 +335,6 @@ class ContactMembersResource(object):
                 "contact_role": '',
                 "role_id": None
             }
-
             contact_id = MemberContactDA().create_member_contact(**contact_member_params)
             logger.debug("New created contact_id: {}".format(contact_id))
             contact = {}
@@ -367,7 +367,6 @@ class ContactMembersResource(object):
 
             contact_id = MemberContactDA().create_member_contact(**contact_member_params)
             logger.debug("New created contact_id: {}".format(contact_id))
-
         resp.body = json.dumps({
             "contacts": contacts,
             "success": True
@@ -470,6 +469,7 @@ class MemberContactResource(object):
             raise MemberNotFound(email)
 
         member_contact = MemberContactDA().get_member_contact_by_email(email)
+        req.headers['kafka_single_contact_add_member_id'] = str(member_id)
         if member_contact:
             raise MemberContactExists(email)
 
@@ -891,6 +891,8 @@ class MemberContactAccept(object):
 
             MemberContactDA.accept_invitation(member_id, contact_member_id, status)
             MemberContactDA.accept_invitation(contact_member_id, member_id, status)
+            req.headers['kafka_contacter_id'] = str(contact_member_id)
+            req.headers['kafka_contact_request_status'] = status
             resp.body = json.dumps({
                 "description": "Successfully accepted",
                 "success": True

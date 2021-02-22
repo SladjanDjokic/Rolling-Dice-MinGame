@@ -66,7 +66,6 @@ mail = 'mail_activity'
 registration = 'registration_activity'
 contact = 'contact_activity'
 calendar = 'calendar_activity'
-member_change_password = 'member_activity'
 
 [kafka.event_types]
 
@@ -103,7 +102,7 @@ group_file_cloud = 'create_group_folder'
 forgot_password = 'forgot_password'
 member_group_resource = 'create_group'
 group_crud = 'add_member_group'
-group_member_invite = 'invite_member_to_group'
+group_non_member_invite = 'invite_non_member_to_group'
 member_group_security = 'update_security_group'
 member_invite = 'create_member_invite'
 keygen_file_upload = 'amerakey_picture_create'

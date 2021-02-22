@@ -16,8 +16,12 @@ import gevent
 import app.util.json as json
 from pprint import pformat
 from app.config import settings
+from app.da import GroupDA
+from app.da.mail import BaseMailDA
+from app.da.member import MemberNotificationsSettingDA
 from app.events.publishers.publisher import BaseProducer
 from app.exceptions.session import UnauthorizedSession, InvalidSessionError
+from app.util import request
 from app.util.error import HTTPError
 from app.util.session import get_session_cookie, validate_session
 from app.da.activity import ActivityDA
@@ -282,7 +286,6 @@ class KafkaProducerMiddleware(object):
 
             # Gevent to not block request. Create dict from topic_data model for kafka
             topic_data_dict = vars(topic_data)
-            logger.debug("### PRODUCING")
             self.producer_async(topic, [json.dumps(topic_data_dict,
                                                    default_parser=json.parser)])
 
@@ -320,6 +323,7 @@ class KafkaProducerMiddleware(object):
         # Send all other data to activity topic for monitoring purposes
         topic = "activity"
         topic_data.event_type = "activity"
+
 
         try:
             topic, event = self._resource_topic_event(req, resource)
@@ -399,6 +403,65 @@ class KafkaProducerMiddleware(object):
                                                        default_parser=json.parser)
 
             ActivityDA.insert_activity(**db_query_data)
+
+            # Check if event maps to a notification type
+            # TODO Member_ID for notifications should be from the payload since the request came from the sender
+            event_type_to_notification = {
+                settings.get('kafka.event_types.post.group_crud'): "RequestToJoinGroup",
+                settings.get('kafka.event_types.put.group_membership_response'): "GroupJoin",
+                settings.get('kafka.event_types.post.create_contact'): "RequestContact",
+                settings.get('kafka.event_types.put.contact_request_response'): "Contact",
+                settings.get('kafka.event_types.post.mail_draft_send'): "AmeraMail",
+                }
+            if 200 <= int(topic_data.http_status[:3]) < 300:
+                # Check if event_type matches a notification
+                notification_type = event_type_to_notification.get(topic_data.event_type)
+                logger.debug(f"### {topic_data.event_type}")
+                if notification_type:
+                    notification_sent = False
+                    member_id = None
+                    if notification_type == "AmeraMail":
+                        pass
+                        # TODO How to get member_id for TO. Query mail object based on Member and mail_id
+                        #  from req_url_params
+                        # member_id = BaseMailDA.get_mail_detail(topic_data.req_url_params.get('member'))
+                    elif notification_type == "RequestToJoinGroup":
+                        logger.debug("RequestTOJoinGroup Notification")
+                        member_id = req.headers.get('kafka_invitee_id')
+                        topic_data_dict['kafka_invitee_id'] = member_id
+                        topic_data_dict['kafka_group_name'] = req.headers.get('kafka_group_name')
+                        # req.set_header('kafka_member_id', "")
+                    elif notification_type == "GroupJoin":
+                        # TODO revert header. Do it efficiently
+                        # req.header('group_id', "")
+                        group = GroupDA.get_group(int(req.headers.get('kafka_group_id')))
+                        member_id = group.get('group_leader_id')
+                        topic_data_dict['kafka_group_name'] = group.get('name')
+                        topic_data_dict['kafka_group_leader_id'] = group.get('group_leader_id')
+                        # topic_data_dict['kafka_group_id'] = req.headers.get('kafka_group_id')
+                        topic_data_dict['kafka_group_status'] = req.headers.get('kafka_group_status')
+                    elif notification_type == "RequestContact":
+                        logger.debug(" REQUEST CONTACT")
+                        contact_list = req.headers.get('kafka_contact_id_list')
+                        # req.set_header('kafka_contact_member_id_list', "")
+                        if contact_list:
+                            logger.debug(f"### {contact_list}")
+                            topic_data_dict['kafka_contact_id_list'] = json.loads(contact_list)
+                            self.producer_async("sms", [json.dumps(topic_data_dict,
+                                                                   default_parser=json.parser)])
+                            self.producer_async("email", [json.dumps(topic_data_dict,
+                                                                   default_parser=json.parser)])
+                        notification_sent = True
+                    elif notification_type == "Contact":
+                        member_id = int(req.headers.get('kafka_contacter_id'))
+                        topic_data_dict['kafka_contacter_id'] = member_id
+                        topic_data_dict['kafka_contact_request_status'] = req.headers.get('kafka_contact_request_status')
+                        # req.set_header('kafka_contact_accepted_id', "")
+
+                    # produce notification if not already sent
+                    if member_id and not notification_sent:
+                        self.produce_notification(member_id, notification_type, topic_data_dict)
+
         except Exception as e:
             logger.error(e, exc_info=True)
 
@@ -417,8 +480,8 @@ class KafkaProducerMiddleware(object):
                 # will be triggered from poll() above, or flush() below, when the message has
                 # been successfully delivered or failed permanently.
                 data = data.encode('utf-8')
-                self.p.produce(topic, value=data,
-                               callback=self.delivery_report)
+                logger.debug(f"PRODUCING to {topic} {data}")
+                self.p.produce(topic, value=data, callback=self.delivery_report)
             except KafkaException as exc:
                 logger.error('KafkaException When Producing or Polling')
                 self.__handle_kafka_errors(exc.args[0])
@@ -487,3 +550,19 @@ class KafkaProducerMiddleware(object):
         else:
             logger.debug('Message delivered to {} [{}] {}'.format(
                 msg.topic(), msg.partition(), msg.value()))
+
+    def produce_notification(self, member_id, notification_type, topic_data_dict):
+        member_notificiation_settings = MemberNotificationsSettingDA.get_notifications_setting(
+            memberId=int(member_id)).get('data')
+        if member_notificiation_settings:
+            sms_topic = member_notificiation_settings.get('sms').get(notification_type)
+            email_topic = member_notificiation_settings.get('email').get(notification_type)
+        # TODO Group these together into one json for kafka.
+            if sms_topic:
+                self.producer_async('sms', [json.dumps(topic_data_dict,
+                                                       default_parser=json.parser)])
+            if email_topic:
+                self.producer_async('email', [json.dumps(topic_data_dict,
+                                                         default_parser=json.parser)])
+        else:
+            logger.error("No notificaiton settings for user")

@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 loop = asyncio.get_event_loop()
 
-
+# TODO see asyncio docs about running things in threads so they do not block
 if __name__ == '__main__':
     c = parser.add_argument_group('consumers')
     c.add_argument("--consumer-name", type=str, default='calls',

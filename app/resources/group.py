@@ -269,6 +269,7 @@ class GroupMembershipResource(object):
         (group_id, group_member_email) = request.get_json_or_form(
             "groupId", "groupMemberEmail", req=req)
         member = MemberDA().get_member_by_email(group_member_email)
+        req.headers['kafka_invitee_id'] = member.get('member_id')
         if not member:
             raise MemberNotFound(group_member_email)
         group_member_id = GroupMembershipDA().create_group_membership(
@@ -276,6 +277,7 @@ class GroupMembershipResource(object):
         if not group_member_id:
             raise MemberExists(group_member_email)
         group = GroupDetailResource().get_group_detail(group_id)
+        req.headers['kafka_group_name'] = group.get('group_name')
         resp.body = json.dumps({
             "data": group,
             "description": "Member added successfully!",
@@ -324,7 +326,7 @@ class GroupMembershipResource(object):
 class GroupMemberInviteResource(MemberInviteResource):
 
     def __init__(self):
-        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.group_member_invite'),
+        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.group_non_member_invite'),
                                     "topic": settings.get('kafka.topics.member')
                                     }
                            }
@@ -435,7 +437,9 @@ class GroupMemberAccept(object):
             )
 
             GroupMembershipDA.accept_group_invitation(group_id, member_id, status)
-
+            # Headers set for kafka topic routing for notifications
+            req.headers['kafka_group_id'] = str(group_id)
+            req.headers['kafka_group_status'] = status
             resp.body = json.dumps({
                 "description": "Successfully done",
                 "success": True
