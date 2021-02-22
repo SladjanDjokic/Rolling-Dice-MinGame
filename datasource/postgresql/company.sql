@@ -20,6 +20,7 @@ CREATE TABLE company (
     update_date           TIMESTAMP       WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX company_parent_id_idx ON company (parent_company_id);
+
 -- ------------------------------------------------------------------------------
 -- Table:        company_role_xref
 -- Description:  contains the role a member has within the company.

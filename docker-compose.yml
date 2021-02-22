@@ -1,14 +1,13 @@
 version: "3.8"
 services:
-
   amera-dns:
     container_name: amera-dns
     image: andyshinn/dnsmasq:latest
     restart: always
     command: >
-     --log-queries
-     --log-facility=-
-     --address=/dev.amera.local/127.0.0.1
+      --log-queries
+      --log-facility=-
+      --address=/dev.amera.local/127.0.0.1
     deploy:
       resources:
         limits:
@@ -111,7 +110,7 @@ services:
   #     - 5000
   #   ports:
   #     - 5000:5000
-  #   environment: 
+  #   environment:
   #     - AMERA_API_KAFKA.BOOTSTRAP_SERVERS=kafka:9092
   #   volumes:
   #     - ../web-api:/app
@@ -214,7 +213,7 @@ services:
       - 5000
     ports:
       - 5000:5000
-    environment: 
+    environment:
       - AMERA_API_KAFKA.BOOTSTRAP_SERVERS=kafka:9092
     volumes:
       - ../web-api:/app
@@ -247,7 +246,7 @@ services:
     volumes:
       - ../web-signaling:/app
       - demo-signaling-python-packages:/root/.local/share
-    command: ['pipenv', 'run', 'docker']
+    command: ["pipenv", "run", "docker"]
 
   amera-eventserver:
     container_name: amera-eventserver
@@ -280,7 +279,18 @@ services:
       - ../web-api:/app
       - web-api-python-packages:/root/.local/share
     # command: [ "uvicorn", "--app-dir=./eventserver", "test-star:app", "--host", "0.0.0.0", "--port", "4000", "--reload" ]
-    command: ["gunicorn", "--chdir", "eventserver", "sse:app", "--reload", "--bind=0.0.0.0:4000", "-k", "uvicorn.workers.UvicornWorker", "--log-level=DEBUG"]
+    command:
+      [
+        "gunicorn",
+        "--chdir",
+        "eventserver",
+        "sse:app",
+        "--reload",
+        "--bind=0.0.0.0:4000",
+        "-k",
+        "uvicorn.workers.UvicornWorker",
+        "--log-level=DEBUG",
+      ]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/healthz"]
       interval: 30s
@@ -371,6 +381,7 @@ services:
       - ../web-api/datasource/postgresql/company.sql:/docker-entrypoint-initdb.d/k-company.sql
       - ../web-api/datasource/postgresql/member_security_preferences.sql:/docker-entrypoint-initdb.d/l-member_security_preferences.sql
       - ../web-api/datasource/postgresql/face_embeddings.sql:/docker-entrypoint-initdb.d/m-face-embeddings.sql
+      - ../web-api/datasource/postgresql/project.sql:/docker-entrypoint-initdb.d/n-project.sql
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/z-3-test-schedule.sql
@@ -379,6 +390,9 @@ services:
       - ../web-api/datasource/postgresql/test-achievements.dev.sql:/docker-entrypoint-initdb.d/z-6-test-achievements.dev.sql
       - ../web-api/datasource/postgresql/test-fileshare.sql:/docker-entrypoint-initdb.d/z-7-test-fileshare.dev.sql
       - ../web-api/datasource/postgresql/test-event.dev.sql:/docker-entrypoint-initdb.d/z-8-test-event.dev.sql
+      - ../web-api/datasource/postgresql/test-company.dev.sql:/docker-entrypoint-initdb.d/z-9-0-test-company.dev.sql
+      - ../web-api/datasource/postgresql/test-company-role_xref.dev.sql:/docker-entrypoint-initdb.d/z-9-1-test-company-roles.dev.sql
+      - ../web-api/datasource/postgresql/test-project.dev.sql:/docker-entrypoint-initdb.d/z-9-2-test-project-dev.sql
     environment:
       POSTGRES_DB: ameraiot
       POSTGRES_USER: amera
@@ -462,8 +476,8 @@ services:
         condition: service_healthy
       amera-eventserver:
         condition: service_healthy
-#    command: [ "pipenv", "run", "email"]
-    command: [ "pipenv", "run", "dev-calls" ]
+    #    command: [ "pipenv", "run", "email"]
+    command: ["pipenv", "run", "dev-calls"]
 
   amera-email-consumer:
     container_name: amera-email-consumer
@@ -529,7 +543,7 @@ services:
       amera-eventserver:
         condition: service_healthy
     # command: [ "pipenv", "run", "sms" ]
-    command: [ "pipenv", "run", "dev-sms" ]
+    command: ["pipenv", "run", "dev-sms"]
 
   # Kafka and Zookeeper Single Deploy
   zookeeper:
@@ -548,7 +562,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M    
+          memory: 256M
         reservations:
           memory: 50M
 

@@ -1,0 +1,20 @@
+INSERT INTO company_role_xref (company_id, member_id, company_role)
+VALUES 
+    (1, 1, 'owner'),
+    (1, 2, 'administrator'),
+    (1, 3, 'standard'),
+    (1, 4, 'standard'),
+    (1, 5, 'standard'),
+    (1, 6, 'standard'),
+    (1, 7, 'standard'),
+    (1, 8, 'standard'),
+    (2, 1, 'administrator'),
+    (2, 9, 'standard'),
+    (2, 10, 'standard'),
+    (2, 11, 'standard'),
+    (2, 12, 'standard'),
+    (3, 13, 'standard'),
+    (3, 1, 'administrator'),
+    (3, 14, 'standard'),
+    (3, 15, 'standard'),
+    (3, 16, 'standard');

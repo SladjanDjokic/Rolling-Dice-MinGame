@@ -275,4 +275,3 @@ class CompanyUnregisteredResource(object):
                 "description": "Something went wrong",
                 "success": False
             }, default_parser=json.parser)
-

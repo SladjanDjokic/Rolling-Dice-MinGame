@@ -25,7 +25,7 @@ from app.resources.change_password import MemberChangePasswordResource
 from app.resources.logout import MemberLogoutResource
 from app.resources.session import ValidateSessionResource
 from app.resources.file_download import FileDownloadResource
-from app.resources.file_sharing import  FileStorageDetail, ShareFile, ShareFileDetail, \
+from app.resources.file_sharing import FileStorageDetail, ShareFile, ShareFileDetail, \
     DownloadStorageFile, DownloadSharedFile, MemberFileCloud, MemberFileBin, MemberShareFile, GroupFileCloud, \
     GroupFileBin, FileGroupResource
 from app.resources.group import MemberGroupResource, GroupMembershipResource, GroupDetailResource, \
@@ -47,6 +47,7 @@ from app.resources.mail import MailDraftComposeResource, MailAttachmentResource,
 from app.resources.role import RolesResource
 from app.resources.avatar import MemberAvatarResource
 from app.resources.activity import ActivitiesResource
+from app.resources.project import ProjectResource
 from app.resources.company import CompanyResource, CompanyUnregisteredResource
 
 from app.resources.notifications_setting import MemberNotificationsSetting
@@ -165,13 +166,13 @@ def _setup_routes(app):
     app.add_route("/member-contacts", ContactMembersResource())
 
     app.add_route("/valid-session", ValidateSessionResource())
-    
-    # member drive 
+
+    # member drive
     app.add_route("/drive/member/files", MemberFileCloud())
     app.add_route("/drive/member/files/bin", MemberFileBin())
     app.add_route("/drive/member/files/sharing", MemberShareFile())
 
-    # group drive 
+    # group drive
     app.add_route("/drive/group/{group_id}/files", GroupFileCloud())
     app.add_route("/drive/group/{group_id}/files/bin", GroupFileBin())
     app.add_route("/drive/groups", FileGroupResource())
@@ -294,7 +295,8 @@ def _setup_routes(app):
                   suffix="remove")  # POST - move mail to origin
     app.add_route("/mail/archive/mv/trash", mail_archive_resource,
                   suffix="trash")  # POST - Add to archive
-    app.add_route("/mail/archive/members", mail_archive_resource, suffix="members")
+    app.add_route("/mail/archive/members",
+                  mail_archive_resource, suffix="members")
 
     # Sent
     mail_sent_resource = MailSentResource()
@@ -323,6 +325,30 @@ def _setup_routes(app):
 
     # Call Notificaitons
 
+    # Companies
+    app.add_route("/company", CompanyResource())
+
+    # Project
+    project_resource = ProjectResource()
+    app.add_route("/project", project_resource)
+    app.add_route("/project/roles", project_resource, suffix="roles")
+    app.add_route("/project/member", project_resource, suffix="member")
+    app.add_route("/project/member/roles",
+                  project_resource, suffix="member_role")
+    app.add_route("/project/member/privilege",
+                  project_resource, suffix="member_privilege")
+    app.add_route("/project/epic", project_resource, suffix="epic")
+    app.add_route("/project/tremor", project_resource, suffix="tremor")
+    app.add_route("/project/story", project_resource, suffix="story")
+    app.add_route("/project/epic/{epic_id:int}",
+                  project_resource, suffix="epic")
+    app.add_route("/project/tremor/{tremor_id:int}",
+                  project_resource, suffix="tremor")
+    app.add_route("/project/story/{story_id:int}",
+                  project_resource, suffix="story")
+    app.add_route("/project/task/{task_id:int}",
+                  project_resource, suffix="task")
+
     # Upcoming Events
     app.add_route("/member/event/upcoming", MemberUpcomingEvents())
 
@@ -330,7 +356,8 @@ def _setup_routes(app):
     # Event Invitations
     app.add_route("/member/event/invite", member_event_invitation_resource)
     # Event Invitation Accept/Decline
-    app.add_route("/member/event/invite/{event_invite_id}", member_event_invitation_resource)
+    app.add_route(
+        "/member/event/invite/{event_invite_id}", member_event_invitation_resource)
     app.add_route("/notify", IncomingCallView())
 
     # Report Bugs
@@ -342,7 +369,8 @@ def _setup_routes(app):
     company_resource = CompanyResource()
 
     app.add_route("/company", company_resource)
-    app.add_route("/company/{company_id:int}", company_resource, suffix="detail")
+    app.add_route("/company/{company_id:int}",
+                  company_resource, suffix="detail")
     app.add_route("/company/member", company_resource, suffix="member")
 
     app.add_route("/company/unregistered", CompanyUnregisteredResource())
