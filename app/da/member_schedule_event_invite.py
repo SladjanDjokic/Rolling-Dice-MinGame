@@ -274,3 +274,25 @@ class MemberScheduleEventInviteDA(object):
 
         except Exception as e:
             return None
+
+    @classmethod
+    def delete_invitations_event_by_ids(cls, event_ids):
+        try:
+            ids = list()
+            for id in event_ids:
+                ids.append(str(id))
+
+            event_comma_ids = ', '.join(ids)
+
+            query = ("""
+                DELETE 
+                FROM event_invite_2
+                WHERE event_id in (%s)
+            """)
+
+            params = (event_comma_ids,)
+            cls.source.execute(query, params)
+            cls.source.commit()
+            return True
+        except Exception as e:
+            raise e

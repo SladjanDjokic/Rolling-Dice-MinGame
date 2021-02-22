@@ -190,6 +190,15 @@ class MemberScheduleEventResource(object):
                     all_event_ids.append(recurring_id)
 
         '''
+            attachments for all instances of the
+            recurring event
+        '''
+        if len(attachments) > 0:
+            for file_id in attachments:
+                for event_id in all_event_ids:
+                    MemberEventDA().bind_attachment(event_id, file_id)
+
+        '''
             Invite members for all events in the row. 1 event x 1 member = 1 invite
         '''
         if invited_members and len(invited_members) > 0:
@@ -257,6 +266,16 @@ class MemberScheduleEventResource(object):
             event_tz = contents['eventTimeZone']
             location_mode = contents['locationMode']
             location_data = contents['locationData']
+            sequence_id = contents['sequence_id']
+            event_recurrence_freq = contents['recurrence']
+            end_condition = contents['endCondition']
+            repeat_weekdays = contents['repeatWeekDays']
+            end_date_datetime = contents['endDate']
+            repeat_times = contents['repeatTimes']
+            invitedGroup = contents['invitedGroup']
+            recurringCopies = contents['recurringCopies']
+            recurrenceUpdateOption = contents['recurrenceUpdateOption'] if 'recurrenceUpdateOption' in contents.keys(
+            ) else None
             event_description = contents['description'] if 'description' in contents.keys(
             ) else None
             invitations = contents['invitations'] if 'invitations' in contents.keys(
@@ -271,56 +290,100 @@ class MemberScheduleEventResource(object):
             location_address = location_data if (
                 location_mode == 'lookup' or location_mode == 'url') else None
 
-            # Update the event 2 table
-            updates = dict(event_name=event_name,
-                           event_color_id=color_id,
-                           event_description=event_description,
-                           event_tz=event_tz,
-                           start_datetime=event_start_utc,
-                           end_datetime=event_end_utc,
-                           is_full_day=isFullDay,
-                           event_type=event_type,
-                           location_mode=location_mode,
-                           location_id=location_id,
-                           location_address=location_address,
-                           cover_attachment_id=cover_attachment_id
-                           )
+            if hasattr(invitedGroup, 'group_id'):
+                group_id = invitedGroup.group_id
+            else:
+                group_id = None
 
-            updated_event_id = MemberEventDA().update_event_by_id(event_id, updates)
+            if recurrenceUpdateOption and recurrenceUpdateOption == 'next':
+                #cancel sequence_id & date
+                MemberEventDA.cancel_events_after(sequence_id, event_start_utc)
+                # add new sequence
+                sequence_id = MemberEventDA().add_sequence(sequence_name=event_name)
+            else:
+                #cancel sequence_id
+                MemberEventDA.cancel_events_by_sequence_id(sequence_id)
 
-            # Update the invites
+
+            # This is the first event id
+            event_id = MemberEventDA().add_2(
+                sequence_id=sequence_id,
+                event_color_id=color_id,
+                event_name=event_name,
+                event_description=event_description,
+                host_member_id=host_member_id,
+                is_full_day=isFullDay,
+                event_tz=event_tz,
+                start_datetime=event_start_utc,
+                end_datetime=event_end_utc,
+                event_type=event_type,
+                event_recurrence_freq=event_recurrence_freq,
+                end_condition=end_condition,
+                repeat_weekdays=repeat_weekdays,
+                end_date_datetime=end_date_datetime,
+                location_mode=location_mode,
+                location_id=location_id,
+                location_address=location_address,
+                repeat_times=repeat_times,
+                cover_attachment_id=cover_attachment_id,
+                group_id=None
+            )
+
+            # if recurring -> add events for each instance
+            all_event_ids = [event_id]
+
+            if event_recurrence_freq != 'No recurrence':
+                if len(recurringCopies) > 0:
+                    for copy in recurringCopies:
+                        recurring_id = MemberEventDA().add_2(
+                            sequence_id=sequence_id,
+                            event_color_id=color_id,
+                            event_name=event_name,
+                            event_description=event_description,
+                            host_member_id=host_member_id,
+                            is_full_day=isFullDay,
+                            event_tz=event_tz,
+                            start_datetime=copy["start"],
+                            end_datetime=copy["end"],
+                            event_type=event_type,
+                            event_recurrence_freq=event_recurrence_freq,
+                            end_condition=end_condition,
+                            repeat_weekdays=repeat_weekdays,
+                            end_date_datetime=end_date_datetime,
+                            location_mode=location_mode,
+                            location_id=location_id,
+                            location_address=location_address,
+                            repeat_times=repeat_times,
+                            cover_attachment_id=cover_attachment_id,
+                            group_id=None
+                        )
+                        all_event_ids.append(recurring_id)
+
+            '''
+                attachments for all instances of the
+                recurring event
+            '''
+            if len(attachments) > 0:
+                for file_id in attachments:
+                    for event_id in all_event_ids:
+                        MemberEventDA().bind_attachment(event_id, file_id['member_file_id'])
+
+            '''
+                Invite members for all events in the row. 1 event x 1 member = 1 invite
+            '''
             if invitations and len(invitations) > 0:
-                # First we delete all invitations that were there, but are no longer required
-                # Existing invites have numberic ids, new ones - strings
+                if len(all_event_ids) > 0:
+                    for invitation in invitations:
+                        for event_id in all_event_ids:
+                            MemberScheduleEventInviteDA().create_invite(
+                                invitee_id=invitation['invite_member_id'], event_id=event_id)
 
-                invite_ids_to_stay = [
-                    invite['invite_id'] for invite in invitations if type(invite['invite_id']) == int]
-                MemberScheduleEventInviteDA().delete_invites_by_exception(
-                    event_id=event_id, invite_ids_to_stay=invite_ids_to_stay)
-
-                # Then add all new invites
-                for item in invitations:
-                    if type(item['invite_id']) == str:
-                        MemberScheduleEventInviteDA().create_invite(
-                            invitee_id=item['invite_member_id'], event_id=event_id)
-            else:
-                # delete all invites
-                MemberScheduleEventInviteDA().delete_invites_by_event(event_id=event_id)
-
-            # Update attached files
-            if attachments and len(attachments) > 0:
-
-                attachment_ids_to_stay = [attachment['attachment_id'] for attachment in attachments if type(
-                    attachment['attachment_id']) == int]
-                MemberEventDA().unbind_attachments_by_exception(
-                    attachment_ids_to_stay=attachment_ids_to_stay, event_id=event_id)
-
-                for item in attachments:
-                    if type(item['attachment_id']) == str:
-                        MemberEventDA.bind_attachment(
-                            event_id=event_id, attachment_file_id=item['member_file_id'])
-            else:
-                MemberEventDA().unbind_all_attachments(event_id=event_id)
+            '''
+                Now get the sequence we've created and send it back to front end.
+                Single event is a sequence of one
+            '''
+            result = MemberEventDA.get_event_sequence_by_id(
+                sequence_id)
 
         if updated_event_id:
             logger.debug('updating success', updated_event_id)

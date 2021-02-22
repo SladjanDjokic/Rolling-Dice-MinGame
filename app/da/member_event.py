@@ -362,6 +362,26 @@ class MemberEventDA(object):
             raise e
 
     @classmethod
+    def cancel_events_by_sequence_id(cls, sequence_id):
+        try:
+            query = ("""
+                UPDATE event_2
+	                SET event_status = 'Cancel'
+	                WHERE sequence_id = %s
+	                RETURNING TRUE
+                """)
+            params = (sequence_id, )
+            cls.source.execute(query, params)
+            success = None
+            if cls.source.has_results():
+                result = cls.source.cursor.fetchone()
+                success = result[0]
+            cls.source.commit()
+            return success
+        except Exception as e:
+            raise e
+
+    @classmethod
     def change_event_date(cls, event_id, start, end):
         try:
             query = ("""
@@ -1036,3 +1056,60 @@ class MemberEventDA(object):
         cls.source.execute(query, params)
         cls.source.commit()
         return True
+
+    @classmethod
+    def get_events_ids_sequence_by_id(cls, sequence_id):
+        try:
+            query = ("""
+                SELECT array_agg(event_2.id) as event_ids
+                FROM event_2
+                WHERE sequence_id = %s
+                GROUP BY sequence_id
+            """)
+            params = (sequence_id,)
+            cls.source.execute(query, params)
+            ids = None
+            if cls.source.has_results():
+                result = cls.source.cursor.fetchone()
+                ids = result[0]
+            cls.source.commit()
+            return ids
+        except Exception as e:
+            raise e
+
+    @classmethod
+    def delete_events_sequence_by_id(cls, sequence_id):
+        try:
+            query = ("""
+                DELETE 
+                FROM event_2
+                WHERE sequence_id = %s
+            """)
+            params = (sequence_id,)
+            cls.source.execute(query, params)
+            cls.source.commit()
+            return True
+        except Exception as e:
+            raise e
+
+    @classmethod
+    def delete_attachments_event_by_ids(cls, event_ids):
+        try:
+            ids = list()
+            for id in event_ids:
+                ids.append(str(id))
+
+            event_comma_ids = ', '.join(ids)
+
+            query = ("""
+                DELETE 
+                FROM event_media
+                WHERE event_id in (%s)
+            """)
+
+            params = (event_comma_ids,)
+            cls.source.execute(query, params)
+            cls.source.commit()
+            return True
+        except Exception as e:
+            raise e
