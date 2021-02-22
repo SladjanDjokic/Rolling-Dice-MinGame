@@ -9,10 +9,13 @@ logger = logging.getLogger(__name__)
 
 
 class ProjectResource(object):
-    @inject_member
-    def on_get(self, req, resp, member):
+    @check_session
+    def on_get(self, req, resp):
+        member_id = req.context.auth['session']['member_id']
         try:
-            projects = ProjectDA.get_related_projects(member["member_id"])
+            projects = ProjectDA.get_related_projects(member_id)
+            if not projects:
+                projects = []
             resp.body = json.dumps({
                 "success": True,
                 "description": "Projects data fetched succefully",
