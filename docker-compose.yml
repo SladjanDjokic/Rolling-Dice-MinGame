@@ -224,8 +224,8 @@ services:
       # test: CMD wget --no-verbose --tries=1 --spider http://localhost:5000/healthz || exit 1
       test: ["CMD", "curl", "-f", "http://localhost:5000/healthz"]
       interval: 30s
-      timeout: 10s
-      retries: 22
+      timeout: 1s
+      retries: 1000
 
   amera-signaling:
     container_name: amera-signaling
@@ -369,6 +369,8 @@ services:
       - ../web-api/datasource/postgresql/schema-updates-2021-02-06_event_invite_feedback.sql:/docker-entrypoint-initdb.d/j-4-schema-updates.invitee_comment.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-02-07_event_picture.sql:/docker-entrypoint-initdb.d/j-5-event_picture.sql
       - ../web-api/datasource/postgresql/company.sql:/docker-entrypoint-initdb.d/k-company.sql
+      - ../web-api/datasource/postgresql/member_security_preferences.sql:/docker-entrypoint-initdb.d/l-member_security_preferences.sql
+      - ../web-api/datasource/postgresql/face_embeddings.sql:/docker-entrypoint-initdb.d/m-face-embeddings.sql
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/z-3-test-schedule.sql

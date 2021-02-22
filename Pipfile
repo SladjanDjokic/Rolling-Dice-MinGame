@@ -51,6 +51,7 @@ certifi = "*"
 avro = "*"
 ipregistry = "*"
 mock = "*"
+numpy = "*"
 
 [requires]
 python_version = "3.7.9"
@@ -61,12 +62,10 @@ python_version = "3.7.9"
 "docker" = "env GUNICORN_CMD_ARGS=\"--reload\" python run.py --env-name=LOCAL"
 "server" = "python run.py"
 "local" = "gunicorn --reload --bind=0.0.0.0:5000 --workers=1 --worker-class=gevent --worker-connections=1000 local-start:app"
-
 # Consumer scripts for local dev with reload
 "dev-calls" = "watchmedo auto-restart -p '*.py' -R python -- run-consumers.py --consumer-name=calls"
 "dev-email" = "watchmedo auto-restart -p '*.py' -R python -- run-consumers.py --consumer-name=email"
 "dev-sms" = "watchmedo auto-restart -p '*.py' -R python -- run-consumers.py --consumer-name=sms"
-
 # Consumers production (no watchdog)
 "calls" = "python run-consumers.py --consumer-name=calls"
 "emails" = "python run-consumers.py --consumer-name=email"

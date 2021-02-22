@@ -136,6 +136,7 @@ attempt_to_use_promo_code = 'attempt_to_use_promo_code'
 reset_password_attempted = 'reset_password_attempted'
 send_verification_code = 'send_verification_code'
 create_signature = 'create_signature'
+facial_recognition = 'facial_recognition'
 
 [kafka.event_types.put]
 file_storage = 'file_edit'
@@ -179,4 +180,7 @@ default_folders = [
     'Spreadsheets',
     'Videos'
 ]
+
+[facial_recognition]
+distance_max = "2.5"
 

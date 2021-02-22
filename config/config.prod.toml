@@ -178,3 +178,6 @@ default_folders = [
     'Spreadsheets',
     'Videos'
 ]
+
+[facial_recognition]
+distance_max = "2.5"

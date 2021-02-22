@@ -1649,7 +1649,8 @@ class MemberInfoDA(object):
                 COALESCE(json_agg(DISTINCT country_code.*) FILTER (WHERE country_code.id IS NOT NULL), '[]') AS country_code,
                 COALESCE(json_agg(DISTINCT member_achievement.*) FILTER (WHERE member_achievement.id IS NOT NULL), '[]') AS achievement_information,
                 file_storage_engine.storage_engine_id as s3_avatar_url,
-                member_profile.biography as biography
+                member_profile.biography as biography,
+                member_security_preferences.facial_recognition as facial_recognition
             FROM member
                 LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
                 LEFT OUTER JOIN member_location ON member_location.member_id = member.id
@@ -1659,6 +1660,7 @@ class MemberInfoDA(object):
                 LEFT OUTER JOIN member_achievement ON member_achievement.member_id = member.id
                 LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+                LEFT OUTER JOIN member_security_preferences ON member.id = member_security_preferences.member_id
             WHERE member.id = %s
             GROUP BY
                 member.id,
@@ -1673,7 +1675,8 @@ class MemberInfoDA(object):
                 member.create_date,
                 member.update_date,
                 file_storage_engine.storage_engine_id,
-                member_profile.biography
+                member_profile.biography,
+                member_security_preferences.facial_recognition
             """)
         get_member_info_params = (member_id,)
         cls.source.execute(get_member_info_query, get_member_info_params)
@@ -1694,7 +1697,8 @@ class MemberInfoDA(object):
                     country_code,
                     achievement_information,
                     s3_avatar_url,
-                    biography
+                    biography,
+                    facial_recognition
             ) in cls.source.cursor:
                 member = {
                     "member_id": member_id,
@@ -1713,7 +1717,8 @@ class MemberInfoDA(object):
                     "country_code": country_code,
                     "achievement_information": achievement_information,
                     "amera_avatar_url": amerize_url(s3_avatar_url),
-                    "biography": biography
+                    "biography": biography,
+                    "facial_recognition": facial_recognition
                 }
 
                 return member

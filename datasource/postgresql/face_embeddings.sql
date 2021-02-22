@@ -1,0 +1,7 @@
+CREATE TABLE face_embeddings (
+  id SERIAL PRIMARY KEY,
+  member_id      INTEGER         NOT NULL REFERENCES member (id) UNIQUE,
+  embeddings bytea NOT NULL,
+  create_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  update_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);

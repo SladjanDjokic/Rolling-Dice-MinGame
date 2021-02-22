@@ -8,6 +8,7 @@ from app.calls.views import IncomingCallView
 from app.chat.views import ChatView
 from app.config import parser, settings
 from app.middleware import CrossDomain, KafkaProducerMiddleware  # , JSONTranslator
+from app.resources.facial_recognition import FacialRecognitionResource
 from app.resources.member import MemberRegisterResource, MemberSearchResource, \
     MemberGroupSearchResource, MemberContactResource, MemberContactAccept, ContactMembersResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms, MemberDepartments, MemberContactsRoles, \
@@ -353,3 +354,5 @@ def _setup_routes(app):
                   admin_resource, suffix="session")
     app.add_route("/admin/member/{member_id:int}",
                   admin_resource, suffix="member")
+
+    app.add_route("/facial-recognition", FacialRecognitionResource())
