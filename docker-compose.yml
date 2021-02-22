@@ -382,6 +382,7 @@ services:
       - ../web-api/datasource/postgresql/member_security_preferences.sql:/docker-entrypoint-initdb.d/l-member_security_preferences.sql
       - ../web-api/datasource/postgresql/face_embeddings.sql:/docker-entrypoint-initdb.d/m-face-embeddings.sql
       - ../web-api/datasource/postgresql/project.sql:/docker-entrypoint-initdb.d/n-project.sql
+      - ../web-api/datasource/postgresql/state_code.sql:/docker-entrypoint-initdb.d/o-state_code.sql
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/z-3-test-schedule.sql
