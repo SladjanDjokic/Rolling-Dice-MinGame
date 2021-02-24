@@ -944,9 +944,7 @@ class MemberContactDA(object):
                 contact.update_date,
                 file_storage_engine.storage_engine_id,
                 contact.status,
-                member_session.status,
-                company.id,
-                company.name
+                member_session.status
             """)
 
         if search_key != '':
@@ -990,8 +988,9 @@ class MemberContactDA(object):
                     THEN member_session.status
                     ELSE 'inactive'
                 END as online_status,
-                company.id as company_id,
-                company.name as member_company_name
+                COALESCE(json_agg(DISTINCT company.*) FILTER (WHERE company.id IS NOT NULL), '[]')->0->'id' as company_id,
+                COALESCE(json_agg(DISTINCT company.*) FILTER (WHERE company.id IS NOT NULL), '[]')->0->'name' as member_company_name,
+                COALESCE(json_agg(DISTINCT company.*) FILTER (WHERE company.id IS NOT NULL), '[]') AS companies
                 {get_contacts_base_query}
             ORDER BY {sort_columns_string}
         """)
@@ -1054,7 +1053,8 @@ class MemberContactDA(object):
                         status,
                         online_status,
                         company_id,
-                        member_company_name
+                        member_company_name,
+                        companies
                 ) in cls.source.cursor:
                     contact = {
                         "id": id,
@@ -1091,7 +1091,8 @@ class MemberContactDA(object):
                         "status": status,
                         "online_status": online_status,
                         "company_id": company_id,
-                        "member_company_name": member_company_name
+                        "member_company_name": member_company_name,
+                        "companies": companies
 
                         # "city": city,
                         # "state": state,
