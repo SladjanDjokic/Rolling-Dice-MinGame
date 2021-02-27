@@ -13,7 +13,7 @@ from app.resources.member import MemberRegisterResource, MemberSearchResource, \
     MemberGroupSearchResource, MemberContactResource, MemberContactAccept, ContactMembersResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms, MemberDepartments, MemberContactsRoles, \
     MemberContactsCompanies, MemberContactsCountries, MemberTimezones, MemberInfoByIdResource, \
-    MemberContactSecurity, MemberSettingResource
+    MemberContactSecurity, MemberSettingResource, MemberVideoMailResource
 from app.resources.verification import Verification
 from app.resources.verifycell import VerifyCell
 from app.resources.promo_codes import PromoCodes
@@ -228,6 +228,12 @@ def _setup_routes(app):
     app.add_route("/member/notifications/setting",
                   MemberNotificationsSetting())
 
+    # Video mail
+
+    member_video_mail_resource = MemberVideoMailResource()
+    app.add_route("/member/mail/{receiver:int}", member_video_mail_resource)
+    app.add_route("/member/mail", member_video_mail_resource)
+    app.add_route("/member/mail/read/{mail_id:int}", member_video_mail_resource, suffix="read")
     # Draft
     draft_resource = MailDraftComposeResource()
     app.add_route("/mail/draft", draft_resource)  # POST

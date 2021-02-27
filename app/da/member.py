@@ -2106,3 +2106,108 @@ class MemberNotificationsSettingDA(object):
             return result
         except Exception as e:
             logger.debug(e.message)
+
+class MemberVideoMailDA(object):
+    source = source
+
+    @classmethod
+    def create_video_mail(cls, message_from, message_to, video_storage_id, subject):
+        try:
+            query = """
+                INSERT INTO contact_video_mail (message_from, message_to, video_storage_id, subject)
+                VALUES (%s, %s, %s, %s)
+                RETURNING ID
+            """
+
+            params = (message_from, message_to, video_storage_id, subject)
+
+            cls.source.execute(query, params)
+            id = cls.source.get_last_row_id()
+
+            cls.source.commit()
+
+            return id
+        except Exception as e:
+            logger.debug(e.message)
+    
+    @classmethod
+    def get_video_mails(cls, member_id, search_key='', page_number=None, page_size=None):
+        query = """
+            SELECT
+                contact_video_mail.id,
+                contact_video_mail.subject,
+                contact_video_mail.read,
+                contact_video_mail.create_date,
+                file_storage_engine.storage_engine_id as video_url,
+                member.id as member_id,
+                member.email as email,
+                member.first_name as first_name,
+                member.last_name as last_name
+            FROM contact_video_mail
+            LEFT JOIN member ON contact_video_mail.message_from = member.id
+            LEFT OUTER JOIN file_storage_engine ON contact_video_mail.video_storage_id = file_storage_engine.id
+            WHERE (
+                member.email LIKE %s OR 
+                member.first_name LIKE %s OR 
+                member.last_name LIKE %s OR 
+                contact_video_mail.subject LIKE %s )
+                AND message_to = %s
+            ORDER BY contact_video_mail.create_date DESC
+            """
+
+        like_search_key = """%{}%""".format(search_key)
+        params = (like_search_key, like_search_key,
+                  like_search_key, like_search_key, member_id)
+
+        if page_size and page_number:
+            query += """LIMIT %s OFFSET %s"""
+            params = (like_search_key, like_search_key, like_search_key, like_search_key, member_id, page_size,
+                      (page_number - 1) * page_size)
+
+        mails = []
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            for (
+                    id,
+                    subject,
+                    read,
+                    create_date,
+                    video_url,
+                    member_id,
+                    email,
+                    first_name,
+                    last_name
+            ) in cls.source.cursor:
+                mail = {
+                    "id": id,
+                    "subject": subject,
+                    "read": read,
+                    "create_date": datetime.datetime.strftime(create_date, "%Y-%m-%d %H:%M:%S"),
+                    "video_url": amerize_url(video_url),
+                    "member_id": member_id,
+                    "email": email,
+                    "first_name": first_name,
+                    "last_name": last_name
+                }
+
+                mails.append(mail)
+        return mails
+
+    @classmethod
+    def read_video_mail(cls, member_id, mail_id):
+        try:
+            query = """
+                UPDATE contact_video_mail
+                SET read = true
+                WHERE message_to = %s AND id = %s
+            """
+
+            params = (member_id, mail_id)
+
+            cls.source.execute(query, params)
+            cls.source.commit()
+
+            return
+        except Exception as e:
+            logger.debug(e.message)
+    

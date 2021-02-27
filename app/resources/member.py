@@ -6,7 +6,7 @@ import app.util.json as json
 import app.util.request as request
 from app.util.auth import inject_member
 from app import settings
-from app.da.member import MemberDA, MemberContactDA, MemberInfoDA, MemberSettingDA
+from app.da.member import MemberDA, MemberContactDA, MemberInfoDA, MemberSettingDA, MemberVideoMailDA
 from app.da.file_sharing import FileStorageDA, FileTreeDA
 from app.da.invite import InviteDA
 from app.da.group import GroupMembershipDA, GroupDA
@@ -897,6 +897,88 @@ class MemberContactAccept(object):
                 "description": "Successfully accepted",
                 "success": True
             }, default_parser=json.parser)
+        except Exception as e:
+            resp.body = json.dumps({
+                "description": "Something went wrong",
+                "success": False
+            }, default_parser=json.parser)
+
+class MemberVideoMailResource(object):
+
+    def on_post(self, req, resp, receiver):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+        try:            
+            (video_blob, subject) = request.get_json_or_form("video_blob", "subject", req=req)
+            video_storage_id = None
+            if video_blob is not None:
+                video_storage_id = FileStorageDA().put_file_to_storage(video_blob)
+
+            mail_id = MemberVideoMailDA.create_video_mail(member_id, receiver, video_storage_id, subject)
+            
+            resp.body = json.dumps({
+                "mail_id": mail_id,
+                "description": "Successfully created",
+                "success": True
+            }, default_parser=json.parser)
+        except:
+            resp.body = json.dumps({
+                "description": "Something went wrong",
+                "success": False
+            }, default_parser=json.parser)
+    
+    def on_get(self, req, resp):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+        try:          
+            search_key = req.get_param('search_key') or ''
+            page_size = req.get_param_as_int('page_size')
+            page_number = req.get_param_as_int('page_number')
+
+            logger.debug(f"search_key {search_key}")
+            logger.debug(f"page_number {search_key}")
+            logger.debug(f"page_size {search_key}")
+
+            mails = MemberVideoMailDA.get_video_mails(member_id, search_key, page_number, page_size)
+            
+            resp.body = json.dumps({
+                "data": mails,
+                "description": "Successfully loaded",
+                "success": True
+            }, default_parser=json.parser)
+
+        except Exception as e:
+            resp.body = json.dumps({
+                "description": "Something went wrong",
+                "success": False
+            }, default_parser=json.parser)
+    
+    def on_put_read(self, req, resp, mail_id):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+        try:     
+
+            MemberVideoMailDA.read_video_mail(member_id, mail_id)
+            
+            resp.body = json.dumps({
+                "success": True
+            }, default_parser=json.parser)
+
         except Exception as e:
             resp.body = json.dumps({
                 "description": "Something went wrong",

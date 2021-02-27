@@ -79,7 +79,8 @@ class ActivityDA(object):
                     member.last_name as last_name,
                     job_title.name as job_title,
                     file_path(file_storage_engine.storage_engine_id, '/member/file') as s3_avatar_url,
-                    xref.read
+                    xref.read,
+                    contact_video_mail.read as vmail_read
                 FROM activity_trace
                 LEFT OUTER JOIN member ON member.id = activity_trace.member_id
                 LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
@@ -87,13 +88,20 @@ class ActivityDA(object):
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
                 LEFT OUTER JOIN mail_header ON mail_header.id = (activity_trace.request_data->>'mail_id')::int
                 LEFT OUTER JOIN mail_xref xref ON mail_header.id = xref.mail_header_id AND xref.member_id = %s
-
+                LEFT OUTER JOIN contact_video_mail ON contact_video_mail.id = (activity_trace.response->>'mail_id')::int
                 WHERE
-                    activity_trace.response ? 'fails'
-                    AND
-                    activity_trace.request_data->'receivers'->'amera' @> %s
-                    ORDER BY activity_trace.create_date DESC
-                    LIMIT 10
+                    (
+                        activity_trace.response ? 'fails'
+                        AND
+                        activity_trace.request_data->'receivers'->'amera' @> %s
+                    ) OR
+                    (
+                        activity_trace.status = 'ended'
+                        AND
+                        (activity_trace.request_url_params->>'receiver')::int = %s
+                    )
+                ORDER BY activity_trace.create_date DESC
+                LIMIT 10
             """
             query_invitations = """
                 SELECT
@@ -166,7 +174,7 @@ class ActivityDA(object):
                 ORDER BY activity_trace.create_date DESC
                 LIMIT 10
                 """
-            param_mails = (member_id, str(member_id), )
+            param_mails = (member_id, str(member_id), member_id)
             param_invitations = (str(member_id),)
 
             cls.source.execute(query_mails, param_mails)
@@ -189,7 +197,8 @@ class ActivityDA(object):
                         last_name,
                         job_title,
                         s3_avatar_url,
-                        read
+                        read,
+                        vmail_read
                 ) in cls.source.cursor:
                     mail = {
                         "id": id,
@@ -210,6 +219,7 @@ class ActivityDA(object):
                         "job_title": job_title,
                         "amera_avatar_url": s3_avatar_url,
                         "read": read,
+                        "vmail_read": vmail_read
                     }
                     mails.append(mail)
 
