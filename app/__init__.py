@@ -1,6 +1,9 @@
 import logging
+import sys
 import os
 import falcon
+import importlib
+
 # from falcon_auth import FalconAuthMiddleware, TokenAuthBackend
 from falcon_multipart.middleware import MultipartMiddleware
 
@@ -25,22 +28,20 @@ from app.resources.change_password import MemberChangePasswordResource
 from app.resources.logout import MemberLogoutResource
 from app.resources.session import ValidateSessionResource
 from app.resources.file_download import FileDownloadResource
-from app.resources.file_sharing import FileStorageDetail, ShareFile, ShareFileDetail, \
-    DownloadStorageFile, DownloadSharedFile, MemberFileCloud, MemberFileBin, MemberShareFile, GroupFileCloud, \
-    GroupFileBin, FileGroupResource
+from app.resources.file_sharing import MemberFileCloud, MemberFileBin, \
+    MemberShareFile, GroupFileCloud, GroupFileBin, FileGroupResource
 from app.resources.group import MemberGroupResource, GroupMembershipResource, GroupDetailResource, \
     GroupMemberInviteResource, GroupMembersResource, MemberGroupSecurity, GroupMemberAccept, \
     GroupActivityDriveResource, GroupActivityCalendarResource
 from app.resources.system import SystemActivityResource
 from app.resources.system import SystemActivityUsersResource
 from app.resources.language import LanguageResource
-from app.resources.static import StaticResource
 from app.resources.member_scheduler_setting import MemberSchedulerSettingResource
 from app.resources.member_schedule_event import MemberScheduleEventResource, MemberScheduleEventColors, \
     EventAttachmentResorce, MemberUpcomingEvents, MemberEventInvitations
 from app.resources.member_schedule_holiday import MemberScheduleHolidayResource
 from app.resources.member_schedule_event_invite import MemberScheduleEventInviteResource, \
-    MemberScheduleEventInviteAddSingleResource, MemberScheduleEventInviteSetStatusResource
+    MemberScheduleEventInviteSetStatusResource
 from app.resources.country import CountryCodeResource
 from app.resources.mail import MailDraftComposeResource, MailAttachmentResource, MailInboxResource, MailStaredResource, \
     MailTrashResource, MailArchiveResource, MailSettingsResource, MailSentResource, MailMemberFolderResource
@@ -52,23 +53,29 @@ from app.resources.company import CompanyResource, CompanyUnregisteredResource
 
 from app.resources.notifications_setting import MemberNotificationsSetting
 # from app.resources.memberfile import
-# from app.resources.keygen import KeyGenResource, KeyGenFileUpload
 
 from app.resources.bug_report import BugReportResource, BugReportUsersResource
 
 from app.resources.admin import AdminMemberResource
 
-from app.da.__init__ import check_trees
-
 from app.util.config import setup_vyper
 from app.util.error import error_handler
 from app.util.logging import setup_logging
+
+try:
+    imsecure_spec = importlib.util.find_spec(".imsecure.image_secure", package="imsecure")
+except ModuleNotFoundError:
+    imsecure_spec = None
+
+imsecure_found = imsecure_spec is not None
+
+if imsecure_found:
+    from app.resources.keygen import KeyGenResource, KeyGenFileUpload
 
 # from app.util.auth import validate_token
 
 
 logger = logging.getLogger(__name__)
-
 
 # auth_backend = TokenAuthBackend(validate_token)
 
@@ -86,6 +93,18 @@ def configure(**overrides):
 
     logging.getLogger("vyper").setLevel(log_level)
     setup_vyper(parser, overrides)
+    print(f"Getting Worker Class {settings.get('WORKER_CLASS')}")
+    if 'meinheld' in settings.get('WORKER_CLASS'):
+        import meinheld
+        # This passes the limits of Signed int
+        # print(f"Max Size: {sys.maxsize}")
+        # This passes the limits of Signed int )
+        # print(f"Max size: {2**10 * 2**10 * 2**10 * 2**10 * 1}")
+        # Setting to 1 Gigabyte
+        max_size = 2**10 * 2**10 * 2**10 * 1
+        # print(f"Max size: {max_size}")
+        # This sets the max body size to 549 GB
+        meinheld.set_max_content_length(max_size)
 
 
 def create_app():
@@ -105,8 +124,6 @@ def create_app():
 
     _setup_routes(app)
 
-    # check_trees()
-
     return app
 
 
@@ -120,10 +137,13 @@ def start():
 
 
 def _setup_routes(app):
+    logger.debug(f"Spec checker: {imsecure_found} {imsecure_spec} {imsecure_spec.name if imsecure_spec else ''}")
+
     app.add_route('/healthz', HealthResource())
 
-    # app.add_route('/demo/image-upload', KeyGenFileUpload())
-    # app.add_route("/demo/keygen", KeyGenResource())
+    if imsecure_found:
+        app.add_route('/demo/image-upload', KeyGenFileUpload())
+        app.add_route("/demo/keygen", KeyGenResource())
     app.add_route("/member/login", MemberLoginResource())
     app.add_route("/member/forgot", MemberForgotPasswordResource())
     app.add_route(
@@ -329,8 +349,7 @@ def _setup_routes(app):
     # Routes for Chat App
     app.add_route("/chat", ChatView())
 
-    # Call Notificaitons
-
+    # Call Notifications
 
     # Project
     project_resource = ProjectResource()

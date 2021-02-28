@@ -1,9 +1,17 @@
 import logging
 import multiprocessing
-
+import importlib
 import gunicorn.app.base
-import gevent.monkey
-gevent.monkey.patch_all()
+
+try:
+    gevent_spec = importlib.util.find_spec(
+        ".gevent.monkey", package="gevent")
+    if gevent_spec is not None:
+        import gevent.monkey
+        gevent.monkey.patch_all()
+except ModuleNotFoundError:
+    pass
+
 
 from pprint import pformat
 

@@ -11,8 +11,6 @@ from confluent_kafka import Producer, KafkaError, KafkaException
 # from app.tasks.main import producer_async
 # from app.events.publishers.publisher import producer_async
 
-import gevent
-
 import app.util.json as json
 from pprint import pformat
 from app.config import settings
@@ -469,6 +467,9 @@ class KafkaProducerMiddleware(object):
 
     def producer_async(self, topic, data_source):
         # create_topic(self.topic)
+        if 'meinheld' in settings.get('WORKER_CLASS'):
+            return
+
         for data in data_source:
             try:
                 # Poll will trigger the callback self.deliver_report which indicates if the message has

@@ -11,7 +11,7 @@ def _get_default_args(args):
 
 
 def _get_args(args):
-    return vars(args.parse_args([]))
+    return vars(args.parse_known_args()[0])
 
 
 def _setup_args(args):
