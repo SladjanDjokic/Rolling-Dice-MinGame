@@ -154,7 +154,9 @@ def _setup_routes(app):
     app.add_route("/member/invite", MemberInviteResource())
     app.add_route("/member/info/{member_id}", MemberInfoByIdResource())
     app.add_route("/member/info", MemberInfoResource())
-    app.add_route("/member/setting", MemberSettingResource())
+    member_setting_resource = MemberSettingResource()
+    app.add_route("/member/setting", member_setting_resource)
+    app.add_route("/member/payment-setting", member_setting_resource, suffix="payment")
     app.add_route("/member/invite/{invite_key:uuid}", MemberInviteResource())
     app.add_route("/member/register/{invite_key:uuid}", MemberRegisterResource())  # noqa: E501
     app.add_route("/member/register", MemberRegisterResource())  # noqa: E501
@@ -254,6 +256,8 @@ def _setup_routes(app):
     app.add_route("/member/mail/{receiver:int}", member_video_mail_resource)
     app.add_route("/member/mail", member_video_mail_resource)
     app.add_route("/member/mail/read/{mail_id:int}", member_video_mail_resource, suffix="read")
+    app.add_route("/member/mail/delete/{mail_id:int}", member_video_mail_resource, suffix="delete")
+
     # Draft
     draft_resource = MailDraftComposeResource()
     app.add_route("/mail/draft", draft_resource)  # POST

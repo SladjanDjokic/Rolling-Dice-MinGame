@@ -2059,7 +2059,64 @@ class MemberSettingDA(object):
         except Exception as e:
             logger.debug("iss+++++ {}".format(e))
             pass
+    
+    @classmethod
+    def update_member_payment_setting(cls, member_id, member_location):
 
+        try:
+
+            # Member location
+            member_location_update_query = ("""
+                UPDATE member_location
+                SET
+                    description = %s,
+                    address_1 = %s,
+                    street = %s,
+                    address_2 = %s,
+                    city = %s,
+                    state = %s,
+                    province = %s,
+                    postal = %s,
+                    country = %s,
+                    country_code_id = %s,
+                    location_type = %s
+                WHERE id=%s AND member_id = %s;
+            """)
+            member_location_insert_query = ("""
+                INSERT INTO member_location (description, address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, member_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id;
+            """)
+            member_location_delete_query = ("""
+                DELETE FROM member_location
+                WHERE member_id = %s AND NOT id = ANY(%s) AND location_type IN ('home', 'billing');
+            """)
+
+            if member_location:
+                location_ids_to_stay = list()
+                for location in member_location:
+                    if location:
+                        id_, description, street, address_1, address_2, city, state, province, postal, country, country_code_id, location_type = [
+                            location[k] for k in ('id', 'description', 'street', 'address_1', 'address_2', 'city', 'state', 'province', 'postal', 'country', 'country_code_id', 'location_type')]
+
+                    if type(id_) == int:
+                        cls.source.execute(
+                            member_location_update_query, (description, address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, id_, member_id))
+                        location_ids_to_stay.append(id_)
+                    else:
+                        cls.source.execute(
+                            member_location_insert_query, (description, address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, member_id))
+                        location_ids_to_stay.append(
+                            cls.source.get_last_row_id())
+                    cls.source.commit()
+                # Track what was deleted in the UI and kill it in db as well
+                cls.source.execute(member_location_delete_query,
+                                   (member_id, location_ids_to_stay))
+                cls.source.commit()
+            return True
+        except Exception as e:
+            logger.debug("iss+++++ {}".format(e))
+            pass
 
 class MemberNotificationsSettingDA(object):
     source = source
@@ -2111,83 +2168,182 @@ class MemberVideoMailDA(object):
     source = source
 
     @classmethod
-    def create_video_mail(cls, message_from, message_to, video_storage_id, subject):
+    def create_video_mail(cls, message_from, receiver, video_storage_id, subject, type, media_type, replied_id=None):
         try:
-            query = """
-                INSERT INTO contact_video_mail (message_from, message_to, video_storage_id, subject)
-                VALUES (%s, %s, %s, %s)
-                RETURNING ID
-            """
+            query = ""
+            params = ()
+            if type == 'contact':
+                query = """
+                    INSERT INTO video_mail (message_from, video_storage_id, subject, type, media_type)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING ID
+                """
+                params = (message_from, video_storage_id, subject, type, media_type)
+            elif type == 'reply':
+                query = """
+                    INSERT INTO video_mail (message_from, video_storage_id, subject, type, media_type, replied_id)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING ID
+                """
+                params = (message_from, video_storage_id, subject, type, media_type, replied_id)
 
-            params = (message_from, message_to, video_storage_id, subject)
+            elif type == 'group':
+                query = """
+                    INSERT INTO video_mail (message_from, group_id, video_storage_id, subject, type, media_type)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING ID
+                """
+                params = (message_from, receiver, video_storage_id, subject, type, media_type)
 
             cls.source.execute(query, params)
             id = cls.source.get_last_row_id()
-
             cls.source.commit()
+
+            query = """
+                    INSERT INTO video_mail_xref (member_id, video_mail_id)
+                    VALUES (%s, %s)
+                """
+            if type == 'contact' or type == 'reply':
+                params = (receiver, id)
+                cls.source.execute(query, params)
+                cls.source.commit()
+
+            else:
+                group_leader_query ="""SELECT
+                    group_leader_id
+                    FROM member_group
+                    WHERE id = %s
+                """
+                group_param = (receiver,)
+                
+                cls.source.execute(group_leader_query, group_param)
+
+                if cls.source.has_results():
+                    (group_leader_id,) = cls.source.cursor.fetchone()
+
+                group_member_query = """
+                    INSERT INTO video_mail_xref (member_id, video_mail_id)
+                    SELECT member_group_membership.member_id, %s as video_mail_id 
+                    FROM member_group_membership
+                    WHERE member_group_membership.group_id = %s AND member_group_membership.member_id <> %s
+                """
+                params = (id, receiver, message_from)
+                
+                cls.source.execute(group_member_query, params)
+                cls.source.commit()
+
+                params = (group_leader_id, id)
+                
+                if group_leader_id is not message_from:
+                    cls.source.execute(query, params)
+                    cls.source.commit()
+
 
             return id
         except Exception as e:
-            logger.debug(e.message)
+            logger.debug(e)
     
     @classmethod
     def get_video_mails(cls, member_id, search_key='', page_number=None, page_size=None):
         query = """
             SELECT
-                contact_video_mail.id,
-                contact_video_mail.subject,
-                contact_video_mail.read,
-                contact_video_mail.create_date,
+                vm.id,
+                vm.subject,
+                vm.type,
+                vm.media_type,
+                vmx.status,
+                vm.create_date,
+                vm.group_id,
+                member_group.group_name,
+                sender.id as member_id,
+                sender.email,
+                sender.first_name,
+                sender.last_name,
                 file_storage_engine.storage_engine_id as video_url,
-                member.id as member_id,
-                member.email as email,
-                member.first_name as first_name,
-                member.last_name as last_name
-            FROM contact_video_mail
-            LEFT JOIN member ON contact_video_mail.message_from = member.id
-            LEFT OUTER JOIN file_storage_engine ON contact_video_mail.video_storage_id = file_storage_engine.id
+				COALESCE(json_agg(DISTINCT t1.*) FILTER (WHERE t1.member_id IS NOT NULL), '[]') AS read_members
+            FROM video_mail_xref as vmx
+            LEFT JOIN video_mail as vm ON vm.id = vmx.video_mail_id
+            LEFT JOIN member as sender ON sender.id = vm.message_from
+            LEFT OUTER JOIN (
+                SELECT
+                    reader.id as member_id,
+                    reader.email as email,
+                    reader.first_name as first_name,
+                    reader.last_name as last_name,
+                    vmx_read.video_mail_id
+                FROM video_mail_xref as vmx_read
+                LEFT JOIN member as reader ON vmx_read.member_id = reader.id
+                WHERE vmx_read.status <> 'unread' AND vmx_read.member_id <> %s
+            ) as t1 ON t1.video_mail_id = vm.id
+            LEFT OUTER JOIN member_group ON member_group.id = vm.group_id
+            LEFT OUTER JOIN file_storage_engine ON vm.video_storage_id = file_storage_engine.id
             WHERE (
-                member.email LIKE %s OR 
-                member.first_name LIKE %s OR 
-                member.last_name LIKE %s OR 
-                contact_video_mail.subject LIKE %s )
-                AND message_to = %s
-            ORDER BY contact_video_mail.create_date DESC
+                sender.email like %s OR 
+                sender.first_name LIKE %s OR 
+                sender.last_name LIKE %s OR 
+                vm.subject LIKE %s )
+                AND vmx.member_id = %s
+                AND vmx.status <> 'deleted'
+            GROUP BY
+                vm.id,
+                vm.subject,
+                vm.type,
+                vm.media_type,
+                vmx.status,
+                vm.create_date,
+                vm.group_id,
+                member_group.group_name,
+                sender.id,
+                sender.email,
+                sender.first_name,
+                sender.last_name,
+                file_storage_engine.storage_engine_id
+            ORDER BY vm.create_date desc
             """
 
         like_search_key = """%{}%""".format(search_key)
-        params = (like_search_key, like_search_key,
+        params = (member_id, like_search_key, like_search_key,
                   like_search_key, like_search_key, member_id)
 
         if page_size and page_number:
             query += """LIMIT %s OFFSET %s"""
-            params = (like_search_key, like_search_key, like_search_key, like_search_key, member_id, page_size,
+            params = (member_id, like_search_key, like_search_key, like_search_key, like_search_key, member_id, page_size,
                       (page_number - 1) * page_size)
 
         mails = []
         cls.source.execute(query, params)
         if cls.source.has_results():
             for (
-                    id,
-                    subject,
-                    read,
-                    create_date,
-                    video_url,
-                    member_id,
-                    email,
-                    first_name,
-                    last_name
+                id,
+                subject,
+                type,
+                media_type,
+                status,
+                create_date,
+                group_id,
+                group_name,
+                member_id,
+                email,
+                first_name,
+                last_name,
+                video_url,
+                read_members
             ) in cls.source.cursor:
                 mail = {
                     "id": id,
                     "subject": subject,
-                    "read": read,
+                    "type": type,
+                    "media_type": media_type,
+                    "status": status,
                     "create_date": datetime.datetime.strftime(create_date, "%Y-%m-%d %H:%M:%S"),
-                    "video_url": amerize_url(video_url),
+                    "group_id": group_id,
+                    "group_name": group_name,
                     "member_id": member_id,
                     "email": email,
                     "first_name": first_name,
-                    "last_name": last_name
+                    "last_name": last_name,
+                    "video_url": amerize_url(video_url),
+                    "read_members": read_members
                 }
 
                 mails.append(mail)
@@ -2197,9 +2353,12 @@ class MemberVideoMailDA(object):
     def read_video_mail(cls, member_id, mail_id):
         try:
             query = """
-                UPDATE contact_video_mail
-                SET read = true
-                WHERE message_to = %s AND id = %s
+                UPDATE video_mail_xref
+                SET status = 'read'
+                WHERE
+                    video_mail_xref.member_id= %s
+                    AND video_mail_xref.video_mail_id = %s
+                    AND video_mail_xref.status = 'unread'
             """
 
             params = (member_id, mail_id)
@@ -2211,3 +2370,22 @@ class MemberVideoMailDA(object):
         except Exception as e:
             logger.debug(e.message)
     
+    @classmethod
+    def delete_video_mail(cls, member_id, mail_id):
+        try:
+            query = """
+                UPDATE video_mail_xref
+                SET status = 'deleted'
+                WHERE
+                    video_mail_xref.member_id= %s
+                    AND video_mail_xref.video_mail_id = %s
+            """
+
+            params = (member_id, mail_id)
+
+            cls.source.execute(query, params)
+            cls.source.commit()
+
+            return
+        except Exception as e:
+            logger.debug(e.message)

@@ -80,7 +80,11 @@ class ActivityDA(object):
                     job_title.name as job_title,
                     file_path(file_storage_engine.storage_engine_id, '/member/file') as s3_avatar_url,
                     xref.read,
-                    contact_video_mail.read as vmail_read
+                    video_mail_xref.status as vmail_status,
+                    video_mail.type as vmail_type,
+                    video_mail.subject as vmail_subject,
+                    video_mail.media_type as media_type,
+                    member_group.group_name
                 FROM activity_trace
                 LEFT OUTER JOIN member ON member.id = activity_trace.member_id
                 LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
@@ -88,20 +92,24 @@ class ActivityDA(object):
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
                 LEFT OUTER JOIN mail_header ON mail_header.id = (activity_trace.request_data->>'mail_id')::int
                 LEFT OUTER JOIN mail_xref xref ON mail_header.id = xref.mail_header_id AND xref.member_id = %s
-                LEFT OUTER JOIN contact_video_mail ON contact_video_mail.id = (activity_trace.response->>'mail_id')::int
+                LEFT OUTER JOIN video_mail ON (video_mail.id = (activity_trace.response->'mail_id')::int)
+                LEFT OUTER JOIN video_mail_xref ON video_mail.id = video_mail_xref.video_mail_id AND video_mail_xref.status <> 'deleted'
+                LEFT OUTER JOIN member_group ON member_group.id = video_mail.group_id 
                 WHERE
                     (
-                        activity_trace.response ? 'fails'
-                        AND
-                        activity_trace.request_data->'receivers'->'amera' @> %s
-                    ) OR
-                    (
                         activity_trace.status = 'ended'
-                        AND
-                        (activity_trace.request_url_params->>'receiver')::int = %s
+                        AND activity_trace.http_status = '200 OK'
+                        AND activity_trace.response ? 'fails'
+                        AND activity_trace.request_data->'receivers'->'amera' @> %s
+                    )
+                    OR (
+                        activity_trace.status = 'ended'
+                        AND activity_trace.event_type = 'activity'
+                        AND activity_trace.http_status = '200 OK'
+                        AND video_mail_xref.member_id = %s
                     )
                 ORDER BY activity_trace.create_date DESC
-                LIMIT 10
+                LIMIT 20
             """
             query_invitations = """
                 SELECT
@@ -177,6 +185,8 @@ class ActivityDA(object):
             param_mails = (member_id, str(member_id), member_id)
             param_invitations = (str(member_id),)
 
+            # logger.debug(query_mails)
+            # logger.debug(param_mails)
             cls.source.execute(query_mails, param_mails)
             if cls.source.has_results():
                 for (
@@ -198,7 +208,11 @@ class ActivityDA(object):
                         job_title,
                         s3_avatar_url,
                         read,
-                        vmail_read
+                        vmail_status,
+                        vmail_type,
+                        vmail_subject,
+                        media_type,
+                        group_name
                 ) in cls.source.cursor:
                     mail = {
                         "id": id,
@@ -219,7 +233,11 @@ class ActivityDA(object):
                         "job_title": job_title,
                         "amera_avatar_url": s3_avatar_url,
                         "read": read,
-                        "vmail_read": vmail_read
+                        "vmail_status": vmail_status,
+                        "vmail_type": vmail_type,
+                        "vmail_subject": vmail_subject,
+                        "media_type": media_type,
+                        "group_name": group_name
                     }
                     mails.append(mail)
 
