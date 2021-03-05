@@ -92,6 +92,8 @@ contact_security = 'contact_security'
 get_members = 'get_members'
 event_invite_response = 'event_invite_response'
 mail_base_resource = ''
+read_contact_video_mail = 'read_contact_video_mail'
+read_group_video_mail = 'read_group_video_mail'
 
 [kafka.event_types.post]
 member_change_password = 'change_password'
@@ -136,6 +138,8 @@ reset_password_attempted = 'reset_password_attempted'
 send_verification_code = 'send_verification_code'
 create_signature = 'create_signature'
 facial_recognition = 'facial_recognition'
+send_contact_video_mail = 'send_contact_video_mail'
+send_group_video_mail = 'send_group_video_mail'
 
 [kafka.event_types.put]
 file_storage = 'file_edit'
@@ -169,6 +173,8 @@ delete_event = 'delete_event'
 delete_mail = 'delete_mail'
 admin_member_disable_session = 'admin_member_disable_session'
 admin_member_disable = 'admin_member_disable'
+delete_contact_video_mail = 'delete_contact_video_mail'
+delete_group_video_mail = 'delete_group_video_mail'
 
 [drive]
 default_folders = [

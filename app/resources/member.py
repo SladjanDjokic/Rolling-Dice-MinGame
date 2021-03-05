@@ -925,25 +925,90 @@ class MemberContactAccept(object):
             }, default_parser=json.parser)
 
 class MemberVideoMailResource(object):
+    def __init__(self) -> None:
+        self.kafka_data = {
+            "POST": {
+                "uri": {
+                    "/mail/video/contact/{member_id:int}": {
+                        "event_type": settings.get('kafka.event_types.post.send_contact_video_mail'),
+                        "topic": settings.get('kafka.topics.member')
+                    },
+                    "/mail/video/group/{group_id:int}": {
+                        "event_type": settings.get('kafka.event_types.post.send_group_video_mail'),
+                        "topic": settings.get('kafka.topics.member')
+                    },
+                }
+            },
+            "GET": {
+                "uri": {
+                    "/mail/video/contact/{member_id:int}/video_mail/{video_mail_id:int}": {
+                        "event_type": settings.get('kafka.event_types.get.read_contact_video_mail'),
+                        "topic": settings.get('kafka.topics.member')
+                    },
+                    "/mail/video/group/{group_id:int}/video_mail/{video_mail_id:int}": {
+                        "event_type": settings.get('kafka.event_types.get.read_group_video_mail'),
+                        "topic": settings.get('kafka.topics.member')
+                    },
+                }
+            },
+            "DELETE": {
+                "uri": {
+                    "/mail/video/contact/{member_id:int}/video_mail/{video_mail_id:int}": {
+                        "event_type": settings.get('kafka.event_types.delete.delete_contact_video_mail'),
+                        "topic": settings.get('kafka.topics.member')
+                    },
+                    "/mail/video/group/{group_id:int}/video_mail/{video_mail_id:int}": {
+                        "event_type": settings.get('kafka.event_types.get.delete_group_video_mail'),
+                        "topic": settings.get('kafka.topics.member')
+                    },
+                }
+            }
+        }
 
-    def on_post(self, req, resp, receiver):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
-
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
+    @inject_member
+    def on_post_contact(self, req, resp, member, member_id):
         try:            
             (video_blob, subject, type, media_type, replied_id) = request.get_json_or_form("video_blob", "subject", "type", "media_type", "replied_id", req=req)
             video_storage_id = None
             if video_blob is not None:
                 video_storage_id = FileStorageDA().put_file_to_storage(video_blob)
 
-            mail_id = MemberVideoMailDA.create_video_mail(member_id, receiver, video_storage_id, subject, type, media_type, replied_id)
-            
+            video_mail_id = None
+            if type == 'contact':
+                video_mail_id = MemberVideoMailDA.create_contact_video_mail(member['member_id'], video_storage_id, subject, media_type)
+            else:
+                video_mail_id = MemberVideoMailDA.create_reply_video_mail(member['member_id'], video_storage_id, subject, media_type, replied_id)           
+
+            MemberVideoMailDA.create_contact_video_mail_xref(member_id, video_mail_id)
+
             resp.body = json.dumps({
-                "mail_id": mail_id,
+                "video_mail_id": video_mail_id,
+                "description": "Successfully created",
+                "success": True
+            }, default_parser=json.parser)
+        except:
+            resp.body = json.dumps({
+                "description": "Something went wrong",
+                "success": False
+            }, default_parser=json.parser)
+
+    @inject_member
+    def on_post_group(self, req, resp, member, group_id):
+        try:            
+            (video_blob, subject, media_type) = request.get_json_or_form("video_blob", "subject", "media_type", req=req)
+            video_storage_id = None
+            if video_blob is not None:
+                video_storage_id = FileStorageDA().put_file_to_storage(video_blob)
+
+            video_mail_id = MemberVideoMailDA.create_group_video_mail(member['member_id'], group_id, video_storage_id, subject, media_type)
+            group = GroupDA().get_group(group_id)
+            MemberVideoMailDA.create_group_video_mail_xref(member['member_id'], group_id, video_mail_id)
+            
+            if group['group_leader_id'] != member['member_id']:
+                MemberVideoMailDA.create_contact_video_mail_xref(group['group_leader_id'], video_mail_id)
+
+            resp.body = json.dumps({
+                "video_mail_id": video_mail_id,
                 "description": "Successfully created",
                 "success": True
             }, default_parser=json.parser)
@@ -953,7 +1018,7 @@ class MemberVideoMailResource(object):
                 "success": False
             }, default_parser=json.parser)
     
-    def on_get(self, req, resp):
+    def on_get_all(self, req, resp):
         try:
             session_id = get_session_cookie(req)
             session = validate_session(session_id)
@@ -984,17 +1049,9 @@ class MemberVideoMailResource(object):
                 "success": False
             }, default_parser=json.parser)
     
-    def on_put_read(self, req, resp, mail_id):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
-
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
+    def on_get_contact(self, req, resp, member_id, video_mail_id):
         try:     
-
-            MemberVideoMailDA.read_video_mail(member_id, mail_id)
+            MemberVideoMailDA.read_video_mail(member_id, video_mail_id)
             
             resp.body = json.dumps({
                 "success": True
@@ -1006,17 +1063,41 @@ class MemberVideoMailResource(object):
                 "success": False
             }, default_parser=json.parser)
 
-    def on_put_delete(self, req, resp, mail_id):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
+    @inject_member
+    def on_get_group(self, req, resp, member, group_id, video_mail_id):
+        try:     
+            MemberVideoMailDA.read_video_mail(member['member_id'], video_mail_id)
+            
+            resp.body = json.dumps({
+                "success": True
+            }, default_parser=json.parser)
 
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
+        except Exception as e:
+            resp.body = json.dumps({
+                "description": "Something went wrong",
+                "success": False
+            }, default_parser=json.parser)
+
+    def on_delete_contact(self, req, resp, member_id, video_mail_id):
         try:     
 
-            MemberVideoMailDA.delete_video_mail(member_id, mail_id)
+            MemberVideoMailDA.delete_video_mail(member_id, video_mail_id)
+            
+            resp.body = json.dumps({
+                "success": True
+            }, default_parser=json.parser)
+
+        except Exception as e:
+            resp.body = json.dumps({
+                "description": "Something went wrong",
+                "success": False
+            }, default_parser=json.parser)
+
+    @inject_member
+    def on_delete_group(self, req, resp, member, group_id, video_mail_id):
+        try:
+
+            MemberVideoMailDA.delete_video_mail(member['member_id'], video_mail_id)
             
             resp.body = json.dumps({
                 "success": True

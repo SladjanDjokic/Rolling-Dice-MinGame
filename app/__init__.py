@@ -250,14 +250,6 @@ def _setup_routes(app):
     app.add_route("/member/notifications/setting",
                   MemberNotificationsSetting())
 
-    # Video mail
-
-    member_video_mail_resource = MemberVideoMailResource()
-    app.add_route("/member/mail/{receiver:int}", member_video_mail_resource)
-    app.add_route("/member/mail", member_video_mail_resource)
-    app.add_route("/member/mail/read/{mail_id:int}", member_video_mail_resource, suffix="read")
-    app.add_route("/member/mail/delete/{mail_id:int}", member_video_mail_resource, suffix="delete")
-
     # Draft
     draft_resource = MailDraftComposeResource()
     app.add_route("/mail/draft", draft_resource)  # POST
@@ -349,6 +341,16 @@ def _setup_routes(app):
     app.add_route("/mail/folders", mail_member_folder_resource)
     app.add_route("/mail/folders/mv",
                   mail_member_folder_resource, suffix="move")
+
+    # Routes for video mail
+    
+    video_mail_resource = MemberVideoMailResource()
+
+    app.add_route("/mail/video/all", video_mail_resource, suffix="all")
+    app.add_route("/mail/video/contact/{member_id:int}", video_mail_resource, suffix="contact")
+    app.add_route("/mail/video/contact/{member_id:int}/video_mail/{video_mail_id:int}", video_mail_resource, suffix="contact")
+    app.add_route("/mail/video/group/{group_id:int}", video_mail_resource, suffix="group")
+    app.add_route("/mail/video/group/{group_id:int}/video_mail/{video_mail_id:int}", video_mail_resource, suffix="group")
 
     # Routes for Chat App
     app.add_route("/chat", ChatView())

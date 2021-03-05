@@ -2168,43 +2168,65 @@ class MemberVideoMailDA(object):
     source = source
 
     @classmethod
-    def create_video_mail(cls, message_from, receiver, video_storage_id, subject, type, media_type, replied_id=None):
+    def create_reply_video_mail(cls, message_from, video_storage_id, subject, media_type, replied_id):
         try:
-            query = ""
-            params = ()
-            if type == 'contact':
-                query = """
-                    INSERT INTO video_mail (message_from, video_storage_id, subject, type, media_type)
-                    VALUES (%s, %s, %s, %s, %s)
-                    RETURNING ID
-                """
-                params = (message_from, video_storage_id, subject, type, media_type)
-            elif type == 'reply':
-                query = """
-                    INSERT INTO video_mail (message_from, video_storage_id, subject, type, media_type, replied_id)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    RETURNING ID
-                """
-                params = (message_from, video_storage_id, subject, type, media_type, replied_id)
-
-            elif type == 'group':
-                query = """
-                    INSERT INTO video_mail (message_from, group_id, video_storage_id, subject, type, media_type)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    RETURNING ID
-                """
-                params = (message_from, receiver, video_storage_id, subject, type, media_type)
+            query = """
+                INSERT INTO video_mail (message_from, video_storage_id, subject, type, media_type, replied_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING ID
+            """
+            params = (message_from, video_storage_id, subject, 'reply', media_type, replied_id)
 
             cls.source.execute(query, params)
             id = cls.source.get_last_row_id()
             cls.source.commit()
 
+            return id
+        except Exception as e:
+            logger.debug(e)
+
+    @classmethod
+    def create_group_video_mail(cls, message_from, group_id, video_storage_id, subject, media_type):
+        try:
+            query = """
+                INSERT INTO video_mail (message_from, group_id, video_storage_id, subject, type, media_type)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING ID
+            """
+            params = (message_from, group_id, video_storage_id, subject, "group", media_type)
+
+            cls.source.execute(query, params)
+            id = cls.source.get_last_row_id()
+            cls.source.commit()
+
+            return id
+
+        except Exception as e:
+            logger.debug(e)
+        
+    @classmethod
+    def create_contact_video_mail(cls, message_from, video_storage_id, subject, media_type):
+        try:
+            query = """
+                INSERT INTO video_mail (message_from, video_storage_id, subject, type, media_type)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING ID
+            """
+            params = (message_from, video_storage_id, subject, 'contact', media_type)
+
+            cls.source.execute(query, params)
+            id = cls.source.get_last_row_id()
+            cls.source.commit()
+
+            return id
             query = """
                     INSERT INTO video_mail_xref (member_id, video_mail_id)
                     VALUES (%s, %s)
                 """
+
+            params = (receiver, id)
+
             if type == 'contact' or type == 'reply':
-                params = (receiver, id)
                 cls.source.execute(query, params)
                 cls.source.commit()
 
@@ -2243,6 +2265,38 @@ class MemberVideoMailDA(object):
         except Exception as e:
             logger.debug(e)
     
+    @classmethod
+    def create_contact_video_mail_xref(cls, message_to, video_mail_id):
+        try:
+            query = """
+                    INSERT INTO video_mail_xref (member_id, video_mail_id)
+                    VALUES (%s, %s)
+                """
+
+            params = (message_to, video_mail_id)
+
+            cls.source.execute(query, params)
+            cls.source.commit()
+        except Exception as e:
+            logger.debug(e)
+    
+    @classmethod
+    def create_group_video_mail_xref(cls, message_from, group_id, video_mail_id):
+        try:
+
+            group_member_query = """
+                INSERT INTO video_mail_xref (member_id, video_mail_id)
+                SELECT member_group_membership.member_id, %s as video_mail_id 
+                FROM member_group_membership
+                WHERE member_group_membership.group_id = %s AND member_group_membership.member_id <> %s
+            """
+            params = (video_mail_id, group_id, message_from)
+                
+            cls.source.execute(group_member_query, params)
+            cls.source.commit()
+        except Exception as e:
+            logger.debug(e)
+            
     @classmethod
     def get_video_mails(cls, member_id, search_key='', page_number=None, page_size=None):
         query = """

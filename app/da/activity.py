@@ -92,9 +92,9 @@ class ActivityDA(object):
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
                 LEFT OUTER JOIN mail_header ON mail_header.id = (activity_trace.request_data->>'mail_id')::int
                 LEFT OUTER JOIN mail_xref xref ON mail_header.id = xref.mail_header_id AND xref.member_id = %s
-                LEFT OUTER JOIN video_mail ON (video_mail.id = (activity_trace.response->'mail_id')::int)
+                LEFT OUTER JOIN video_mail ON (video_mail.id = (activity_trace.response->'video_mail_id')::int)
                 LEFT OUTER JOIN video_mail_xref ON video_mail.id = video_mail_xref.video_mail_id AND video_mail_xref.status <> 'deleted'
-                LEFT OUTER JOIN member_group ON member_group.id = video_mail.group_id 
+                LEFT OUTER JOIN member_group ON member_group.id = video_mail.group_id
                 WHERE
                     (
                         activity_trace.status = 'ended'
@@ -104,7 +104,7 @@ class ActivityDA(object):
                     )
                     OR (
                         activity_trace.status = 'ended'
-                        AND activity_trace.event_type = 'activity'
+                        AND activity_trace.event_type IN ('send_contact_video_mail', 'send_group_video_mail')
                         AND activity_trace.http_status = '200 OK'
                         AND video_mail_xref.member_id = %s
                     )
