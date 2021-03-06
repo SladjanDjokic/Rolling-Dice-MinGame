@@ -1,11 +1,11 @@
-FROM python:3.7-slim as base
+FROM python:3.9-slim as base
 
 # Setup env
 ENV LANG C.UTF-8
 ENV LC_ALL C.UTF-8
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONFAULTHANDLER 1
-
+ENV KAFKA_VERSION 1.6.0
 ENV ENTRYKIT_VERSION 0.4.0
 
 RUN apt-get update && \
@@ -13,8 +13,9 @@ RUN apt-get update && \
     inotify-tools \
     libpq-dev \
     wget \
+    curl \ 
     gcc \
-    python3-dev \
+    # python3-dev \
     musl-dev \
     build-essential \
     ca-certificates \
@@ -22,12 +23,17 @@ RUN apt-get update && \
     && apt-get clean && \
     rm -rf /var/lib/apt/lists*
 
-RUN wget https://github.com/progrium/entrykit/releases/download/v${ENTRYKIT_VERSION}/entrykit_${ENTRYKIT_VERSION}_Linux_x86_64.tgz \
-    && tar -xvzf entrykit_${ENTRYKIT_VERSION}_Linux_x86_64.tgz \
-    && rm entrykit_${ENTRYKIT_VERSION}_Linux_x86_64.tgz \
-    && mv entrykit /bin/entrykit \
-    && chmod +x /bin/entrykit \
-    && entrykit --symlink
+RUN wget https://github.com/edenhill/librdkafka/archive/v${KAFKA_VERSION}.tar.gz \
+    && tar xvzf v${KAFKA_VERSION}.tar.gz \
+    && cd librdkafka-${KAFKA_VERSION}/ \
+    && ./configure && make && make install && ldconfig
+
+# RUN wget https://github.com/progrium/entrykit/releases/download/v${ENTRYKIT_VERSION}/entrykit_${ENTRYKIT_VERSION}_Linux_x86_64.tgz \
+#     && tar -xvzf entrykit_${ENTRYKIT_VERSION}_Linux_x86_64.tgz \
+#     && rm entrykit_${ENTRYKIT_VERSION}_Linux_x86_64.tgz \
+#     && mv entrykit /bin/entrykit \
+#     && chmod +x /bin/entrykit \
+#     && entrykit --symlink
 
 WORKDIR /app
 
@@ -41,6 +47,4 @@ COPY . /app
 
 EXPOSE 5000
 
-ENTRYPOINT [ \
-    "prehook", "/opt/bin/docker-setup.sh", "--", \
-    "/opt/bin/docker-entrypoint.sh"]
+ENTRYPOINT ["/opt/bin/docker-entrypoint.sh"]

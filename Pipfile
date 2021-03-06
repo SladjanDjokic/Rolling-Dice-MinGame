@@ -31,7 +31,7 @@ pytz = "*"
 cryptography = "*"
 requests = "*"
 twilio = "*"
-confluent-kafka = "*"
+confluent-kafka = "==1.6.0"
 gevent = "*"
 aiokafka = "*"
 starlette = "*"
@@ -54,7 +54,7 @@ mock = "*"
 numpy = "*"
 
 [requires]
-python_version = "3.7.9"
+python_version = "3.9"
 
 [scripts]
 "dev" = "python run.py --env-name=LOCAL"
