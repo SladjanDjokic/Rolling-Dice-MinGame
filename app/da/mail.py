@@ -1116,16 +1116,16 @@ class DraftMailDA(BaseMailDA):
         raise HTTPInternalServerError
 
     @classmethod
-    def cu_draft_mail_for_member(cls, member, subject, body, receiver=None, update=False,
+    def cu_draft_mail_for_member(cls, member_id, subject, body, receiver=None, update=False,
                                  mail_header_id=None, reply_id=None, cc=None, bcc=None, user_folder_id=None):
 
         if receiver is None:
             receiver = []
         if user_folder_id == -1:
             user_folder_id = None
-        if user_folder_id and not cls.folder_id_is_valid(member["member_id"], user_folder_id):
+        if user_folder_id and not cls.folder_id_is_valid(member_id, user_folder_id):
             raise HTTPBadRequest("Folder is not valid")
-        if reply_id and not cls.can_reply_to(member["member_id"], reply_id):
+        if reply_id and not cls.can_reply_to(member_id, reply_id):
             raise HTTPBadRequest("You don't have permission to reply this email")
 
         if update:
@@ -1159,7 +1159,7 @@ class DraftMailDA(BaseMailDA):
 
             query_data = (
                 subject, json.dumps(receiver), json.dumps(cc) if cc else None, json.dumps(bcc) if bcc else None,
-                member["member_id"], mail_header_id
+                member_id, mail_header_id
             )
             bod_query_data = (
                 body,
@@ -1186,29 +1186,29 @@ class DraftMailDA(BaseMailDA):
                 RETURNING id;
             """
             query_data = (
-                member["member_id"], subject,
+                member_id, subject,
                 json.dumps(receiver), json.dumps(cc) if cc else None, json.dumps(bcc) if bcc else None
             )
             bod_query_data = (
-                member["member_id"], body
+                member_id, body
             )
 
-        logger.debug(f"MEMBER: {member}")
+        logger.debug(f"MEMBER: {member_id}")
         cls.source.execute(action_query, query_data)
         if cls.source.has_results():
             created_mail_id = cls.source.cursor.fetchone()[0]
-            folder_id = MailFolderDA.get_folder_id_for_member("DRAFT", member["member_id"])
+            folder_id = MailFolderDA.get_folder_id_for_member("DRAFT", member_id)
             if update:
                 created_mail_id = mail_header_id
                 cls.source.execute(xref_query,
-                                   (user_folder_id, True if reply_id else False, reply_id, member["member_id"],
-                                    member["member_id"], created_mail_id, folder_id,))
+                                   (user_folder_id, True if reply_id else False, reply_id, member_id,
+                                    member_id, created_mail_id, folder_id,))
             else:
                 cls.source.execute(xref_query,
-                                   (user_folder_id, member["member_id"], member["member_id"], created_mail_id))
+                                   (user_folder_id, member_id, member_id, created_mail_id))
                 if cls.source.has_results():
                     xref_id = cls.source.cursor.fetchone()[0]
-                    MailFolderDA.add_folder_to_mail("DRAFT", xref_id, member["member_id"], False)
+                    MailFolderDA.add_folder_to_mail("DRAFT", xref_id, member_id, False)
                 else:
                     raise HTTPInternalServerError
             cls.source.execute(body_query, (*bod_query_data, created_mail_id))

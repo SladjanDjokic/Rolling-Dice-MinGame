@@ -81,13 +81,13 @@ def check_session_administrator(func):
     return wrapper
 
 
-def inject_member(func):
-    def wrapper(cls, request, response, *args, **kwargs):
-        try:
-            member = get_session_member_data(request)
-            func(cls, request, response, member, *args, **kwargs)
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
-        except ForbiddenSessionError as err:
-            raise ForbiddenSession() from err
-    return wrapper
+# def inject_member(func):
+#     def wrapper(cls, request, response, *args, **kwargs):
+#         try:
+#             member = get_session_member_data(request)
+#             func(cls, request, response, member, *args, **kwargs)
+#         except InvalidSessionError as err:
+#             raise UnauthorizedSession() from err
+#         except ForbiddenSessionError as err:
+#             raise ForbiddenSession() from err
+#     return wrapper

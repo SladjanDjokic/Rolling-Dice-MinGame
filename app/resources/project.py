@@ -1,5 +1,5 @@
 import logging
-from app.util.auth import inject_member, check_session
+from app.util.auth import check_session
 import app.util.json as json
 import app.util.request as request
 from app.da.project import ProjectDA
@@ -29,9 +29,10 @@ class ProjectResource(object):
             logger.exception(err)
             raise err
 
-    @inject_member
-    def on_post(self, req, resp, member):
+    @check_session
+    def on_post(self, req, resp):
         try:
+            member_id = req.context.auth['session']['member_id']
             (company_id, creator_project_role_id, owner_member_id, project_title, project_type, project_description, project_start_date, project_estimated_days,) = request.get_json_or_form(
                 "company_id", "creator_project_role_id", "owner_member_id", "project_title", "project_type", "project_description", "project_start_date", "project_estimated_days", req=req)
 
@@ -45,7 +46,7 @@ class ProjectResource(object):
                                                         )
 
             # Create project members for creator and owner
-            creator_member_id = member["member_id"]
+            creator_member_id = member_id
             creator_project_member_id = ProjectDA.create_project_member({'project_id': project_id,
                                                                          'member_id': creator_member_id,
                                                                          'pay_rate': 0,
@@ -85,11 +86,13 @@ class ProjectResource(object):
             logger.exception(err)
             raise err
 
-    @inject_member
-    def on_post_member(self, req, resp, member):
+    @check_session
+    def on_post_member(self, req, resp):
         try:
             (project_id, members,) = request.get_json_or_form(
                 "project_id", "members", req=req)
+
+            member_id = req.context.auth['session']['member_id']
 
             if len(members) > 0:
                 # Member ids of persons already in the project
@@ -99,7 +102,7 @@ class ProjectResource(object):
                 new_members = set(members) - set(onboarded_member_ids)
                 # Last item makes sure we don't delete ourselves
                 discarded_members = set(
-                    onboarded_member_ids) - set(members) - {member["member_id"]}
+                    onboarded_member_ids) - set(members) - {member_id}
 
                 if len(new_members) > 0:
                     for member_id in new_members:
@@ -216,14 +219,15 @@ class ProjectResource(object):
             raise err
 
     # Epics
-    @inject_member
-    def on_post_epic(self, req, resp, member):
+    @check_session
+    def on_post_epic(self, req, resp):
         try:
+            member_id = req.context.auth['session']['member_id']
             (project_id, epic_title, epic_description) = request.get_json_or_form(
                 "project_id", "epic_title", "epic_description", req=req)
 
             inserted = ProjectDA.insert_epic({"project_id": project_id, "epic_title": epic_title,
-                                              "epic_description": epic_description, "member_id": member["member_id"]})
+                                              "epic_description": epic_description, "member_id": member_id})
 
             if inserted:
                 resp.body = json.dumps({
@@ -244,14 +248,15 @@ class ProjectResource(object):
             logger.exception(err)
             raise err
 
-    @inject_member
-    def on_put_epic(self, req, resp, member, epic_id):
+    @check_session
+    def on_put_epic(self, req, resp, epic_id):
         try:
+            member_id = req.context.auth['session']['member_id']
             (epic_title, epic_description) = request.get_json_or_form(
                 "epic_title", "epic_description", req=req)
 
             updated = ProjectDA.update_epic({"epic_id": epic_id, "epic_title": epic_title,
-                                             "epic_description": epic_description, "member_id": member["member_id"]})
+                                             "epic_description": epic_description, "member_id": member_id})
 
             if updated:
                 resp.body = json.dumps({
@@ -297,14 +302,15 @@ class ProjectResource(object):
             raise err
 
     # Tremors
-    @inject_member
-    def on_post_tremor(self, req, resp, member):
+    @check_session
+    def on_post_tremor(self, req, resp):
         try:
+            member_id = req.context.auth['session']['member_id']
             (project_id, project_epic_id, tremor_title, tremor_description) = request.get_json_or_form(
                 "project_id", "project_epic_id", "tremor_title", "tremor_description", req=req)
 
             inserted = ProjectDA.insert_tremor({"project_id": project_id, "project_epic_id": project_epic_id,
-                                                "tremor_title": tremor_title, "tremor_description": tremor_description, "member_id": member["member_id"]})
+                                                "tremor_title": tremor_title, "tremor_description": tremor_description, "member_id": member_id})
 
             if inserted:
                 resp.body = json.dumps({
@@ -325,14 +331,15 @@ class ProjectResource(object):
             logger.exception(err)
             raise err
 
-    @inject_member
-    def on_put_tremor(self, req, resp, tremor_id, member):
+    @check_session
+    def on_put_tremor(self, req, resp, tremor_id):
         try:
+            member_id = req.context.auth['session']['member_id']
             (project_id, tremor_title, tremor_description) = request.get_json_or_form(
                 "project_id", "tremor_title", "tremor_description", req=req)
 
             updated = ProjectDA.update_tremor({"project_id": project_id, "tremor_id": tremor_id,
-                                               "tremor_title": tremor_title, "tremor_description": tremor_description, "member_id": member["member_id"]})
+                                               "tremor_title": tremor_title, "tremor_description": tremor_description, "member_id": member_id})
 
             if updated:
                 resp.body = json.dumps({
@@ -378,14 +385,15 @@ class ProjectResource(object):
             raise err
 
     # Story
-    @inject_member
-    def on_post_story(self, req, resp, member):
+    @check_session
+    def on_post_story(self, req, resp):
+        member_id = req.context.auth['session']['member_id']
         try:
             (project_id, project_tremor_id, story_title, story_description) = request.get_json_or_form(
                 "project_id", "project_tremor_id", "story_title", "story_description", req=req)
 
             inserted = ProjectDA.insert_story({"project_id": project_id, "project_tremor_id": project_tremor_id,
-                                               "story_title": story_title, "story_description": story_description, "member_id": member["member_id"]})
+                                               "story_title": story_title, "story_description": story_description, "member_id": member_id})
 
             if inserted:
                 resp.body = json.dumps({
@@ -406,14 +414,15 @@ class ProjectResource(object):
             logger.exception(err)
             raise err
 
-    @inject_member
-    def on_put_story(self, req, resp, story_id, member):
+    @check_session
+    def on_put_story(self, req, resp, story_id):
+        member_id = req.context.auth['session']['member_id']
         try:
             (project_id, story_title, story_description) = request.get_json_or_form(
                 "project_id", "story_title", "story_description", req=req)
 
             updated = ProjectDA.update_tremor({"project_id": project_id, "story_id": story_id,
-                                               "story_title": story_title, "story_description": story_description, "member_id": member["member_id"]})
+                                               "story_title": story_title, "story_description": story_description, "member_id": member_id})
 
             if updated:
                 resp.body = json.dumps({
@@ -459,6 +468,6 @@ class ProjectResource(object):
             raise err
 
     # Task
-    @inject_member
-    def on_post_task(self, req, resp, member):
+    @check_session
+    def on_post_task(self, req, resp):
         logger.debug('task')

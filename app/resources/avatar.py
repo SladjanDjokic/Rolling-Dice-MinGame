@@ -1,4 +1,4 @@
-from app.util.auth import inject_member
+from app.util.auth import check_session
 import os
 import falcon
 import app.util.json as json
@@ -58,8 +58,8 @@ class MemberAvatarResource(object):
             }, default_parser=json.parser)
 
     @classmethod
-    @inject_member
-    def on_put_deprecated(cls, req, resp, member):
+    @check_session
+    def on_put_deprecated(cls, req, resp):
         cls.on_put(req, resp, req.context.auth["session"]["member_id"])
 
     @staticmethod

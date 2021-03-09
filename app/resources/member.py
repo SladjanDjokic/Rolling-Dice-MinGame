@@ -4,7 +4,7 @@ from uuid import UUID
 
 import app.util.json as json
 import app.util.request as request
-from app.util.auth import inject_member
+from app.util.auth import check_session
 from app import settings
 from app.da.member import MemberDA, MemberContactDA, MemberInfoDA, MemberSettingDA, MemberVideoMailDA
 from app.da.file_sharing import FileStorageDA, FileTreeDA
@@ -109,7 +109,6 @@ class MemberRegisterResource(object):
             "cellConfirmationTS", "emailConfirmationTS", "activatedPromoCode", "department_id", "company_id", req=req)
         try:
             # We store the key in hex format in the database
-
 
             if password != confirm_password:
                 raise MemberPasswordMismatch()
@@ -292,26 +291,21 @@ class ContactMembersResource(object):
                                     "topic": settings.get('kafka.topics.contact')
                                     },
                            "DELETE": {"event_type": settings.get('kafka.event_types.delete.delete_contact'),
-                                   "topic": settings.get('kafka.topics.contact')
-                                   },
+                                      "topic": settings.get('kafka.topics.contact')
+                                      },
                            "GET": {"event_type": settings.get('kafka.event_types.get.get_members'),
                                    "topic": settings.get('kafka.topics.contact')
                                    },
 
                            }
 
+    @check_session
     def on_post(self, req, resp):
-
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
-
+        member_id = req.context.auth["session"]["member_id"]
         contacts = list()
         contact_member_id_list = req.get_param('member_id_list').split(',')
-        req.headers['kafka_contact_id_list'] = json.dumps(contact_member_id_list)
+        req.headers['kafka_contact_id_list'] = json.dumps(
+            contact_member_id_list)
         for contact_member_id in contact_member_id_list:
             contact_member = MemberDA().get_contact_member(contact_member_id)
 
@@ -372,6 +366,7 @@ class ContactMembersResource(object):
             "success": True
         }, default_parser=json.parser)
 
+    @check_session
     def on_delete(self, req, resp):
         (contact_ids) = request.get_json_or_form("contactIds", req=req)
         contact_ids = contact_ids[0].split(',')
@@ -390,24 +385,19 @@ class ContactMembersResource(object):
             "success": True
         }, default_parser=json.parser)
 
+    @check_session
     def on_get(self, req, resp):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
+        member_id = req.context.auth["session"]["member_id"]
 
-            # sort_by_params = 'first_name, last_name, -company' or '+first_name, +last_name, -company'
-            sort_params = req.get_param('sort')
+        # sort_by_params = 'first_name, last_name, -company' or '+first_name, +last_name, -company'
+        sort_params = req.get_param('sort')
 
-            members = MemberContactDA.get_members(member_id, sort_params)
+        members = MemberContactDA.get_members(member_id, sort_params)
 
-            resp.body = json.dumps({
-                "members": members,
-                "success": True
-            }, default_parser=json.parser)
-
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
+        resp.body = json.dumps({
+            "members": members,
+            "success": True
+        }, default_parser=json.parser)
 
 
 class MemberContactResource(object):
@@ -425,6 +415,7 @@ class MemberContactResource(object):
         'exempt_methods': ['POST']
     }
 
+    @check_session
     def on_put(self, req, resp):
         (id, role_id, role) = request.get_json_or_form(
             "id", "role_id", "role", req=req)
@@ -445,14 +436,9 @@ class MemberContactResource(object):
                 }, default_parser=json.parser)
         return
 
+    @check_session
     def on_post(self, req, resp):
-
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
+        member_id = req.context.auth["session"]["member_id"]
 
         (first_name, last_name, country, cell_phone,
          office_phone, home_phone, email,
@@ -504,34 +490,27 @@ class MemberContactResource(object):
             "success": True
         }, default_parser=json.parser)
 
-    @staticmethod
-    def on_get(req, resp):
+    @check_session
+    def on_get(self, req, resp):
+        member_id = req.context.auth["session"]["member_id"]
 
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
+        # sort_by_params = 'first_name, last_name, -company' or '+first_name, +last_name, -company'
+        search_key = req.get_param('searchKey') or ''
+        page_size = req.get_param_as_int('pageSize')
+        page_number = req.get_param_as_int('pageNumber')
+        sort_params = req.get_param('sort')
+        filter_params = req.get_param('filter')
 
-            # sort_by_params = 'first_name, last_name, -company' or '+first_name, +last_name, -company'
-            search_key = req.get_param('searchKey') or ''
-            page_size = req.get_param_as_int('pageSize')
-            page_number = req.get_param_as_int('pageNumber')
-            sort_params = req.get_param('sort')
-            filter_params = req.get_param('filter')
+        result = MemberContactDA.get_member_contacts(
+            member_id, sort_params, filter_params,
+            search_key, page_size, page_number
+        )
 
-            result = MemberContactDA.get_member_contacts(
-                member_id, sort_params, filter_params,
-                search_key, page_size, page_number
-            ) 
-
-            resp.body = json.dumps({
-                "contacts": result['contacts'],
-                "count": result['count'],
-                "success": True
-            }, default_parser=json.parser)
-
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
+        resp.body = json.dumps({
+            "contacts": result['contacts'],
+            "count": result['count'],
+            "success": True
+        }, default_parser=json.parser)
 
 
 class MemberContactSecurity(object):
@@ -545,16 +524,13 @@ class MemberContactSecurity(object):
                                    },
                            }
 
+    @check_session
     def on_get(self, req, resp, contact_member_id=None):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
+        member_id = req.context.auth["session"]["member_id"]
 
         try:
-            security_info = MemberContactDA.get_security(member_id, contact_member_id)
+            security_info = MemberContactDA.get_security(
+                member_id, contact_member_id)
             resp.body = json.dumps({
                 "data": security_info,
                 "success": True
@@ -565,13 +541,9 @@ class MemberContactSecurity(object):
                 "success": False
             }, default_parser=json.parser)
 
+    @check_session
     def on_post(self, req, resp, contact_member_id=None):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
+        member_id = req.context.auth["session"]["member_id"]
 
         try:
 
@@ -580,7 +552,8 @@ class MemberContactSecurity(object):
 
             # Upload image to aws and create an entry in db
 
-            security = MemberContactDA.get_security(member_id, contact_member_id)
+            security = MemberContactDA.get_security(
+                member_id, contact_member_id)
             security_picture_storage_id = security["security_picture_storage_id"]
             logger.debug("pin: {}".format(pin))
             if picture is not None:
@@ -608,21 +581,16 @@ class MemberContactSecurity(object):
 
 
 class MemberContactsRoles(object):
+    @check_session
     def on_get(self, req, resp):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
+        member_id = req.context.auth["session"]["member_id"]
 
-            roles = MemberContactDA.get_contacts_roles(member_id)
+        roles = MemberContactDA.get_contacts_roles(member_id)
 
-            resp.body = json.dumps({
-                "roles": roles,
-                "success": True
-            }, default_parser=json.parser)
-
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
+        resp.body = json.dumps({
+            "roles": roles,
+            "success": True
+        }, default_parser=json.parser)
 
 
 class MemberInfoResource(object):
@@ -633,51 +601,34 @@ class MemberInfoResource(object):
                                    },
                            }
 
-    @staticmethod
-    def on_get(req, resp):
+    @check_session
+    def on_get(self, req, resp):
+        member_id = req.context.auth["session"]["member_id"]
 
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
+        member_info = MemberInfoDA().get_member_info(member_id)
 
+        resp.body = json.dumps({
+            "data": member_info,
+            "success": True
+        }, default_parser=json.parser)
+
+    @check_session
+    def on_put(self, req, resp):
+        member_id = req.context.auth["session"]["member_id"]
+
+        (member, member_profile, member_achievement, member_contact_2, member_location) = request.get_json_or_form(
+            "member", "member_profile", "member_achievement", "member_contact_2", "member_location", req=req)
+
+        updated = MemberInfoDA().update_member_info(member_id,
+                                                    member, member_profile, member_achievement, member_contact_2, member_location)
+
+        if updated:
             member_info = MemberInfoDA().get_member_info(member_id)
-
             resp.body = json.dumps({
                 "data": member_info,
                 "success": True
             }, default_parser=json.parser)
 
-        except InvalidSessionError as err:
-            #  resp.body = json.dumps({
-            #     "description": 'Unauthorized session',
-            #     "member": member_info,
-            #     "success": False
-            # }, default_parser=json.parser)
-            raise UnauthorizedSession() from err
-
-    @staticmethod
-    def on_put(req, resp):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
-
-            (member, member_profile, member_achievement, member_contact_2, member_location) = request.get_json_or_form(
-                "member", "member_profile", "member_achievement", "member_contact_2", "member_location", req=req)
-
-            updated = MemberInfoDA().update_member_info(member_id,
-                                                        member, member_profile, member_achievement, member_contact_2, member_location)
-
-            if updated:
-                member_info = MemberInfoDA().get_member_info(member_id)
-                resp.body = json.dumps({
-                    "data": member_info,
-                    "success": True
-                }, default_parser=json.parser)
-
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
 
 class MemberSettingResource(object):
 
@@ -687,91 +638,55 @@ class MemberSettingResource(object):
     #                                },
     #                        }
 
-    @staticmethod
-    def on_get(req, resp):
+    @check_session
+    def on_get(self, req, resp):
+        member_id = req.context.auth["session"]["member_id"]
+        member_info = MemberSettingDA().get_member_setting(member_id)
 
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
+        resp.body = json.dumps({
+            "data": member_info,
+            "success": True
+        }, default_parser=json.parser)
 
+    @check_session
+    def on_put(self, req, resp):
+        member_id = req.context.auth["session"]["member_id"]
+
+        (member_profile, member_location) = request.get_json_or_form(
+            "member_profile", "member_location", req=req)
+
+        logger.debug("member_profile_x: {}".format(member_profile))
+        updated = MemberSettingDA().update_member_setting(
+            member_id, member_profile, member_location)
+
+        if updated:
             member_info = MemberSettingDA().get_member_setting(member_id)
-
             resp.body = json.dumps({
                 "data": member_info,
                 "success": True
             }, default_parser=json.parser)
 
-        except InvalidSessionError as err:
-            #  resp.body = json.dumps({
-            #     "description": 'Unauthorized session',
-            #     "member": member_info,
-            #     "success": False
-            # }, default_parser=json.parser)
-            raise UnauthorizedSession() from err
-
-    @staticmethod
-    def on_put(req, resp):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
-
-            (member_profile, member_location) = request.get_json_or_form(
-                "member_profile", "member_location", req=req)
-
-            logger.debug("member_profile_x: {}".format(member_profile))
-            updated = MemberSettingDA().update_member_setting(member_id, member_profile, member_location)
-
-            if updated:
-                member_info = MemberSettingDA().get_member_setting(member_id)
-                resp.body = json.dumps({
-                    "data": member_info,
-                    "success": True
-                }, default_parser=json.parser)
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
-
-    @staticmethod
-    def on_put_payment(req, resp):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
-
-            (member_location, ) = request.get_json_or_form(
-                "member_location", req=req)
-
-            updated = MemberSettingDA().update_member_payment_setting(member_id, member_location)
-
-            if updated:
-                member_info = MemberSettingDA().get_member_setting(member_id)
-                resp.body = json.dumps({
-                    "data": member_info,
-                    "success": True
-                }, default_parser=json.parser)
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
-
+    @check_session
+    def on_put_payment(self, req, resp):
+        member_id = req.context.auth["session"]["member_id"]
+        (member_location, ) = request.get_json_or_form("member_location", req=req)
+        updated = MemberSettingDA().update_member_payment_setting(member_id, member_location)
+        if updated:
+            member_info = MemberSettingDA().get_member_setting(member_id)
+            resp.body = json.dumps({
+                "data": member_info,
+                "success": True
+            }, default_parser=json.parser)
 
 class MemberInfoByIdResource(object):
+    @check_session
     def on_get(self, req, resp, member_id):
+        member_info = MemberInfoDA().get_member_info(member_id)
 
-        try:
-            member_info = MemberInfoDA().get_member_info(member_id)
-
-            resp.body = json.dumps({
-                "data": member_info,
-                "success": True
-            }, default_parser=json.parser)
-
-        except InvalidSessionError as err:
-            #  resp.body = json.dumps({
-            #     "description": 'Unauthorized session',
-            #     "member": member_info,
-            #     "success": False
-            # }, default_parser=json.parser)
-            raise UnauthorizedSession() from err
+        resp.body = json.dumps({
+            "data": member_info,
+            "success": True
+        }, default_parser=json.parser)
 
 
 class MemberJobTitles(object):
@@ -898,20 +813,21 @@ class MemberContactAccept(object):
 
     def __init__(self):
         self.kafka_data = {"PUT": {"event_type": settings.get('kafka.event_types.put.contact_request_response'),
-                                    "topic": settings.get('kafka.topics.registration')
-                                    }
-                          }
-                                
+                                   "topic": settings.get('kafka.topics.registration')
+                                   }
+                           }
 
-    @inject_member
-    def on_put(self, req, resp, member, contact_member_id):
-        member_id = member['member_id']
+    @check_session
+    def on_put(self, req, resp, contact_member_id):
+        member_id = req.context.auth["session"]["member_id"]
         try:
             (status,) = request.get_json_or_form(
                 "status", req=req)
 
-            MemberContactDA.accept_invitation(member_id, contact_member_id, status)
-            MemberContactDA.accept_invitation(contact_member_id, member_id, status)
+            MemberContactDA.accept_invitation(
+                member_id, contact_member_id, status)
+            MemberContactDA.accept_invitation(
+                contact_member_id, member_id, status)
             req.headers['kafka_contacter_id'] = str(contact_member_id)
             req.headers['kafka_contact_request_status'] = status
             resp.body = json.dumps({
@@ -965,19 +881,25 @@ class MemberVideoMailResource(object):
             }
         }
 
-    @inject_member
-    def on_post_contact(self, req, resp, member, member_id):
-        try:            
-            (video_blob, subject, type, media_type, replied_id) = request.get_json_or_form("video_blob", "subject", "type", "media_type", "replied_id", req=req)
+    @check_session
+    def on_post_contact(self, req, resp, member_id):
+        logged_member_id = req.context.auth["session"]["member_id"]
+
+        try:
+            (video_blob, subject, type, media_type, replied_id) = request.get_json_or_form(
+                "video_blob", "subject", "type", "media_type", "replied_id", req=req)
+
             video_storage_id = None
             if video_blob is not None:
                 video_storage_id = FileStorageDA().put_file_to_storage(video_blob)
 
             video_mail_id = None
             if type == 'contact':
-                video_mail_id = MemberVideoMailDA.create_contact_video_mail(member['member_id'], video_storage_id, subject, media_type)
+                video_mail_id = MemberVideoMailDA.create_contact_video_mail(
+                    logged_member_id, video_storage_id, subject, media_type)
             else:
-                video_mail_id = MemberVideoMailDA.create_reply_video_mail(member['member_id'], video_storage_id, subject, media_type, replied_id)           
+                video_mail_id = MemberVideoMailDA.create_reply_video_mail(
+                    logged_member_id, video_storage_id, subject, media_type, replied_id)
 
             MemberVideoMailDA.create_contact_video_mail_xref(member_id, video_mail_id)
 
@@ -992,20 +914,25 @@ class MemberVideoMailResource(object):
                 "success": False
             }, default_parser=json.parser)
 
-    @inject_member
-    def on_post_group(self, req, resp, member, group_id):
-        try:            
-            (video_blob, subject, media_type) = request.get_json_or_form("video_blob", "subject", "media_type", req=req)
+    @check_session
+    def on_post_group(self, req, resp, group_id):
+        member_id = req.context.auth["session"]["member_id"]
+        try:
+            (video_blob, subject, media_type) = request.get_json_or_form(
+                "video_blob", "subject", "media_type", req=req)
             video_storage_id = None
             if video_blob is not None:
                 video_storage_id = FileStorageDA().put_file_to_storage(video_blob)
 
-            video_mail_id = MemberVideoMailDA.create_group_video_mail(member['member_id'], group_id, video_storage_id, subject, media_type)
+            video_mail_id = MemberVideoMailDA.create_group_video_mail(
+                member_id, group_id, video_storage_id, subject, media_type)
             group = GroupDA().get_group(group_id)
-            MemberVideoMailDA.create_group_video_mail_xref(member['member_id'], group_id, video_mail_id)
-            
-            if group['group_leader_id'] != member['member_id']:
-                MemberVideoMailDA.create_contact_video_mail_xref(group['group_leader_id'], video_mail_id)
+            MemberVideoMailDA.create_group_video_mail_xref(
+                member_id, group_id, video_mail_id)
+
+            if group['group_leader_id'] != member_id:
+                MemberVideoMailDA.create_contact_video_mail_xref(
+                    group['group_leader_id'], video_mail_id)
 
             resp.body = json.dumps({
                 "video_mail_id": video_mail_id,
@@ -1017,16 +944,11 @@ class MemberVideoMailResource(object):
                 "description": "Something went wrong",
                 "success": False
             }, default_parser=json.parser)
-    
-    def on_get_all(self, req, resp):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
 
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
-        try:          
+    @check_session
+    def on_get_all(self, req, resp):
+        member_id = req.context.auth["session"]["member_id"]
+        try:
             search_key = req.get_param('search_key') or ''
             page_size = req.get_param_as_int('page_size')
             page_number = req.get_param_as_int('page_number')
@@ -1035,8 +957,9 @@ class MemberVideoMailResource(object):
             logger.debug(f"page_number {search_key}")
             logger.debug(f"page_size {search_key}")
 
-            mails = MemberVideoMailDA.get_video_mails(member_id, search_key, page_number, page_size)
-            
+            mails = MemberVideoMailDA.get_video_mails(
+                member_id, search_key, page_number, page_size)
+
             resp.body = json.dumps({
                 "data": mails,
                 "description": "Successfully loaded",
@@ -1048,11 +971,11 @@ class MemberVideoMailResource(object):
                 "description": "Something went wrong",
                 "success": False
             }, default_parser=json.parser)
-    
+
     def on_get_contact(self, req, resp, member_id, video_mail_id):
-        try:     
+        try:
             MemberVideoMailDA.read_video_mail(member_id, video_mail_id)
-            
+
             resp.body = json.dumps({
                 "success": True
             }, default_parser=json.parser)
@@ -1063,11 +986,12 @@ class MemberVideoMailResource(object):
                 "success": False
             }, default_parser=json.parser)
 
-    @inject_member
-    def on_get_group(self, req, resp, member, group_id, video_mail_id):
-        try:     
-            MemberVideoMailDA.read_video_mail(member['member_id'], video_mail_id)
-            
+    @check_session
+    def on_get_group(self, req, resp, group_id, video_mail_id):
+        member_id = req.context.auth["session"]["member_id"]
+        try:
+            MemberVideoMailDA.read_video_mail(member_id, video_mail_id)
+
             resp.body = json.dumps({
                 "success": True
             }, default_parser=json.parser)
@@ -1079,10 +1003,10 @@ class MemberVideoMailResource(object):
             }, default_parser=json.parser)
 
     def on_delete_contact(self, req, resp, member_id, video_mail_id):
-        try:     
+        try:
 
             MemberVideoMailDA.delete_video_mail(member_id, video_mail_id)
-            
+
             resp.body = json.dumps({
                 "success": True
             }, default_parser=json.parser)
@@ -1093,12 +1017,13 @@ class MemberVideoMailResource(object):
                 "success": False
             }, default_parser=json.parser)
 
-    @inject_member
-    def on_delete_group(self, req, resp, member, group_id, video_mail_id):
+    @check_session
+    def on_delete_group(self, req, resp, group_id, video_mail_id):
+        member_id = req.context.auth["session"]["member_id"]
         try:
 
-            MemberVideoMailDA.delete_video_mail(member['member_id'], video_mail_id)
-            
+            MemberVideoMailDA.delete_video_mail(member_id, video_mail_id)
+
             resp.body = json.dumps({
                 "success": True
             }, default_parser=json.parser)

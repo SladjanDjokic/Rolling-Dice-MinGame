@@ -4,7 +4,6 @@ import app.util.json as json
 import app.util.request as request
 from app import settings
 from app.util.session import get_session_cookie, validate_session
-from app.util.auth import inject_member
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 from app.da.member_event import MemberEventDA
 from app.da.member_schedule_event import MemberScheduleEventDA
@@ -12,7 +11,7 @@ from app.da.member import MemberDA
 from app.da.file_sharing import FileStorageDA, FileTreeDA
 from app.da.member_schedule_event_invite import MemberScheduleEventInviteDA
 from app.da.file_sharing import FileStorageDA
-from app.util.auth import inject_member
+from app.util.auth import check_session
 from app.exceptions.member import MemberNotFound
 from app.exceptions.member_schedule_event import ScheduleEventAddingFailed
 from app.exceptions.file_sharing import FileShareExists, FileNotFound, \
@@ -36,12 +35,12 @@ class MemberScheduleEventResource(object):
                                       },
                            }
 
-    @inject_member
-    def on_get(self, req, resp, member):
+    @check_session
+    def on_get(self, req, resp):
         """
         Retrieve all events for a user's calendar based on search start and end time
         """
-        event_host_member_id = member["member_id"]
+        event_host_member_id = req.context.auth["session"]["member_id"]
 
         search_time_start = req.get_param('search_time_start')
         search_time_end = req.get_param('search_time_end')
@@ -65,12 +64,12 @@ class MemberScheduleEventResource(object):
                 "success": True
             }, default_parser=json.parser)
 
-    @inject_member
-    def on_post(self, req, resp, member):
+    @check_session
+    def on_post(self, req, resp):
         """
         Create an event for a user
         """
-        host_member_id = member["member_id"]
+        host_member_id = req.context.auth["session"]["member_id"]
         (event_data,) = request.get_json_or_form("event_data", req=req)
 
         (event_name,
@@ -237,9 +236,9 @@ class MemberScheduleEventResource(object):
                 "success": False
             }, default_parser=json.parser)
 
-    @inject_member
-    def on_put(self, req, resp, member):
-        host_member_id = member["member_id"]
+    @check_session
+    def on_put(self, req, resp):
+        host_member_id = req.context.auth["session"]["member_id"]
         (event_data, mode) = request.get_json_or_form(
             "event_data", "mode", req=req)
 
@@ -296,14 +295,13 @@ class MemberScheduleEventResource(object):
                 group_id = None
 
             if recurrenceUpdateOption and recurrenceUpdateOption == 'next':
-                #cancel sequence_id & date
+                # cancel sequence_id & date
                 MemberEventDA.cancel_events_after(sequence_id, event_start_utc)
                 # add new sequence
                 sequence_id = MemberEventDA().add_sequence(sequence_name=event_name)
             else:
-                #cancel sequence_id
+                # cancel sequence_id
                 MemberEventDA.cancel_events_by_sequence_id(sequence_id)
-
 
             # This is the first event id
             event_id = MemberEventDA().add_2(
@@ -366,7 +364,8 @@ class MemberScheduleEventResource(object):
             if len(attachments) > 0:
                 for file_id in attachments:
                     for event_id in all_event_ids:
-                        MemberEventDA().bind_attachment(event_id, file_id['member_file_id'])
+                        MemberEventDA().bind_attachment(
+                            event_id, file_id['member_file_id'])
 
             '''
                 Invite members for all events in the row. 1 event x 1 member = 1 invite
@@ -400,9 +399,9 @@ class MemberScheduleEventResource(object):
                 "success": False
             }, default_parser=json.parser)
 
-    @inject_member
-    def on_delete(self, req, resp, member):
-        host_member_id = member["member_id"]
+    @check_session
+    def on_delete(self, req, resp):
+        host_member_id = req.context.auth["session"]["member_id"]
         (option, event) = request.get_json_or_form('option', 'event', req=req)
         event_id = event['event_id']
         sequence_id = event['sequence_id']
@@ -476,24 +475,25 @@ class EventAttachmentResorce(object):
                                       },
                            }
 
-    @inject_member
-    def on_get(self, req, resp, member):
+    @check_session
+    def on_get(self, req, resp):
         logger.debug('aaa')
 
-    @inject_member
-    def on_post(self, req, resp, member):
+    @check_session
+    def on_post(self, req, resp):
         logger.debug('Incoming attachment')
         file = req.get_param("file")
         file_name = req.get_param("fileName")
         file_size_bytes = req.get_param("size")
         mime_type = req.get_param("mime")
+        member_id = req.context.auth["session"]["member_id"]
 
         storage_file_id = FileStorageDA().put_file_to_storage(
             file, file_size_bytes, mime_type)
         member_file_id = FileTreeDA().create_member_file_entry(
             file_id=storage_file_id,
             file_name=file_name,
-            member_id=member["member_id"],
+            member_id=member_id,
             status="available",
             file_size_bytes=file_size_bytes)  # FIXME: change this after we migrate to storing file size in fs_storage
         if not member_file_id:
@@ -513,22 +513,17 @@ class EventAttachmentResorce(object):
                 "success": False
             }, default_parser=json.parser)
 
-    @inject_member
-    def on_delete(self, req, resp, member):
+    @check_session
+    def on_delete(self, req, resp):
         logger.debug('ccc')
 
 
 class MemberUpcomingEvents(object):
-    @staticmethod
-    def on_get(req, resp):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
-            current = req.get_param('current')
-            limit = req.get_param('limit')
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
+    @check_session
+    def on_get(self, req, resp):
+        member_id = req.context.auth["session"]["member_id"]
+        current = req.get_param('current')
+        limit = req.get_param('limit')
 
         upcoming_events = MemberEventDA().get_upcoming_events(member_id, current, limit)
 
@@ -550,10 +545,10 @@ class MemberEventInvitations(object):
                                    },
                            }
 
-    @inject_member
-    def on_get(self, req, resp, member):
-
-        success = MemberEventDA().get_event_invitations(member["member_id"])
+    @check_session
+    def on_get(self, req, resp):
+        member_id = req.context.auth["session"]["member_id"]
+        success = MemberEventDA().get_event_invitations(member_id)
 
         resp.body = json.dumps({
             "data": success,
@@ -562,12 +557,12 @@ class MemberEventInvitations(object):
             "success": True
         }, default_parser=json.parser)
 
-    @inject_member
-    def on_put(self, req, resp, member, event_invite_id):
+    @check_session
+    def on_put(self, req, resp, event_invite_id):
         status_list = ['Accepted', 'Declined']
         (status, comment) = request.get_json_or_form(
             "status", "comment", req=req)
-        member_id = member["member_id"]
+        member_id = req.context.auth["session"]["member_id"]
         if status in status_list:
 
             '''
