@@ -16,7 +16,7 @@ from app.resources.member import MemberRegisterResource, MemberSearchResource, \
     MemberGroupSearchResource, MemberContactResource, MemberContactAccept, ContactMembersResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms, MemberDepartments, MemberContactsRoles, \
     MemberContactsCompanies, MemberContactsCountries, MemberTimezones, MemberInfoByIdResource, \
-    MemberContactSecurity, MemberSettingResource, MemberVideoMailResource
+    MemberContactSecurity, MemberSettingResource, MemberVideoMailResource, ContactMembersOtherInvitationsResource
 from app.resources.verification import Verification
 from app.resources.verifycell import VerifyCell
 from app.resources.promo_codes import PromoCodes
@@ -50,6 +50,8 @@ from app.resources.avatar import MemberAvatarResource
 from app.resources.activity import ActivitiesResource
 from app.resources.project import ProjectResource
 from app.resources.company import CompanyResource, CompanyUnregisteredResource
+from app.resources.activity_new import SystemActivitySessionResource, SystemActivitySecurityResource, SystemActivityMessageResource, \
+    SystemActivityGroupResource, SystemActivityInvitationsResource
 
 from app.resources.notifications_setting import MemberNotificationsSetting
 # from app.resources.memberfile import
@@ -186,6 +188,7 @@ def _setup_routes(app):
     app.add_route("/member/contacts/countries", MemberContactsCountries())
     app.add_route("/member/file/{file_path}", FileDownloadResource())
     app.add_route("/member-contacts", ContactMembersResource())
+    app.add_route("/member/other-invitations", ContactMembersOtherInvitationsResource())
 
     app.add_route("/valid-session", ValidateSessionResource())
 
@@ -221,6 +224,13 @@ def _setup_routes(app):
     app.add_route("/system/activity/users", SystemActivityUsersResource())
 
     app.add_route("/member/activity", ActivitiesResource())
+
+    # Activity New version
+    app.add_route("/system/activity/activity", SystemActivitySessionResource())
+    app.add_route("/system/activity/security", SystemActivitySecurityResource())
+    app.add_route("/system/activity/message", SystemActivityMessageResource())
+    app.add_route("/system/activity/group", SystemActivityGroupResource())
+    app.add_route("/system/activity/invitations", SystemActivityInvitationsResource())
 
     app.add_route("/languages", LanguageResource())
 

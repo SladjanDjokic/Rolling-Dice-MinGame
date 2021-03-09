@@ -66,10 +66,18 @@ mail = 'mail_activity'
 registration = 'registration_activity'
 contact = 'contact_activity'
 calendar = 'calendar_activity'
+activity = 'activity'
+event = 'event'
 
 [kafka.event_types]
 
 [kafka.event_types.get]
+activity_activity = 'activity_activity'
+activity_security = 'activity_security'
+activity_message = 'activity_message'
+activity_group = 'activity_group'
+activity_invitations = 'activity_invitations'
+other_invitations = 'other_invitations'
 file_download = 'file_download'
 file_storage = 'retrieve_file'
 member_file_cloud = 'retrieve_file_trees'

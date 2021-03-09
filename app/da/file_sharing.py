@@ -1887,3 +1887,68 @@ class ShareFileDA(object):
         if cls.source.has_results():
             shared_file = cls.source.cursor.fetchone()
             return shared_file[0]
+
+    @classmethod
+    def get_all_file_share_invitations_by_member_id(cls, member_id):
+        files = list()
+
+        try:
+            query = f"""
+                SELECT
+                    file_share.id,
+                    file_share.create_date,
+                    member_file.file_name,
+                    file.storage_engine_id as file_url,
+                    create_user.id as create_user_id,
+                    create_user.first_name,
+                    create_user.last_name,
+                    create_user.email,
+                    file_storage_engine.storage_engine_id
+                FROM member
+                INNER JOIN file_tree on member.main_file_tree = file_tree.id
+                INNER JOIN file_tree_item on file_tree.id = file_tree_item.file_tree_id
+                INNER JOIN file_share on file_share.target_node = file_tree_item.id
+                INNER JOIN member_file on member_file.id = file_tree_item.member_file_id
+                INNER JOIN member create_user ON member_file.member_id = create_user.id
+                LEFT JOIN member_profile ON create_user.id = member_profile.member_id
+                LEFT JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
+                LEFT JOIN file_storage_engine file on file.id = member_file.file_id
+                WHERE 
+                    member.id = %s
+                ORDER BY file_share.create_date DESC
+                LIMIT 10
+            """
+
+            params = (member_id,)
+
+            cls.source.execute(query, params)
+            if cls.source.has_results():
+                for (
+                        id,
+                        create_date,
+                        file_name,
+                        file_url,
+                        create_user_id,
+                        first_name,
+                        last_name,
+                        email,
+                        storage_engine_id
+                ) in cls.source.cursor:
+                    file = {
+                        "id": id,
+                        "create_date": create_date,
+                        "file_name": file_name,
+                        "file_url": amerize_url(file_url),
+                        "create_user_id": create_user_id,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "email": email,
+                        "amera_avatar_url": amerize_url(storage_engine_id),
+                        "invitation_type": "drive_share"
+                    }
+                    files.append(file)
+
+            return files
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            return None

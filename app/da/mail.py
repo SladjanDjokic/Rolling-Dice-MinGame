@@ -2035,3 +2035,98 @@ class MailSettingsDA(BaseDA):
 class SentMailDA(BaseMailDA):
     folder_name = "Sent"
     user_folders = True
+
+
+class MailServiceDA(BaseDA):
+    
+    @classmethod
+    def get_activity_message(cls, member_id, is_history=False):
+        mails = list()
+
+        try:
+            unread= ""
+
+            if not is_history:
+                unread = " AND xref.read = false AND xref.deleted = false"
+
+            query_mails = f"""
+                SELECT
+                    head.id,
+                    head.subject,
+                    body.message,
+                    head.message_ts,
+                    head.message_to,
+                    head.message_cc,
+                    head.message_bcc,
+                    xref.id as xref_id,
+                    xref.read,
+                    xref.new_mail,
+                    member.email as email,
+                    member.first_name as first_name,
+                    member.last_name as last_name,
+                    file_path(file_storage_engine.storage_engine_id, '/member/file') as s3_avatar_url
+                FROM mail_header as head
+                INNER JOIN mail_xref xref on head.id = xref.mail_header_id
+                INNER JOIN mail_body body on head.id = body.mail_header_id
+                INNER JOIN member member on member.id = xref.owner_member_id
+                LEFT OUTER JOIN member_profile profile on member.id = profile.member_id
+                LEFT OUTER JOIN file_storage_engine on file_storage_engine.id = profile.profile_picture_storage_id
+                WHERE
+                    (
+                        head.message_to->'amera' @> to_char(%s, '999')::jsonb
+                        OR
+                        head.message_cc->'amera' @> to_char(%s, '999')::jsonb
+                        OR
+                        head.message_bcc->'amera' @> to_char(%s, '999')::jsonb
+                    )
+                    AND
+                    xref.member_id = %s
+                    {unread}
+                ORDER BY head.message_ts DESC
+                LIMIT 10
+            """
+
+            param_mails = (member_id, member_id, member_id, member_id)
+
+
+            cls.source.execute(query_mails, param_mails)
+            if cls.source.has_results():
+                for (
+                        id,
+                        subject,
+                        message,
+                        message_ts,
+                        message_to,
+                        message_cc,
+                        message_bcc,
+                        xref_id,
+                        read,
+                        new_mail,
+                        email,
+                        first_name,
+                        last_name,
+                        s3_avatar_url
+                ) in cls.source.cursor:
+                    mail = {
+                        "id": id,
+                        "subject": subject,
+                        "message": message,
+                        "create_date": message_ts,
+                        "message_to": message_to,
+                        "message_cc": message_cc,
+                        "message_bcc": message_bcc,
+                        "xref_id": xref_id,
+                        "new_mail": new_mail,
+                        "email": email,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "amera_avatar_url": s3_avatar_url,
+                        "read": read,
+                        "invitation_type": "new_mail"
+                    }
+                    mails.append(mail)
+
+            return mails
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            return None

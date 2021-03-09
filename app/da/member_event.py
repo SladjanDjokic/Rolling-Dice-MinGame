@@ -325,9 +325,9 @@ class MemberEventDA(object):
         try:
             query = ("""
                 UPDATE event_2
-	                SET event_status = 'Cancel'
-	                WHERE event_2.id = %s
-	                RETURNING event_2.sequence_id
+                    SET event_status = 'Cancel'
+                    WHERE event_2.id = %s
+                    RETURNING event_2.sequence_id
                 """)
             params = (event_id,)
             cls.source.execute(query, params)
@@ -346,9 +346,9 @@ class MemberEventDA(object):
         try:
             query = ("""
                 UPDATE event_2
-	                SET event_status = 'Cancel'
-	                WHERE sequence_id = %s AND start_datetime >= %s
-	                RETURNING TRUE
+                    SET event_status = 'Cancel'
+                    WHERE sequence_id = %s AND start_datetime >= %s
+                    RETURNING TRUE
                 """)
             params = (sequence_id, start_datetime)
             cls.source.execute(query, params)
@@ -366,9 +366,9 @@ class MemberEventDA(object):
         try:
             query = ("""
                 UPDATE event_2
-	                SET event_status = 'Cancel'
-	                WHERE sequence_id = %s
-	                RETURNING TRUE
+                    SET event_status = 'Cancel'
+                    WHERE sequence_id = %s
+                    RETURNING TRUE
                 """)
             params = (sequence_id, )
             cls.source.execute(query, params)
@@ -410,33 +410,33 @@ class MemberEventDA(object):
                         id as event_id,
                         sequence_id,
                         (
-							SELECT row_to_json(group_data) as group_info
-							FROM (
-								SELECT 
-									member_group.id as group_id,
-									group_name,
-									group_leader_id
-								FROM member_group
-								WHERE member_group.id = group_id
-							) as group_data
-						),
+                            SELECT row_to_json(group_data) as group_info
+                            FROM (
+                                SELECT
+                                    member_group.id as group_id,
+                                    group_name,
+                                    group_leader_id
+                                FROM member_group
+                                WHERE member_group.id = group_id
+                            ) as group_data
+                        ),
                         event_color_id,
                         event_name,
                         event_type,
                         event_description,
                         (
-							SELECT row_to_json(member_data) as host_member_info
-							FROM (
-								SELECT
-									member.id as host_member_id,
-									member.first_name,
-									member.middle_name,
-									member.last_name,
-									member.company_name
-								FROM member
-								WHERE member.id = host_member_id
-							) as member_data
-						),
+                            SELECT row_to_json(member_data) as host_member_info
+                            FROM (
+                                SELECT
+                                    member.id as host_member_id,
+                                    member.first_name,
+                                    member.middle_name,
+                                    member.last_name,
+                                    member.company_name
+                                FROM member
+                                WHERE member.id = host_member_id
+                            ) as member_data
+                        ),
                         is_full_day,
                         event_status,
                         event_tz,
@@ -514,7 +514,7 @@ class MemberEventDA(object):
                             (
                                 SELECT row_to_json(group_data) as group_info
                                 FROM (
-                                    SELECT 
+                                    SELECT
                                         member_group.id as group_id,
                                         group_name,
                                         group_leader_id
@@ -626,7 +626,7 @@ class MemberEventDA(object):
                             (
                                 SELECT row_to_json(group_data) as group_info
                                 FROM (
-                                    SELECT 
+                                    SELECT
                                         member_group.id as group_id,
                                         group_name,
                                         group_leader_id
@@ -707,19 +707,19 @@ class MemberEventDA(object):
                                 ) AS invitees
                             )
                         FROM (
-                            SELECT 
-                                event_2.*, 
+                            SELECT
+                                event_2.*,
                                 event_2.host_member_id AS viewer_member_id
-                            FROM event_2 WHERE {} event_2.host_member_id = %s AND 
+                            FROM event_2 WHERE {} event_2.host_member_id = %s AND
                                 event_2.event_status='Active'
                             UNION
-                            SELECT 
-                                event_2.*, 
+                            SELECT
+                                event_2.*,
                                 event_invite_2.invite_member_id AS viewer_member_id
                             FROM event_2
                             INNER JOIN event_invite_2 ON event_2.id=event_invite_2.event_id
-                            WHERE {} event_invite_2.invite_member_id = %s AND 
-                                event_2.event_status='Active' AND 
+                            WHERE {} event_invite_2.invite_member_id = %s AND
+                                event_2.event_status='Active' AND
                                 event_invite_2.invite_status='Accepted'
                         ) as events
                     ) AS sequence
@@ -763,12 +763,12 @@ class MemberEventDA(object):
     def get_recurring_copies_invite_ids(cls, member_id, original_event_id):
         try:
             query = ('''
-                SELECT event_invite_2.id 
+                SELECT event_invite_2.id
                     FROM event_invite_2
                     LEFT JOIN event_2 ON event_invite_2.event_id = event_2.id
                     LEFT JOIN event_sequence ON event_2.sequence_id = event_sequence.id
                     WHERE event_invite_2.invite_member_id = %s
-                        AND event_invite_2.invite_status = 'Recurring' 
+                        AND event_invite_2.invite_status = 'Recurring'
                         AND event_sequence.id = (
                             SELECT event_sequence.id
                             FROM event_sequence
@@ -818,7 +818,7 @@ class MemberEventDA(object):
                             (
                                 SELECT row_to_json(group_data) as group_info
                                 FROM (
-                                    SELECT 
+                                    SELECT
                                         member_group.id as group_id,
                                         group_name,
                                         group_leader_id
@@ -942,7 +942,7 @@ class MemberEventDA(object):
                     (
                         SELECT row_to_json(group_data) as group_info
                         FROM (
-                            SELECT 
+                            SELECT
                                 member_group.id as group_id,
                                 group_name,
                                 group_leader_id
@@ -1081,7 +1081,7 @@ class MemberEventDA(object):
     def delete_events_sequence_by_id(cls, sequence_id):
         try:
             query = ("""
-                DELETE 
+                DELETE
                 FROM event_2
                 WHERE sequence_id = %s
             """)
@@ -1102,7 +1102,7 @@ class MemberEventDA(object):
             event_comma_ids = ', '.join(ids)
 
             query = ("""
-                DELETE 
+                DELETE
                 FROM event_media
                 WHERE event_id in (%s)
             """)
@@ -1113,3 +1113,185 @@ class MemberEventDA(object):
             return True
         except Exception as e:
             raise e
+
+    @classmethod
+    def get_all_group_event_invitations_by_member_id(cls, member_id):
+        groups = list()
+
+        try:
+            query = f"""
+                SELECT
+                    event_invite_2.id,
+                    event_invite_2.invite_status as status,
+                    event_invite_2.create_date,
+                    event_2.event_name,
+                    event_2.event_type,
+                    event_2.event_description,
+                    member_group.id as group_id,
+                    member_group.group_name,
+                    member.id as create_user_id,
+                    member.first_name,
+                    member.last_name,
+                    member.email,
+                    file_storage_engine.storage_engine_id,
+                    json_build_object(
+                        'group_id', member_group.id,
+                        'group_name', member_group.group_name,
+                        'group_leader_id', member_group.group_leader_id
+                    ) AS group_info
+                FROM event_invite_2
+                INNER JOIN event_2 on event_invite_2.event_id = event_2.id
+                INNER JOIN member_group ON event_2.group_id = member_group.id
+                INNER JOIN member ON event_2.host_member_id = member.id
+                LEFT JOIN member_profile ON member.id = member_profile.member_id
+                LEFT JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
+                WHERE
+                    event_invite_2.invite_member_id = %s AND event_2.event_status='Active'
+                ORDER BY event_invite_2.create_date DESC
+                LIMIT 10
+            """
+
+            params = (member_id,)
+
+            cls.source.execute(query, params)
+            if cls.source.has_results():
+                for (
+                        id,
+                        status,
+                        create_date,
+                        event_name,
+                        event_type,
+                        event_description,
+                        group_id,
+                        group_name,
+                        create_user_id,
+                        first_name,
+                        last_name,
+                        email,
+                        storage_engine_id,
+                        group_info
+                ) in cls.source.cursor:
+                    mail = {
+                        "id": id,
+                        "status": status,
+                        "create_date": create_date,
+                        "event_name": event_name,
+                        "event_type": event_type,
+                        "event_description": event_description,
+                        "group_id": group_id,
+                        "group_name": group_name,
+                        "create_user_id": create_user_id,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "email": email,
+                        "amera_avatar_url": amerize_url(storage_engine_id),
+                        "group_info": group_info
+                    }
+                    groups.append(mail)
+
+            return groups
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            return None
+
+    @classmethod
+    def get_all_event_invitations_by_member_id(cls, member_id):
+        events = list()
+
+        try:
+            query = f"""
+                SELECT
+                    event_invite_2.id,
+                    event_invite_2.invite_status as status,
+                    event_invite_2.create_date,
+                    event_2.event_name,
+                    event_2.event_type,
+                    event_2.event_description,
+                    member.id as create_user_id,
+                    member.first_name,
+                    member.last_name,
+                    member.email,
+                    file_storage_engine.storage_engine_id,
+                    json_agg(json_build_object(
+                        'invite_id', invitations.id,
+                        'invite_member_id', invitations.invite_member_id,
+                        'first_name', invited_member.first_name,
+                        'middle_name', invited_member.middle_name,
+                        'last_name', invited_member.last_name
+                    )) AS invitations,
+                    json_build_object(
+                        'host_member_id', member.id,
+                        'first_name', member.first_name,
+                        'middle_name', member.middle_name,
+                        'last_name', member.last_name
+                    ) AS host_member_info
+                FROM event_invite_2
+                INNER JOIN event_2 on event_invite_2.event_id = event_2.id
+                INNER JOIN member ON event_2.host_member_id = member.id
+                LEFT OUTER JOIN event_invite_2 AS invitations ON invitations.event_id = event_2.id
+                LEFT OUTER JOIN member AS invited_member ON invitations.invite_member_id = invited_member.id
+                LEFT JOIN member_profile ON member.id = member_profile.member_id
+                LEFT JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
+                WHERE
+                    event_invite_2.invite_member_id = %s
+                    AND
+                    event_2.event_status='Active'
+                    AND
+                    event_2.group_id is NULL
+                GROUP BY
+                    event_invite_2.id,
+                    event_invite_2.invite_status,
+                    event_invite_2.create_date,
+                    event_2.event_name,
+                    event_2.event_type,
+                    event_2.event_description,
+                    member.id,
+                    member.first_name,
+                    member.last_name,
+                    member.email,
+                    file_storage_engine.storage_engine_id
+                ORDER BY event_invite_2.create_date DESC
+                LIMIT 10
+            """
+
+            params = (member_id,)
+
+            cls.source.execute(query, params)
+            if cls.source.has_results():
+                for (
+                        id,
+                        status,
+                        create_date,
+                        event_name,
+                        event_type,
+                        event_description,
+                        create_user_id,
+                        first_name,
+                        last_name,
+                        email,
+                        storage_engine_id,
+                        invitations,
+                        host_member_info
+                ) in cls.source.cursor:
+                    event = {
+                        "id": id,
+                        "status": status,
+                        "create_date": create_date,
+                        "event_name": event_name,
+                        "event_type": event_type,
+                        "event_description": event_description,
+                        "create_user_id": create_user_id,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "email": email,
+                        "amera_avatar_url": amerize_url(storage_engine_id),
+                        "invitation_type": "event_invitation",
+                        "invitations": invitations,
+                        "host_member_info": host_member_info
+                    }
+                    events.append(event)
+
+            return events
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            return None

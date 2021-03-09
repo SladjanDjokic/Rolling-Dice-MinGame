@@ -17,6 +17,8 @@ from app.util.session import get_session_cookie, validate_session
 from app.exceptions.member import MemberExistsError, MemberNotFound, MemberDataMissing, MemberExists, MemberContactExists, MemberPasswordMismatch
 from app.exceptions.invite import InviteNotFound, InviteExpired
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
+from app.da.member import MemberContactDA
+from app.da.mail import MailServiceDA
 import app.util.email as sendmail
 
 logger = logging.getLogger(__name__)
@@ -398,6 +400,42 @@ class ContactMembersResource(object):
             "members": members,
             "success": True
         }, default_parser=json.parser)
+
+class ContactMembersOtherInvitationsResource(object):
+
+    def __init__(self):
+        self.kafka_data = {
+                           "GET": {"event_type": settings.get('kafka.event_types.get.other_invitations'),
+                                   "topic": settings.get('kafka.topics.event')
+                                   },
+
+                           }
+
+    def on_get(self, req, resp):
+        try:
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+            member_id = session["member_id"]
+
+
+            # contact invitation
+            contact_invitations = MemberContactDA.get_all_contact_invitations_by_member_id(session["member_id"])
+            # new message
+            new_messages = MailServiceDA.get_activity_message(session["member_id"])
+            # group invite
+            group_invitations = GroupDA.get_all_group_invitations_by_member_id(session["member_id"])
+            result = contact_invitations + new_messages + group_invitations
+
+            resp.body = json.dumps({
+                "data": result,
+                "description": "Other Invitations result fetched sucessfully",
+                "success": True
+            }, default_parser=json.parser)
+        except Exception as err:
+            resp.body = json.dumps({
+                "description": err,
+                "success": False
+            }, default_parser=json.parser)
 
 
 class MemberContactResource(object):

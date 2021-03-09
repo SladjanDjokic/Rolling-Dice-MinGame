@@ -61,7 +61,7 @@ def check_session(func):
     def wrapper(cls, request, response, *args, **kwargs):
         try:
             validate_session_request(request)
-            func(cls, request, response, *args, **kwargs)
+            return func(cls, request, response, *args, **kwargs)
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
         except ForbiddenSessionError as err:
@@ -73,7 +73,7 @@ def check_session_administrator(func):
     def wrapper(cls, request, response, *args, **kwargs):
         try:
             validate_session_administrator(request)
-            func(cls, request, response, *args, **kwargs)
+            return func(cls, request, response, *args, **kwargs)
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
         except ForbiddenSessionError as err:

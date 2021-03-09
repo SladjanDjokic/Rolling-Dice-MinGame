@@ -266,16 +266,16 @@ class GroupMembershipResource(object):
 
     @staticmethod
     def on_post(req, resp):
-        (group_id, group_member_email) = request.get_json_or_form(
-            "groupId", "groupMemberEmail", req=req)
-        member = MemberDA().get_member_by_email(group_member_email)
-        req.headers['kafka_invitee_id'] = member.get('member_id')
+        (group_id, contact_member_id) = request.get_json_or_form(
+            "group_id", "contact_member_id", req=req)
+        member = MemberDA().get_member(contact_member_id)
         if not member:
-            raise MemberNotFound(group_member_email)
+            raise MemberNotFound(contact_member_id)
+        req.headers['kafka_invitee_id'] = member.get('member_id')
         group_member_id = GroupMembershipDA().create_group_membership(
             group_id, member['member_id'])
         if not group_member_id:
-            raise MemberExists(group_member_email)
+            raise MemberExists(member['member_id'])
         group = GroupDetailResource().get_group_detail(group_id)
         req.headers['kafka_group_name'] = group.get('group_name')
         resp.body = json.dumps({

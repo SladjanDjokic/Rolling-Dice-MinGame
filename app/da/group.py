@@ -533,6 +533,72 @@ class GroupDA(object):
         except Exception as err:
             raise err
 
+    @classmethod
+    def get_all_group_invitations_by_member_id(cls, member_id, is_history=False):
+        groups = list()
+
+        try:
+            invited= " AND member_group_membership.status in ('invited', 'active', 'declined')"
+
+            if not is_history:
+                invited = " AND member_group_membership.status = 'invited'"
+
+            query = f"""
+                SELECT
+                    member_group.id,
+                    member_group_membership.status,
+                    member_group_membership.create_date,
+                    member_group.group_name,
+                    member.id as create_user_id,
+                    member.first_name,
+                    member.last_name,
+                    member.email,
+                    file_storage_engine.storage_engine_id
+                FROM member_group_membership
+                INNER JOIN member_group on member_group_membership.group_id = member_group.id
+                INNER JOIN member ON member_group.group_leader_id = member.id
+                LEFT JOIN member_profile ON member.id = member_profile.member_id
+                LEFT JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
+                WHERE 
+                    member_group_membership.member_id = %s
+                    {invited}
+                ORDER BY member_group_membership.create_date DESC
+                LIMIT 10
+            """
+
+            params = (member_id,)
+
+            cls.source.execute(query, params)
+            if cls.source.has_results():
+                for (
+                        id,
+                        status,
+                        create_date,
+                        group_name,
+                        create_user_id,
+                        first_name,
+                        last_name,
+                        email,
+                        storage_engine_id
+                ) in cls.source.cursor:
+                    mail = {
+                        "id": id,
+                        "status": status,
+                        "create_date": create_date,
+                        "group_name": group_name,
+                        "create_user_id": create_user_id,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "email": email,
+                        "amera_avatar_url": amerize_url(storage_engine_id),
+                        "invitation_type": "group_invitation"
+                    }
+                    groups.append(mail)
+
+            return groups
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            return None
 
 class GroupMembershipDA(object):
     source = source

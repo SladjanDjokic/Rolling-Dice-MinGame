@@ -1628,6 +1628,69 @@ class MemberContactDA(object):
         except Exception as err:
             raise err
 
+    @classmethod
+    def get_all_contact_invitations_by_member_id(cls, member_id, is_history=False):
+        contacts = list()
+
+        try:
+            pending= ""
+
+            if not is_history:
+                pending = " AND contact.status = 'requested' AND xref.deleted = 'pending'"
+            
+            query = f"""
+                SELECT
+                    contact.id,
+                    contact.status,
+                    contact.create_date,
+                    member.id as create_user_id,
+                    member.first_name,
+                    member.last_name,
+                    member.email,
+                    file_storage_engine.storage_engine_id
+                FROM contact
+                INNER JOIN contact sender_contact on contact.contact_member_id = sender_contact.member_id AND sender_contact.contact_member_id = contact.member_id
+                INNER JOIN member ON contact.member_id = member.id
+                LEFT JOIN member_profile ON member.id = member_profile.member_id
+                LEFT JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
+                WHERE 
+                    contact.contact_member_id = %s
+                    {pending}
+                ORDER BY contact.create_date DESC
+                LIMIT 10
+            """
+
+            params = (member_id,)
+
+            cls.source.execute(query, params)
+            if cls.source.has_results():
+                for (
+                        id,
+                        status,
+                        create_date,
+                        create_user_id,
+                        first_name,
+                        last_name,
+                        email,
+                        storage_engine_id
+                ) in cls.source.cursor:
+                    contact = {
+                        "id": id,
+                        "status": status,
+                        "create_date": create_date,
+                        "create_user_id": create_user_id,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "email": email,
+                        "amera_avatar_url": amerize_url(storage_engine_id),
+                        "invitation_type": "contact_invitation"
+                    }
+                    contacts.append(contact)
+
+            return contacts
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            return None
 
 class MemberInfoDA(object):
     source = source
