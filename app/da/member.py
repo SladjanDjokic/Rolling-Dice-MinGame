@@ -926,6 +926,7 @@ class MemberContactDA(object):
                 member.middle_name,
                 member.last_name,
                 member_profile.biography,
+                member.email,
                 -- contact.cell_phone,
                 -- contact.office_phone,
                 -- contact.home_phone,
@@ -943,8 +944,7 @@ class MemberContactDA(object):
                 contact.create_date,
                 contact.update_date,
                 file_storage_engine.storage_engine_id,
-                contact.status,
-                member_session.status
+                contact.status
             """)
 
         if search_key != '':
@@ -960,6 +960,7 @@ class MemberContactDA(object):
                 member.middle_name as middle_name,
                 member.last_name as last_name,
                 member_profile.biography as biography,
+                member.email as email,
                 -- contact.cell_phone as cell_phone,
                 -- contact.office_phone as office_phone,
                 -- contact.home_phone as home_phone,
@@ -983,11 +984,8 @@ class MemberContactDA(object):
                 file_storage_engine.storage_engine_id as s3_avatar_url,
                 contact.security_exchange_option,
                 contact.status,
-                CASE
-                    WHEN member_session.status IS NOT NULL
-                    THEN member_session.status
-                    ELSE 'inactive'
-                END as online_status,
+                json_agg(member_session.status)->-1 as online_status,
+                json_agg(member_session.status) as all_statuses,
                 COALESCE(json_agg(DISTINCT company.*) FILTER (WHERE company.id IS NOT NULL), '[]')->0->'id' as company_id,
                 COALESCE(json_agg(DISTINCT company.*) FILTER (WHERE company.id IS NOT NULL), '[]')->0->'name' as member_company_name,
                 COALESCE(json_agg(DISTINCT company.*) FILTER (WHERE company.id IS NOT NULL), '[]') AS companies
@@ -1031,7 +1029,7 @@ class MemberContactDA(object):
                         # cell_phone,
                         # office_phone,
                         # home_phone,
-                        # email,
+                        email,
                         # personal_email,
                         company,
                         title,
@@ -1052,6 +1050,7 @@ class MemberContactDA(object):
                         security_exchange_option,
                         status,
                         online_status,
+                        all_statuses,
                         company_id,
                         member_company_name,
                         companies
@@ -1067,7 +1066,7 @@ class MemberContactDA(object):
                         # "cell_phone": cell_phone,
                         # "office_phone": office_phone,
                         # "home_phone": home_phone,
-                        # "email": email,
+                        "email": email,
                         # "personal_email": personal_email,
                         "company": company,
                         "title": title,
@@ -1090,6 +1089,7 @@ class MemberContactDA(object):
                                 security_exchange_option, 0),
                         "status": status,
                         "online_status": online_status,
+                        "all_statuses": all_statuses,
                         "company_id": company_id,
                         "member_company_name": member_company_name,
                         "companies": companies
