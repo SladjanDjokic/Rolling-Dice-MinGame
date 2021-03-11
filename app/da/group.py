@@ -127,7 +127,7 @@ class GroupDA(object):
                 member.email AS group_leader_email,
                 count(DISTINCT member_group_membership.member_id) AS total_member,
                 count(DISTINCT file_tree_item.id) AS total_files,
-            -- 	Members TODO: THIS QUERY NEEDS IMPROVEMENT
+            --     Members TODO: THIS QUERY NEEDS IMPROVEMENT
                 (
                     SELECT json_agg(group_members) as members
                     FROM (
@@ -261,7 +261,7 @@ class GroupDA(object):
                 member.email AS group_leader_email,
                 count(DISTINCT group_membership_member.member_id) AS total_member,
                 count(DISTINCT file_tree_item.id) AS total_files,
-                 -- 	Members TODO: THIS QUERY NEEDS IMPROVEMENT
+                 --     Members TODO: THIS QUERY NEEDS IMPROVEMENT
                 (
                     SELECT json_agg(group_members) as members
                     FROM (

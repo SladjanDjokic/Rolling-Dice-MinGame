@@ -2040,7 +2040,7 @@ class SentMailDA(BaseMailDA):
 class MailServiceDA(BaseDA):
     
     @classmethod
-    def get_activity_message(cls, member_id, is_history=False):
+    def get_all_text_mails(cls, member_id, is_history=False):
         mails = list()
 
         try:
@@ -2122,7 +2122,7 @@ class MailServiceDA(BaseDA):
                         "last_name": last_name,
                         "amera_avatar_url": s3_avatar_url,
                         "read": read,
-                        "invitation_type": "new_mail"
+                        "invitation_type": "text_mail"
                     }
                     mails.append(mail)
 

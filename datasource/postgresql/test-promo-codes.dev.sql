@@ -3,4 +3,4 @@ INSERT INTO promo_codes (created_by_member_id, promo_code, description, expirati
  (1, '2020CHRISTMAS', 'All AMERA sevices free of charge until Christmas', now() + INTERVAL '2 months');
 
 INSERT INTO promo_code_activations (member_id, promo_code_id) VALUES
-	(2, 1);
+    (2, 1);

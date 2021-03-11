@@ -1636,27 +1636,27 @@ class MemberContactDA(object):
             pending= ""
 
             if not is_history:
-                pending = " AND contact.status = 'requested' AND xref.deleted = 'pending'"
+                pending = " AND receiver_contact.status = 'pending'"
             
             query = f"""
                 SELECT
-                    contact.id,
-                    contact.status,
-                    contact.create_date,
+                    receiver_contact.id,
+                    receiver_contact.status,
+                    receiver_contact.create_date,
                     member.id as create_user_id,
                     member.first_name,
                     member.last_name,
                     member.email,
                     file_storage_engine.storage_engine_id
                 FROM contact
-                INNER JOIN contact sender_contact on contact.contact_member_id = sender_contact.member_id AND sender_contact.contact_member_id = contact.member_id
+                INNER JOIN contact receiver_contact on contact.contact_member_id = receiver_contact.member_id AND receiver_contact.contact_member_id = contact.member_id
                 INNER JOIN member ON contact.member_id = member.id
                 LEFT JOIN member_profile ON member.id = member_profile.member_id
                 LEFT JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
                 WHERE 
-                    contact.contact_member_id = %s
+                    receiver_contact.member_id = %s
                     {pending}
-                ORDER BY contact.create_date DESC
+                ORDER BY receiver_contact.create_date DESC
                 LIMIT 10
             """
 
@@ -2377,7 +2377,7 @@ class MemberVideoMailDA(object):
                 sender.first_name,
                 sender.last_name,
                 file_storage_engine.storage_engine_id as video_url,
-				COALESCE(json_agg(DISTINCT t1.*) FILTER (WHERE t1.member_id IS NOT NULL), '[]') AS read_members
+                COALESCE(json_agg(DISTINCT t1.*) FILTER (WHERE t1.member_id IS NOT NULL), '[]') AS read_members
             FROM video_mail_xref as vmx
             LEFT JOIN video_mail as vm ON vm.id = vmx.video_mail_id
             LEFT JOIN member as sender ON sender.id = vm.message_from
@@ -2506,3 +2506,93 @@ class MemberVideoMailDA(object):
             return
         except Exception as e:
             logger.debug(e.message)
+
+    @classmethod
+    def get_all_media_mails(cls, member_id, is_history=False, mail_type=None):
+        mails = list()
+
+        try:
+            unread = ""
+            mail_type = ""
+
+            if not is_history:
+                unread = " AND xref.status = 'unread'"
+
+            if mail_type:
+                mail_type = f" AND head.type = {mail_type}"
+
+            query_mails = f"""
+                SELECT
+                    head.id,
+                    head.subject,
+                    head.type,
+                    head.media_type,
+                    xref.id as xref_id,
+                    xref.status,
+                    xref.create_date,
+                    mail_storage.storage_engine_id as mail_url,
+                    member.email as email,
+                    member.first_name as first_name,
+                    member.last_name as last_name,
+                    file_storage_engine.storage_engine_id as s3_avatar_url,
+                    member_group.id as group_id,
+                    member_group.group_name
+                FROM video_mail as head
+                INNER JOIN  file_storage_engine mail_storage on mail_storage.id = head.video_storage_id
+                INNER JOIN video_mail_xref xref on head.id = xref.video_mail_id
+                INNER JOIN member member on member.id = head.message_from
+                LEFT OUTER JOIN member_profile profile on member.id = profile.member_id
+                LEFT OUTER JOIN file_storage_engine on file_storage_engine.id = profile.profile_picture_storage_id
+                LEFT OUTER JOIN member_group on member_group.id = head.group_id
+                WHERE
+                    xref.member_id = %s AND xref.status != 'deleted'
+                    {unread}
+                    {mail_type}
+                ORDER BY xref.create_date DESC
+                LIMIT 10
+            """
+
+            param_mails = (member_id,)
+
+
+            cls.source.execute(query_mails, param_mails)
+            if cls.source.has_results():
+                for (
+                        id,
+                        subject,
+                        type,
+                        media_type,
+                        xref_id,
+                        status,
+                        create_date,
+                        mail_url,
+                        email,
+                        first_name,
+                        last_name,
+                        s3_avatar_url,
+                        group_id,
+                        group_name
+                ) in cls.source.cursor:
+                    mail = {
+                        "id": id,
+                        "subject": subject,
+                        "mail_type": type,
+                        "media_type": media_type,
+                        "xref_id": xref_id,
+                        "status": status,
+                        "email": email,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "amera_avatar_url": amerize_url(s3_avatar_url),
+                        "mail_url": amerize_url(mail_url),
+                        "group_id": group_id,
+                        "group_name": group_name,
+                        "create_date": create_date,
+                        "invitation_type": "media_mail"
+                    }
+                    mails.append(mail)
+
+            return mails
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            return None

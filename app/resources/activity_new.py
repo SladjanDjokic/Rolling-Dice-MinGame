@@ -9,7 +9,7 @@ from app.da.mail import MailServiceDA
 from app.da.group import GroupDA
 from app.da.member_event import MemberEventDA
 from app.da.file_sharing import ShareFileDA
-from app.da.member import MemberContactDA
+from app.da.member import MemberContactDA, MemberVideoMailDA
 from app import settings
 
 from operator import itemgetter
@@ -122,7 +122,9 @@ class SystemActivityMessageResource(SystemActivityBaseResource):
     def on_get(self, req, resp):
         try:
             session = self._parse_session(req, resp)
-            result = MailServiceDA.get_activity_message(session["member_id"], is_history=True)
+            text_mails = MailServiceDA.get_all_text_mails(session["member_id"], is_history=True)
+            media_mails = MemberVideoMailDA.get_all_media_mails(session["member_id"], is_history=True)
+            result = text_mails + media_mails
             resp.body = json.dumps({
                 "success": True,
                 "description": "Message result fetched sucessfully",

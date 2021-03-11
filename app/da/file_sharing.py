@@ -642,76 +642,76 @@ class FileTreeDA(object):
                 member_file.file_name as file_name,
                 member_file.file_ivalue as iv,
                 member_file.file_size_bytes as size,
-				-- find all INDIVIDUALS  with whom I shared a node
-				(
-					SELECT json_agg(shares) as shared_with_individuals
-					FROM (
-						SELECT
-						  file_share.id as share_id,
-						  file_share.create_date as shared_date,
-						  member.id as consumer_id,
-						  member.email as consumer_email,
-						  member.first_name as consumer_first_name,
-						  member.last_name as consumer_last_name,
-						  member.company_name as consumer_company_name,
-						  job_title.name as job_title,
-						  department.name as department
-						FROM file_share
-						LEFT JOIN file_tree_item ON file_share.target_node = file_tree_item.id
-						LEFT JOIN member ON file_tree_item.file_tree_id = member.main_file_tree
-						LEFT JOIN job_title ON member.job_title_id = job_title.id
-						LEFT JOIN department ON member.department_id = department.id
-						WHERE original_node = tree.id AND member.id IS NOT NULL
-					) AS shares
-				),
-				-- find all groups I shared with
-				(
-					SELECT json_agg(shares) as shared_with_groups
-					FROM (
-						SELECT
-						  file_share.id as share_id,
-						  file_share.create_date as shared_date,
-						  member_group.id as group_id,
-						  member_group.group_name as group_name,
-						  member_group.exchange_option as exchange_option,
-						  member_group.group_leader_id as leader_id,
-						  member.first_name as leader_first_name,
-						  member.last_name as leader_last_name,
-						  member.company_name as leader_company,
-						  job_title.name as job_title,
-						  department.name as department
-						FROM file_share
-						LEFT JOIN file_tree_item ON file_share.target_node = file_tree_item.id
-						LEFT JOIN member_group ON file_tree_item.file_tree_id = member_group.main_file_tree
-						LEFT JOIN member ON member_group.group_leader_id = member.id
-						LEFT JOIN job_title ON member.job_title_id = job_title.id
-						LEFT JOIN department ON member.department_id = department.id
-						WHERE original_node = tree.id AND member_group.id IS NOT NULL
-					) AS shares
-				),
-				-- find information on the file that was shared with me
-				(
-					SELECT row_to_json(shares) as shared_by_individuals
-					FROM
-					(
-						SELECT
-						  file_share.id as share_id,
-						  file_share.create_date as shared_date,
-						  member.id as sharer_id,
-						  member.email as sharer_email,
-						  member.first_name as sharer_first_name,
-						  member.last_name as sharer_last_name,
-						  member.company_name as sharer_company_name,
-						  job_title.name as job_title,
-						  department.name as department
-						FROM file_share
-						LEFT JOIN file_tree_item ON file_share.original_node = file_tree_item.id
-						LEFT JOIN member ON file_tree_item.file_tree_id = member.main_file_tree
-						LEFT JOIN job_title ON member.job_title_id = job_title.id
-						LEFT JOIN department ON member.department_id = department.id
-						WHERE target_node = tree.id
-					) AS shares
-				),
+                -- find all INDIVIDUALS  with whom I shared a node
+                (
+                    SELECT json_agg(shares) as shared_with_individuals
+                    FROM (
+                        SELECT
+                          file_share.id as share_id,
+                          file_share.create_date as shared_date,
+                          member.id as consumer_id,
+                          member.email as consumer_email,
+                          member.first_name as consumer_first_name,
+                          member.last_name as consumer_last_name,
+                          member.company_name as consumer_company_name,
+                          job_title.name as job_title,
+                          department.name as department
+                        FROM file_share
+                        LEFT JOIN file_tree_item ON file_share.target_node = file_tree_item.id
+                        LEFT JOIN member ON file_tree_item.file_tree_id = member.main_file_tree
+                        LEFT JOIN job_title ON member.job_title_id = job_title.id
+                        LEFT JOIN department ON member.department_id = department.id
+                        WHERE original_node = tree.id AND member.id IS NOT NULL
+                    ) AS shares
+                ),
+                -- find all groups I shared with
+                (
+                    SELECT json_agg(shares) as shared_with_groups
+                    FROM (
+                        SELECT
+                          file_share.id as share_id,
+                          file_share.create_date as shared_date,
+                          member_group.id as group_id,
+                          member_group.group_name as group_name,
+                          member_group.exchange_option as exchange_option,
+                          member_group.group_leader_id as leader_id,
+                          member.first_name as leader_first_name,
+                          member.last_name as leader_last_name,
+                          member.company_name as leader_company,
+                          job_title.name as job_title,
+                          department.name as department
+                        FROM file_share
+                        LEFT JOIN file_tree_item ON file_share.target_node = file_tree_item.id
+                        LEFT JOIN member_group ON file_tree_item.file_tree_id = member_group.main_file_tree
+                        LEFT JOIN member ON member_group.group_leader_id = member.id
+                        LEFT JOIN job_title ON member.job_title_id = job_title.id
+                        LEFT JOIN department ON member.department_id = department.id
+                        WHERE original_node = tree.id AND member_group.id IS NOT NULL
+                    ) AS shares
+                ),
+                -- find information on the file that was shared with me
+                (
+                    SELECT row_to_json(shares) as shared_by_individuals
+                    FROM
+                    (
+                        SELECT
+                          file_share.id as share_id,
+                          file_share.create_date as shared_date,
+                          member.id as sharer_id,
+                          member.email as sharer_email,
+                          member.first_name as sharer_first_name,
+                          member.last_name as sharer_last_name,
+                          member.company_name as sharer_company_name,
+                          job_title.name as job_title,
+                          department.name as department
+                        FROM file_share
+                        LEFT JOIN file_tree_item ON file_share.original_node = file_tree_item.id
+                        LEFT JOIN member ON file_tree_item.file_tree_id = member.main_file_tree
+                        LEFT JOIN job_title ON member.job_title_id = job_title.id
+                        LEFT JOIN department ON member.department_id = department.id
+                        WHERE target_node = tree.id
+                    ) AS shares
+                ),
                 file_storage_engine.update_date as modDate,
                 file_storage_engine.storage_engine_id as fs_url,
                 file_storage_engine.create_date as create_date,
@@ -750,76 +750,76 @@ class FileTreeDA(object):
                 member_file.file_name as file_name,
                 member_file.file_ivalue as iv,
                 member_file.file_size_bytes as size,
-				-- find all INDIVIDUALS  with whom I shared a node
-				(
-					SELECT json_agg(shares) as shared_with_individuals
-					FROM (
-						SELECT
-						  file_share.id as share_id,
-						  file_share.create_date as shared_date,
-						  member.id as consumer_id,
-						  member.email as consumer_email,
-						  member.first_name as consumer_first_name,
-						  member.last_name as consumer_last_name,
-						  member.company_name as consumer_company_name,
-						  job_title.name as job_title,
-						  department.name as department
-						FROM file_share
-						LEFT JOIN file_tree_item ON file_share.target_node = file_tree_item.id
-						LEFT JOIN member ON file_tree_item.file_tree_id = member.main_file_tree
-						LEFT JOIN job_title ON member.job_title_id = job_title.id
-						LEFT JOIN department ON member.department_id = department.id
-						WHERE original_node = tree.id AND member.id IS NOT NULL
-					) AS shares
-				),
-				-- find all groups I shared with
-				(
-					SELECT json_agg(shares) as shared_with_groups
-					FROM (
-						SELECT
-						  file_share.id as share_id,
-						  file_share.create_date as shared_date,
-						  member_group.id as group_id,
-						  member_group.group_name as group_name,
-						  member_group.exchange_option as exchange_option,
-						  member_group.group_leader_id as leader_id,
-						  member.first_name as leader_first_name,
-						  member.last_name as leader_last_name,
-						  member.company_name as leader_company,
-						  job_title.name as job_title,
-						  department.name as department
-						FROM file_share
-						LEFT JOIN file_tree_item ON file_share.target_node = file_tree_item.id
-						LEFT JOIN member_group ON file_tree_item.file_tree_id = member_group.main_file_tree
-						LEFT JOIN member ON member_group.group_leader_id = member.id
-						LEFT JOIN job_title ON member.job_title_id = job_title.id
-						LEFT JOIN department ON member.department_id = department.id
-						WHERE original_node = tree.id AND member_group.id IS NOT NULL
-					) AS shares
-				),
-				-- find information on the file that was shared with me
-				(
-					SELECT row_to_json(shares) as shared_by_individuals
-					FROM
-					(
-						SELECT
-						  file_share.id as share_id,
-						  file_share.create_date as shared_date,
-						  member.id as shared_id,
-						  member.email as sharer_email,
-						  member.first_name as sharer_first_name,
-						  member.last_name as sharer_last_name,
-						  member.company_name as sharer_company_name,
-						  job_title.name as job_title,
-						  department.name as department
-						FROM file_share
-						LEFT JOIN file_tree_item ON file_share.original_node = file_tree_item.id
-						LEFT JOIN member ON file_tree_item.file_tree_id = member.main_file_tree
-						LEFT JOIN job_title ON member.job_title_id = job_title.id
-						LEFT JOIN department ON member.department_id = department.id
-						WHERE target_node = tree.id
-					) AS shares
-				),
+                -- find all INDIVIDUALS  with whom I shared a node
+                (
+                    SELECT json_agg(shares) as shared_with_individuals
+                    FROM (
+                        SELECT
+                          file_share.id as share_id,
+                          file_share.create_date as shared_date,
+                          member.id as consumer_id,
+                          member.email as consumer_email,
+                          member.first_name as consumer_first_name,
+                          member.last_name as consumer_last_name,
+                          member.company_name as consumer_company_name,
+                          job_title.name as job_title,
+                          department.name as department
+                        FROM file_share
+                        LEFT JOIN file_tree_item ON file_share.target_node = file_tree_item.id
+                        LEFT JOIN member ON file_tree_item.file_tree_id = member.main_file_tree
+                        LEFT JOIN job_title ON member.job_title_id = job_title.id
+                        LEFT JOIN department ON member.department_id = department.id
+                        WHERE original_node = tree.id AND member.id IS NOT NULL
+                    ) AS shares
+                ),
+                -- find all groups I shared with
+                (
+                    SELECT json_agg(shares) as shared_with_groups
+                    FROM (
+                        SELECT
+                          file_share.id as share_id,
+                          file_share.create_date as shared_date,
+                          member_group.id as group_id,
+                          member_group.group_name as group_name,
+                          member_group.exchange_option as exchange_option,
+                          member_group.group_leader_id as leader_id,
+                          member.first_name as leader_first_name,
+                          member.last_name as leader_last_name,
+                          member.company_name as leader_company,
+                          job_title.name as job_title,
+                          department.name as department
+                        FROM file_share
+                        LEFT JOIN file_tree_item ON file_share.target_node = file_tree_item.id
+                        LEFT JOIN member_group ON file_tree_item.file_tree_id = member_group.main_file_tree
+                        LEFT JOIN member ON member_group.group_leader_id = member.id
+                        LEFT JOIN job_title ON member.job_title_id = job_title.id
+                        LEFT JOIN department ON member.department_id = department.id
+                        WHERE original_node = tree.id AND member_group.id IS NOT NULL
+                    ) AS shares
+                ),
+                -- find information on the file that was shared with me
+                (
+                    SELECT row_to_json(shares) as shared_by_individuals
+                    FROM
+                    (
+                        SELECT
+                          file_share.id as share_id,
+                          file_share.create_date as shared_date,
+                          member.id as shared_id,
+                          member.email as sharer_email,
+                          member.first_name as sharer_first_name,
+                          member.last_name as sharer_last_name,
+                          member.company_name as sharer_company_name,
+                          job_title.name as job_title,
+                          department.name as department
+                        FROM file_share
+                        LEFT JOIN file_tree_item ON file_share.original_node = file_tree_item.id
+                        LEFT JOIN member ON file_tree_item.file_tree_id = member.main_file_tree
+                        LEFT JOIN job_title ON member.job_title_id = job_title.id
+                        LEFT JOIN department ON member.department_id = department.id
+                        WHERE target_node = tree.id
+                    ) AS shares
+                ),
                 file_storage_engine.update_date as modDate,
                 file_storage_engine.storage_engine_id as fs_url,
                 file_storage_engine.create_date as create_date,
@@ -958,29 +958,29 @@ class FileTreeDA(object):
                 member_file.file_name as file_name,
                 member_file.file_ivalue as iv,
                 member_file.file_size_bytes as size,
-				-- find information on the file that was shared with me
-				(
-					SELECT row_to_json(shares) as shared_by_individuals
-					FROM
-					(
-						SELECT
-						  file_share.id as share_id,
-						  file_share.create_date as shared_date,
-						  member.id as sharer_id,
-						  member.email as sharer_email,
-						  member.first_name as sharer_first_name,
-						  member.last_name as sharer_last_name,
-						  member.company_name as sharer_company_name,
-						  job_title.name as job_title,
-						  department.name as department
-						FROM file_share
-						LEFT JOIN file_tree_item ON file_share.original_node = file_tree_item.id
-						LEFT JOIN member ON file_tree_item.file_tree_id = member.main_file_tree
-						LEFT JOIN job_title ON member.job_title_id = job_title.id
-						LEFT JOIN department ON member.department_id = department.id
-						WHERE target_node = tree.id
-					) AS shares
-				),
+                -- find information on the file that was shared with me
+                (
+                    SELECT row_to_json(shares) as shared_by_individuals
+                    FROM
+                    (
+                        SELECT
+                          file_share.id as share_id,
+                          file_share.create_date as shared_date,
+                          member.id as sharer_id,
+                          member.email as sharer_email,
+                          member.first_name as sharer_first_name,
+                          member.last_name as sharer_last_name,
+                          member.company_name as sharer_company_name,
+                          job_title.name as job_title,
+                          department.name as department
+                        FROM file_share
+                        LEFT JOIN file_tree_item ON file_share.original_node = file_tree_item.id
+                        LEFT JOIN member ON file_tree_item.file_tree_id = member.main_file_tree
+                        LEFT JOIN job_title ON member.job_title_id = job_title.id
+                        LEFT JOIN department ON member.department_id = department.id
+                        WHERE target_node = tree.id
+                    ) AS shares
+                ),
                 file_storage_engine.update_date as modDate,
                 file_storage_engine.storage_engine_id as fs_url,
                 file_storage_engine.create_date as create_date,
@@ -1020,29 +1020,29 @@ class FileTreeDA(object):
                 member_file.file_name as file_name,
                 member_file.file_ivalue as iv,
                 member_file.file_size_bytes as size,
-				-- find information on the file that was shared with me
-				(
-					SELECT row_to_json(shares) as shared_by_individuals
-					FROM
-					(
-						SELECT
-						  file_share.id as share_id,
-						  file_share.create_date as shared_date,
-						  member.id as sharer_id,
-						  member.email as sharer_email,
-						  member.first_name as sharer_first_name,
-						  member.last_name as sharer_last_name,
-						  member.company_name as sharer_company_name,
-						  job_title.name as job_title,
-						  department.name as department
-						FROM file_share
-						LEFT JOIN file_tree_item ON file_share.original_node = file_tree_item.id
-						LEFT JOIN member ON file_tree_item.file_tree_id = member.main_file_tree
-						LEFT JOIN job_title ON member.job_title_id = job_title.id
-						LEFT JOIN department ON member.department_id = department.id
-						WHERE target_node = tree.id
-					) AS shares
-				),
+                -- find information on the file that was shared with me
+                (
+                    SELECT row_to_json(shares) as shared_by_individuals
+                    FROM
+                    (
+                        SELECT
+                          file_share.id as share_id,
+                          file_share.create_date as shared_date,
+                          member.id as sharer_id,
+                          member.email as sharer_email,
+                          member.first_name as sharer_first_name,
+                          member.last_name as sharer_last_name,
+                          member.company_name as sharer_company_name,
+                          job_title.name as job_title,
+                          department.name as department
+                        FROM file_share
+                        LEFT JOIN file_tree_item ON file_share.original_node = file_tree_item.id
+                        LEFT JOIN member ON file_tree_item.file_tree_id = member.main_file_tree
+                        LEFT JOIN job_title ON member.job_title_id = job_title.id
+                        LEFT JOIN department ON member.department_id = department.id
+                        WHERE target_node = tree.id
+                    ) AS shares
+                ),
                 file_storage_engine.update_date as modDate,
                 file_storage_engine.storage_engine_id as fs_url,
                 file_storage_engine.create_date as create_date,
@@ -1190,7 +1190,7 @@ class FileTreeDA(object):
                 WHERE id IN (SELECT id FROM tree ORDER BY level);
 
             UPDATE file_tree_item
-            -- 	this is the bin root
+            --     this is the bin root
                 SET parent_id = sq.bin_root_id
                 FROM (SELECT id AS bin_root_id
                     FROM file_tree_item WHERE parent_id IS NULL AND file_tree_id=%s) as sq
@@ -1223,7 +1223,7 @@ class FileTreeDA(object):
                 WHERE id IN (SELECT id FROM tree ORDER BY level);
 
             UPDATE file_tree_item
-            -- 	this is the main root
+            --     this is the main root
                 SET parent_id = sq.main_root_id
                 FROM (SELECT id AS main_root_id
                     FROM file_tree_item WHERE parent_id IS NULL AND file_tree_id=%s) as sq
@@ -1241,7 +1241,7 @@ class FileTreeDA(object):
                 SELECT
                     file_tree_item.id,
                     parent_id,
-	 				member_file_id,
+                     member_file_id,
                     0 AS level
                 FROM file_tree_item
                 WHERE id = %s

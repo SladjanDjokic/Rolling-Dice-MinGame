@@ -17,7 +17,7 @@ from app.util.session import get_session_cookie, validate_session
 from app.exceptions.member import MemberExistsError, MemberNotFound, MemberDataMissing, MemberExists, MemberContactExists, MemberPasswordMismatch
 from app.exceptions.invite import InviteNotFound, InviteExpired
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
-from app.da.member import MemberContactDA
+from app.da.member import MemberContactDA, MemberVideoMailDA
 from app.da.mail import MailServiceDA
 import app.util.email as sendmail
 
@@ -420,11 +420,13 @@ class ContactMembersOtherInvitationsResource(object):
 
             # contact invitation
             contact_invitations = MemberContactDA.get_all_contact_invitations_by_member_id(session["member_id"])
-            # new message
-            new_messages = MailServiceDA.get_activity_message(session["member_id"])
+            # new text message
+            new_messages = MailServiceDA.get_all_text_mails(session["member_id"])
+            # new media message
+            new_media_messages = MemberVideoMailDA.get_all_media_mails(session["member_id"])
             # group invite
             group_invitations = GroupDA.get_all_group_invitations_by_member_id(session["member_id"])
-            result = contact_invitations + new_messages + group_invitations
+            result = contact_invitations + new_messages + new_media_messages + group_invitations
 
             resp.body = json.dumps({
                 "data": result,
