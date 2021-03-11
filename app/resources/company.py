@@ -49,10 +49,9 @@ class CompanyResource(object):
 
     @staticmethod
     def on_get(req, resp):
-        get_all = req.get_param_as_bool('get_all', default=True)
         member_id = req.get_param('member_id')
 
-        companies = CompanyDA.get_companies(get_all, member_id)
+        companies = CompanyDA.get_companies(member_id)
         resp.body = json.dumps({
             "data": companies,
             "success": True

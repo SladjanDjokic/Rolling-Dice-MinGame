@@ -916,12 +916,15 @@ class MemberContactDA(object):
                     member_session.expiration_date >= current_timestamp
                 LEFT OUTER JOIN company_role_xref ON company_role_xref.member_id = member.id
                 LEFT OUTER JOIN company ON company_role_xref.company_id = company.id
+                LEFT JOIN member_rate ON member_rate.member_id = member.id
             WHERE
                 contact.member_id = %s {filter_conditions_query}
                 {get_contacts_search_query if search_key != "" else ''}
             GROUP BY
                 contact.id,
                 contact.contact_member_id,
+                member_rate.pay_rate,
+            	member_rate.currency_code_id,
                 member.first_name,
                 member.middle_name,
                 member.last_name,
@@ -956,6 +959,8 @@ class MemberContactDA(object):
             SELECT 
                 contact.id as id,
                 contact.contact_member_id as contact_member_id,
+                member_rate.pay_rate as default_pay_rate,
+                member_rate.currency_code_id,
                 member.first_name as first_name,
                 member.middle_name as middle_name,
                 member.last_name as last_name,
@@ -1022,6 +1027,8 @@ class MemberContactDA(object):
                 for (
                         id,
                         contact_member_id,
+                        default_pay_rate,
+                        currency_code_id,
                         first_name,
                         middle_name,
                         last_name,
@@ -1058,6 +1065,8 @@ class MemberContactDA(object):
                     contact = {
                         "id": id,
                         "contact_member_id": contact_member_id,
+                        "default_pay_rate": float(default_pay_rate),
+                        "currency_code_id": currency_code_id,
                         "first_name": first_name,
                         "middle_name": middle_name,
                         "last_name": last_name,
@@ -1973,6 +1982,7 @@ class MemberInfoDA(object):
         except:
             pass
 
+
 class MemberSettingDA(object):
     source = source
 
@@ -2063,9 +2073,9 @@ class MemberSettingDA(object):
 
             member_profile_params = (
                 member_id,) + tuple(2 * [member_profile["online_status"], member_profile["view_profile"],
-                member_profile["add_contact"], member_profile["join_date"], member_profile["login_location"],
-                member_profile["unit_of_measure"], member_profile["timezone_id"], member_profile["date_format"],
-                member_profile["time_format"], member_profile["start_day"]])
+                                         member_profile["add_contact"], member_profile["join_date"], member_profile["login_location"],
+                                         member_profile["unit_of_measure"], member_profile["timezone_id"], member_profile["date_format"],
+                                         member_profile["time_format"], member_profile["start_day"]])
 
             cls.source.execute(member_profile_query, member_profile_params)
             cls.source.commit()

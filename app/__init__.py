@@ -2,6 +2,7 @@ import logging
 import sys
 import os
 import falcon
+
 import importlib
 
 # from falcon_auth import FalconAuthMiddleware, TokenAuthBackend
@@ -50,6 +51,7 @@ from app.resources.avatar import MemberAvatarResource
 from app.resources.activity import ActivitiesResource
 from app.resources.project import ProjectResource
 from app.resources.company import CompanyResource, CompanyUnregisteredResource
+from app.resources.billing import BillingResource
 from app.resources.activity_new import SystemActivitySessionResource, SystemActivitySecurityResource, SystemActivityMessageResource, \
     SystemActivityGroupResource, SystemActivityInvitationsResource
 
@@ -60,6 +62,7 @@ from app.resources.bug_report import BugReportResource, BugReportUsersResource
 
 from app.resources.admin import AdminMemberResource
 
+from app.da.__init__ import migrate_group_members, check_trees
 from app.util.config import setup_vyper
 from app.util.error import error_handler
 from app.util.logging import setup_logging
@@ -125,6 +128,10 @@ def create_app():
     app.add_error_handler(Exception, error_handler)
 
     _setup_routes(app)
+
+    # This will migrate existing data to new group tables
+    migrate_group_members()
+    # check_trees()
 
     return app
 
@@ -365,28 +372,43 @@ def _setup_routes(app):
     # Routes for Chat App
     app.add_route("/chat", ChatView())
 
-    # Call Notifications
+    # Call Notificaitons
 
     # Project
     project_resource = ProjectResource()
     app.add_route("/project", project_resource)
+    app.add_route("/project/{project_id:int}", project_resource)
+    app.add_route("/project/{project_id:int}/soft_delete",
+                  project_resource, suffix="soft_delete")
+    app.add_route("/project/{project_id:int}/restore",
+                  project_resource, suffix="project_restore")
+    app.add_route("/project/{project_id:int}/suspend",
+                  project_resource, suffix="project_suspend")
+    app.add_route("/project/{project_id:int}/unsuspend",
+                  project_resource, suffix="project_unsuspend")
     app.add_route("/project/roles", project_resource, suffix="roles")
     app.add_route("/project/member", project_resource, suffix="member")
     app.add_route("/project/member/roles",
                   project_resource, suffix="member_role")
     app.add_route("/project/member/privilege",
                   project_resource, suffix="member_privilege")
-    app.add_route("/project/epic", project_resource, suffix="epic")
-    app.add_route("/project/tremor", project_resource, suffix="tremor")
-    app.add_route("/project/story", project_resource, suffix="story")
-    app.add_route("/project/epic/{epic_id:int}",
-                  project_resource, suffix="epic")
-    app.add_route("/project/tremor/{tremor_id:int}",
-                  project_resource, suffix="tremor")
-    app.add_route("/project/story/{story_id:int}",
-                  project_resource, suffix="story")
-    app.add_route("/project/task/{task_id:int}",
-                  project_resource, suffix="task")
+    app.add_route("/project/element", project_resource, suffix="element")
+    app.add_route("/project/element/{element_id:int}",
+                  project_resource, suffix="element")
+    app.add_route("/project/element/{element_id:int}/restore",
+                  project_resource, suffix="element_restore")
+    app.add_route("/project/element/{element_id:int}/suspend",
+                  project_resource, suffix="element_suspend")
+    app.add_route("/project/element/{element_id:int}/unsuspend",
+                  project_resource, suffix="element_unsuspend")
+    app.add_route("/project/element/note",
+                  project_resource, suffix="note")
+    app.add_route("/project/element/note/{note_id:int}",
+                  project_resource, suffix="note")
+    app.add_route("/project/element/time",
+                  project_resource, suffix="time")
+    app.add_route("/project/element/time/{time_id:int}",
+                  project_resource, suffix="time")
 
     # Upcoming Events
     app.add_route("/member/event/upcoming", MemberUpcomingEvents())
@@ -413,7 +435,11 @@ def _setup_routes(app):
     app.add_route("/company/member", company_resource, suffix="member")
 
     app.add_route("/company/unregistered", CompanyUnregisteredResource())
-    # Admin Resources
+
+    # Billing resource
+    billing_resource = BillingResource()
+
+    app.add_route("/billing/currency", billing_resource, suffix="currency")
 
     # Admin Resources
     admin_resource = AdminMemberResource()

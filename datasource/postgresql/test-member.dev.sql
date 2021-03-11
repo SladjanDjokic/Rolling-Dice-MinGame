@@ -132,13 +132,13 @@ INSERT INTO member_group
         (2, 'Trollery', 1, '123456', 'MOST_SECURE');
 
 INSERT INTO member_group_membership
-        (group_id, member_id)
+        (group_id, member_id, status)
         VALUES
-        (1, 2),
-        (1, 3),
-        (3, 1),
-        (4, 1),
-        (6, 1);
+        (1, 2, 'active'),
+        (1, 3, 'active'),
+        (3, 1, 'active'),
+        (4, 1, 'active'),
+        (6, 1, 'active');
 
 INSERT INTO invite
         (invite_key, email, expiration, first_name, last_name, inviter_member_id, group_id)
@@ -288,6 +288,15 @@ INSERT INTO member_profile
                 (69, 5,  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent cursus ornare diam in tincidunt. Fusce quis mattis ipsum. Suspendisse eget ligula in augue elementum facilisis quis at lectus. Curabitur at dignissim dolor. Integer eget libero scelerisque, bibendum nunc et, blandit augue. Sed mattis massa sit amet pulvinar tristique. Cras ut dapibus arcu, quis varius arcu. Fusce a gravida eros, nec varius est. Maecenas sagittis risus efficitur tristique facilisis.'),
                 (70, 2,  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent cursus ornare diam in tincidunt. Fusce quis mattis ipsum. Suspendisse eget ligula in augue elementum facilisis quis at lectus. Curabitur at dignissim dolor. Integer eget libero scelerisque, bibendum nunc et, blandit augue. Sed mattis massa sit amet pulvinar tristique. Cras ut dapibus arcu, quis varius arcu. Fusce a gravida eros, nec varius est. Maecenas sagittis risus efficitur tristique facilisis.'),
                 (71, 3, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent cursus ornare diam in tincidunt. Fusce quis mattis ipsum. Suspendisse eget ligula in augue elementum facilisis quis at lectus. Curabitur at dignissim dolor. Integer eget libero scelerisque, bibendum nunc et, blandit augue. Sed mattis massa sit amet pulvinar tristique. Cras ut dapibus arcu, quis varius arcu. Fusce a gravida eros, nec varius est. Maecenas sagittis risus efficitur tristique facilisis.');
+
+do $$
+    begin
+        for r in 1..74 loop
+            INSERT INTO member_rate (member_id, pay_rate, currency_code_id)
+            VALUES (r, floor(random() * 100 + 1), 132);
+            end loop;
+        end;
+$$;
 
 do $$
     begin

@@ -52,3 +52,7 @@ def load(data):
 
 def dump(data, file):
     return ujson.dump(data, file, indent=4, sort_keys=True)
+
+
+def convert_null(input):
+    return None if input == 'null' else input

@@ -21,6 +21,9 @@ class CompanyDA(object):
                 company.city,
                 company.country_code_id,
                 country_code.name as country,
+                currency_code.id AS currency_code_id,
+                currency_code.currency_code,
+                currency_code.currency_name,
                 company.main_phone,
                 company.primary_url,
                 company.logo_storage_id,
@@ -28,7 +31,8 @@ class CompanyDA(object):
                 company.create_date,
                 COALESCE(json_agg(DISTINCT t1.*) FILTER (WHERE t1.id IS NOT NULL), '[]') AS members
             FROM company
-            LEFT JOIN country_code on country_code.id = company.country_code_id
+            LEFT JOIN country_code ON country_code.id = company.country_code_id
+            LEFT JOIN currency_code ON currency_code.id = country_code.currency_code_id
             LEFT OUTER JOIN file_storage_engine ON file_storage_engine.id = company.logo_storage_id
             LEFT OUTER JOIN company_role_xref crx on crx.company_id = company.id
             LEFT OUTER JOIN (
@@ -49,6 +53,9 @@ class CompanyDA(object):
                 company.city,
                 company.country_code_id,
                 country_code.name,
+                currency_code.id,
+                currency_code.currency_code,
+                currency_code.currency_name,
                 company.main_phone,
                 company.primary_url,
                 company.logo_storage_id,
@@ -68,6 +75,9 @@ class CompanyDA(object):
                 city,
                 country_code_id,
                 country,
+                currency_code_id,
+                currency_code,
+                currency_name,
                 main_phone,
                 primary_url,
                 logo_storage_id,
@@ -83,6 +93,9 @@ class CompanyDA(object):
                 "city": city,
                 "country_code_id": country_code_id,
                 "country": country,
+                "currency_code_id": currency_code_id,
+                "currency_code": currency_code,
+                "currency_name": currency_name,
                 "main_phone": main_phone,
                 "primary_url": primary_url,
                 "logo_storage_id": logo_storage_id,
@@ -94,7 +107,7 @@ class CompanyDA(object):
         return None
 
     @classmethod
-    def get_companies(cls, get_all, member_id):
+    def get_companies(cls, member_id):
         query = (f"""
             SELECT
                 company.id,
@@ -104,6 +117,9 @@ class CompanyDA(object):
                 company.city,
                 company.country_code_id,
                 country_code.name as country,
+                currency_code.id AS currency_code_id,
+                currency_code.currency_code,
+                currency_code.currency_name,
                 company.main_phone,
                 company.primary_url,
                 company.logo_storage_id,
@@ -112,7 +128,8 @@ class CompanyDA(object):
                 company.update_date,
                 COALESCE(json_agg(DISTINCT t1.*) FILTER (WHERE t1.id IS NOT NULL), '[]') AS members
             FROM company
-            LEFT JOIN country_code on country_code.id = company.country_code_id
+            LEFT JOIN country_code ON country_code.id = company.country_code_id
+            LEFT JOIN currency_code ON currency_code.id = country_code.currency_code_id
             LEFT OUTER JOIN file_storage_engine ON file_storage_engine.id = company.logo_storage_id
             LEFT OUTER JOIN company_role_xref crx on crx.company_id = company.id
             LEFT OUTER JOIN (
@@ -134,7 +151,7 @@ class CompanyDA(object):
                 LEFT JOIN member_profile ON member.id = member_profile.member_id
                 LEFT JOIN file_storage_engine ON file_storage_engine.id = member_profile.profile_picture_storage_id
             ) as t1 ON t1.company_id = crx.company_id
-            {"WHERE crx.member_id = %s" if not get_all else ""}
+            {"WHERE crx.member_id = %s" if member_id else ""}
             GROUP BY
                 company.id,
                 company.name,
@@ -142,6 +159,9 @@ class CompanyDA(object):
                 company.address_2,
                 company.city,
                 company.country_code_id,
+                currency_code.id,
+                currency_code.currency_code,
+                currency_code.currency_name,
                 country_code.name,
                 company.main_phone,
                 company.primary_url,
@@ -152,7 +172,7 @@ class CompanyDA(object):
         """)
         companies = []
         params = None
-        if not get_all:
+        if member_id:
             params = (member_id,)
 
         cls.source.execute(query, params)
@@ -165,6 +185,9 @@ class CompanyDA(object):
                 city,
                 country_code_id,
                 country,
+                currency_code_id,
+                currency_code,
+                currency_name,
                 main_phone,
                 primary_url,
                 logo_storage_id,
@@ -181,6 +204,9 @@ class CompanyDA(object):
                     "city": city,
                     "country_code_id": country_code_id,
                     "country": country,
+                    "currency_code_id": currency_code_id,
+                    "currency_code": currency_code,
+                    "currency_name": currency_name,
                     "main_phone": main_phone,
                     "primary_url": primary_url,
                     "logo_storage_id": logo_storage_id,
@@ -202,7 +228,8 @@ class CompanyDA(object):
             RETURNING id
         """)
 
-        params = (name, address_1, address_2, city, country_code_id, main_phone, primary_url, logo_storage_id)
+        params = (name, address_1, address_2, city, country_code_id,
+                  main_phone, primary_url, logo_storage_id)
         cls.source.execute(query, params)
         id = cls.source.get_last_row_id()
 
@@ -227,7 +254,8 @@ class CompanyDA(object):
             WHERE id = %s
         """)
 
-        params = (name, address_1, address_2, city, country_code_id, main_phone, primary_url, logo_storage_id, company_id)
+        params = (name, address_1, address_2, city, country_code_id,
+                  main_phone, primary_url, logo_storage_id, company_id)
 
         cls.source.execute(query, params)
 

@@ -8,7 +8,34 @@ from app.exceptions.data import DuplicateKeyError, DataMissingError, \
 from app.exceptions.invite import InviteExistsError, InviteDataMissingError, \
     InviteInvalidInviterError
 from app.util.filestorage import amerize_url
+from app.da.file_sharing import FileTreeDA
+from app.config import settings
 from app.util.security import SECURITY_EXCHANGE_OPTIONS
+from enum import Enum
+
+
+class GroupRole(Enum):
+    OWNER = 'owner'
+    ADMIN = 'administrator'
+    STANDARD = 'standard'
+
+
+class GroupMemberStatus(Enum):
+    ACTIVE = 'active'
+    INACTIVE = 'inactive'
+    DISABLED = 'disabled'
+    TEMP = 'temporary'
+    INVITED = 'invited'
+    DECLINED = 'declined'
+
+
+class GroupExchangeOptions(Enum):
+    NO_ENCRYPTION = 'NO_ENCRYPTION'
+    LEAST_SECURE = 'LEAST_SECURE'
+    SECURE = 'SECURE'
+    VERY_SECURE = 'VERY_SECURE'
+    MOST_SECURE = 'MOST_SECURE'
+
 
 logger = logging.getLogger(__name__)
 
@@ -21,19 +48,29 @@ class GroupDA(object):
         return cls.__get_group('id', group_id)
 
     @classmethod
-    def __get_group(cls, key, value):
-        query = ("""
+    def __get_group(cls, key, value, group_type='contact'):
+        query = (f"""
             SELECT
                 id,
-                group_leader_id,
+                (
+                    SELECT member_id
+                    FROM member_group_membership
+                    WHERE group_id = member_group.id
+                    AND group_role = 'owner'
+                ) AS group_leader_id,
                 group_name,
                 create_date,
-                update_date
+                update_date,
+                (
+                    SELECT COUNT(*)
+                    FROM member_group_membership
+                    WHERE group_id = member_group.id
+                ) AS total_member
             FROM member_group
-            WHERE {} = %s
-            """.format(key))
+            WHERE {key} = %s AND group_type = %s
+        """)
 
-        params = (value,)
+        params = (value, group_type)
         cls.source.execute(query, params)
         if cls.source.has_results():
             for (
@@ -42,6 +79,7 @@ class GroupDA(object):
                     group_name,
                     create_date,
                     update_date,
+                    total_member
             ) in cls.source.cursor:
                 group = {
                     "group_id": id,
@@ -49,7 +87,7 @@ class GroupDA(object):
                     "group_name": group_name,
                     "create_date": create_date,
                     "update_date": update_date,
-                    "total_member": 0
+                    "total_member": total_member
                 }
 
                 return group
@@ -57,19 +95,19 @@ class GroupDA(object):
         return None
 
     @classmethod
-    def get_group_by_name_and_leader_id(cls, group_leader_id, group_name):
+    def get_group_by_name_and_owner_id(cls, group_name, owner_id, group_type='contact'):
         query = ("""
             SELECT
                 id,
-                group_leader_id,
+                member_id as group_leader_id,
                 group_name,
-                create_date,
-                update_date
+                member_group.create_date,
+                member_group.update_date
             FROM member_group
-            WHERE group_leader_id = %s AND group_name = %s
+            LEFT JOIN member_group_membership ON member_group_membership.group_id = member_group.id
+            WHERE group_type = %s AND group_name = %s AND member_group_membership.member_id = %s AND member_group_membership.group_role = 'owner'
         """)
-
-        params = (group_leader_id, group_name,)
+        params = (group_type, group_name, owner_id)
         cls.source.execute(query, params)
         if cls.source.has_results():
             for (
@@ -92,13 +130,13 @@ class GroupDA(object):
         return None
 
     @classmethod
-    def get_groups_by_group_leader_id(cls, group_leader_id, sort_params, search_key = None):
+    def get_groups_by_group_leader_id(cls, group_leader_id, sort_params, group_type='contact', search_key=None):
         sort_columns_string = 'group_name ASC'
         if sort_params:
             group_dict = {
                 'group_id': 'member_group.id',
-                'group_leader_id': 'member_group.group_leader_id',
-                'group_name': 'member_group.group_name',
+                'group_leader_id': 'member_group_membership.member_id',
+                'group_name': 'group_name',
                 'group_create_date': 'member_group.create_date',
                 'group_update_date': 'member_group.update_date',
                 'group_leader_first_name': 'member.first_name',
@@ -110,57 +148,192 @@ class GroupDA(object):
             sort_columns_string = cls.formatSortingParams(
                 sort_params, group_dict) or sort_columns_string
 
-        group_list = list()
         query = (f"""
             SELECT
-                member_group.id,
-                member_group.group_leader_id,
-                member_group.group_name,
-                member_group.exchange_option,
-                member_group.status,
-                'group_leader' as group_role,
-                member_group.create_date,
-                member_group.update_date,
-                NULL as group_join_date,
+                member_group.id AS group_id,
+                member_group_membership.member_id AS group_leader_id,
+                group_name,
+                exchange_option AS group_exchange_option,
+                member_group.status AS group_status,
+                member_group_membership.group_role AS group_role,
+                member_group.create_date AS group_create_date,
+                member_group.update_date AS group_create_date,
+                member_group_membership.create_date AS group_join_date,
                 member.first_name AS group_leader_first_name,
                 member.last_name AS group_leader_last_name,
                 member.email AS group_leader_email,
-                count(DISTINCT member_group_membership.member_id) AS total_member,
-                count(DISTINCT file_tree_item.id) AS total_files,
-            --     Members TODO: THIS QUERY NEEDS IMPROVEMENT
-                (
-                    SELECT json_agg(group_members) as members
-                    FROM (
-                        SELECT
-                            member_group_membership.member_id as id,
-                            member.first_name as first_name,
-                            member.last_name as last_name,
-                            member.email as email,
-                            member.company_name as company,
-                            job_title.name as title,
-                            file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url,
-                            member_group_membership.create_date as create_date
-                        FROM member_group_membership
-                        LEFT JOIN member ON member_group_membership.member_id = member.id 
-                        LEFT JOIN job_title ON member.job_title_id = job_title.id
-                        LEFT JOIN member_profile ON member.id = member_profile.member_id
-                        LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id 
-                        WHERE member_group_membership.group_id = member_group.id
-                    ) AS group_members
-                )
+                COUNT(DISTINCT(members.id)) AS total_member,
+                (SELECT json_agg(members)) AS members,
+                count(DISTINCT file_tree_item.id) AS total_files
             FROM member_group
-            LEFT JOIN member ON member_group.group_leader_id = member.id
-            LEFT JOIN member_group_membership ON (member_group_membership.group_id = member_group.id)
-            LEFT OUTER JOIN file_tree ON (file_tree.id = member_group.main_file_tree)
-            LEFT OUTER JOIN (
-            SELECT id, file_tree_id
-            FROM file_tree_item
-            WHERE file_tree_item.member_file_id is NOT NULL
-            ) as file_tree_item ON (file_tree_item.file_tree_id = file_tree.id)
-            WHERE
-                member_group.group_leader_id = %s
-                AND
-                member_group.status = 'active'
+            INNER JOIN member_group_membership ON member_group.id = member_group_membership.group_id
+            LEFT JOIN member ON member.id = member_group_membership.member_id
+            LEFT JOIN (
+                SELECT
+                    member_group_membership.member_id as id,
+                    member.first_name as first_name,
+                    member.last_name as last_name,
+                    member.email as email,
+                    member.company_name as company,
+                    job_title.name as title,
+                    file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url,
+                    member_group_membership.create_date as create_date,
+                    member_group_membership.group_id as group_id
+                FROM member_group_membership
+                LEFT JOIN member ON member_group_membership.member_id = member.id
+                LEFT JOIN job_title ON member.job_title_id = job_title.id
+                LEFT JOIN member_profile ON member.id = member_profile.member_id
+                LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+            ) AS members ON members.group_id = member_group.id
+            LEFT JOIN file_tree ON (file_tree.id = member_group.main_file_tree)
+            LEFT JOIN (
+                        SELECT id, file_tree_id
+                        FROM file_tree_item
+                        WHERE file_tree_item.member_file_id IS NOT NULL
+                    ) as file_tree_item ON file_tree_item.file_tree_id = file_tree.id
+            WHERE member_group_membership.member_id = %s AND member_group_membership.group_role = 'owner' AND group_type = %s
+            AND (
+                    member_group.group_name ILIKE %s
+                    OR concat_ws(' ', member.first_name, member.last_name) ILIKE %s
+                    OR member.email ILIKE %s
+                    OR concat('create year ', EXTRACT(YEAR FROM member_group.create_date)) LIKE %s
+                    OR concat('create month ', EXTRACT(MONTH FROM member_group.create_date)) LIKE %s
+                    OR concat('create month ', to_char(member_group.create_date, 'month')) LIKE %s
+                    OR concat('create day ', EXTRACT(DAY FROM member_group.create_date)) LIKE %s
+                    OR concat('create day ', to_char(member_group.create_date, 'day')) LIKE %s
+                    OR concat('update year ', EXTRACT(YEAR FROM member_group.update_date)) LIKE %s
+                    OR concat('update month ', EXTRACT(MONTH FROM member_group.update_date)) LIKE %s
+                    OR concat('update month ', to_char(member_group.update_date, 'month')) LIKE %s
+                    OR concat('update day ', EXTRACT(DAY FROM member_group.update_date)) LIKE %s
+                    OR concat('update day ', to_char(member_group.update_date, 'day')) LIKE %s
+                )
+            GROUP BY member_group.id,
+                    member_group_membership.member_id,
+                    group_name,
+                    exchange_option,
+                    member_group.status,
+                    member_group_membership.group_role,
+                    member_group.create_date,
+                    member_group.update_date,
+                    member_group_membership.create_date,
+                    member.first_name,
+                    member.last_name,
+                    member.email
+            ORDER BY {sort_columns_string}
+        """)
+
+        group_list = list()
+
+        if not search_key:
+            search_key = ""
+
+        like_search_key = f"%{search_key}%"
+        params = (group_leader_id, group_type) + tuple(13 * [like_search_key])
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            all_group = cls.source.cursor.fetchall()
+            for row in all_group:
+                group = {
+                    "group_id": row[0],
+                    "group_leader_id": row[1],
+                    "group_name": row[2],
+                    "group_exchange_option": SECURITY_EXCHANGE_OPTIONS.get(row[3]),
+                    "group_status": row[4],
+                    "group_role": row[5],
+                    "group_create_date": row[6],
+                    "group_update_date": row[7],
+                    "group_join_date": row[8],
+                    "group_leader_first_name": row[9],
+                    "group_leader_last_name": row[10],
+                    "group_leader_email": row[11],
+                    "total_member": row[12],
+                    "total_files": row[14],
+                    "members": row[13],
+                    "group_leader_name": f'{row[9]} {row[10]}'
+                }
+                group_list.append(group)
+
+        return group_list
+
+    @classmethod
+    def get_all_groups_by_member_id(cls, member_id, sort_params, group_type='contact', member_only=False, search_key=None):
+        sort_columns_string = 'member_group.group_name ASC'
+        if sort_params:
+            entity_dict = {
+                'group_id': 'member_group.id',
+                'group_leader_id': 'gl.group_leader_id',
+                'group_name': 'group_name',
+                'group_exchange_option': 'exchange_option',
+                'group_status': 'member_group.status',
+                'group_role': 'member_group_membership.group_role',
+                'group_create_date': 'member_group.create_date',
+                'group_update_date': 'member_group.update_date',
+                'group_join_date': 'member_group_membership.create_date',
+                'group_leader_first_name': 'gl.group_leader_first_name',
+                'group_leader_last_name': 'gl.group_leader_last_name',
+                'group_leader_email': 'gl.group_leader_email',
+                'total_member': 'total_member',
+                'total_files': 'total_files'
+            }
+            sort_columns_string = cls.formatSortingParams(
+                sort_params, entity_dict) or sort_columns_string
+
+        query = (f"""
+          SELECT
+                member_group.id as group_id,
+                gl.group_leader_id,
+                group_name,
+                exchange_option as group_exchange_option,
+                member_group.status as group_status,
+                member_group_membership.group_role as group_role,
+                member_group.create_date as group_create_date,
+                member_group.update_date as group_create_date,
+                member_group_membership.create_date as group_join_date,
+                gl.group_leader_first_name,
+                gl.group_leader_last_name,
+                gl.group_leader_email,
+                COUNT(DISTINCT(members.id)) AS total_member,
+                (SELECT json_agg(members)) as members,
+                count(DISTINCT file_tree_item.id) AS total_files
+            FROM member_group
+            INNER JOIN member_group_membership ON member_group.id = member_group_membership.group_id
+            LEFT JOIN member ON member.id = member_group_membership.member_id
+            LEFT JOIN (
+                SELECT
+                    group_id,
+                    member_id AS group_leader_id,
+                    member.first_name AS group_leader_first_name,
+                    member.last_name AS group_leader_last_name,
+                    member.email AS group_leader_email
+                FROM member_group_membership
+                LEFT JOIN member ON member.id = member_group_membership.member_id
+                WHERE group_role = 'owner'
+            ) AS gl ON gl.group_id = member_group.id
+            LEFT JOIN (
+                SELECT
+                    member_group_membership.member_id as id,
+                    member.first_name as first_name,
+                    member.last_name as last_name,
+                    member.email as email,
+                    member.company_name as company,
+                    job_title.name as title,
+                    file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url,
+                    member_group_membership.create_date as create_date,
+                    member_group_membership.group_id as group_id
+                FROM member_group_membership
+                LEFT JOIN member ON member_group_membership.member_id = member.id
+                LEFT JOIN job_title ON member.job_title_id = job_title.id
+                LEFT JOIN member_profile ON member.id = member_profile.member_id
+                LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+            ) AS members ON members.group_id = member_group.id
+            LEFT JOIN file_tree ON (file_tree.id = member_group.main_file_tree)
+            LEFT JOIN (
+                        SELECT id, file_tree_id
+                        FROM file_tree_item
+                        WHERE file_tree_item.member_file_id IS NOT NULL
+                    ) as file_tree_item ON file_tree_item.file_tree_id = file_tree.id
+            WHERE member_group_membership.member_id = %s AND group_type = %s {"AND group_role != 'owner'" if member_only else ""}
+                AND member_group.status = 'active'
                 AND
                 (
                     member_group.group_name ILIKE %s
@@ -177,163 +350,28 @@ class GroupDA(object):
                     OR concat('update day ', EXTRACT(DAY FROM member_group.update_date)) LIKE %s
                     OR concat('update day ', to_char(member_group.update_date, 'day')) LIKE %s
                 )
-            GROUP BY
-                member_group.id,
-                member_group.group_leader_id,
-                member_group.group_name,
-                member_group.exchange_option,
-                member_group.status,
-                member_group.create_date,
-                member_group.update_date,
-                member.first_name,
-                member.last_name,
-                member.email
+            GROUP BY member_group.id,
+                    gl.group_leader_id,
+                    group_name,
+                    exchange_option,
+                    member_group.status,
+                    member_group_membership.group_role,
+                    member_group.create_date,
+                    member_group.update_date,
+                    member_group_membership.create_date,
+                    gl.group_leader_first_name,
+                    gl.group_leader_last_name,
+                    gl.group_leader_email
             ORDER BY {sort_columns_string}
         """)
 
+        group_list = list()
         if not search_key:
             search_key = ""
 
         like_search_key = f"%{search_key}%"
-        params = (group_leader_id, ) + tuple(13 * [like_search_key])
-        cls.source.execute(query, params)
-        if cls.source.has_results():
-            all_group = cls.source.cursor.fetchall()
-            for row in all_group:
-                group = {
-                    "group_id": row[0],
-                    "group_leader_id": row[1],
-                    "group_name": row[2],
-                    "group_exchange_option": SECURITY_EXCHANGE_OPTIONS.get(row[3]),
-                    "group_status": row[4],
-                    "group_role": row[5],
-                    "group_create_date": row[6],
-                    "group_update_date": row[7],
-                    "group_join_date": row[8],
-                    "group_leader_first_name": row[9],
-                    "group_leader_last_name": row[10],
-                    "group_leader_email": row[11],
-                    "total_member": row[12],
-                    "total_files": row[13],
-                    "members": row[14],
-                    "group_leader_name": f'{row[9]} {row[10]}'
-                }
-                group_list.append(group)
+        params = (member_id, group_type) + tuple(13 * [like_search_key])
 
-        return group_list
-
-    @classmethod
-    def get_all_groups_by_member_id(cls, member_id, sort_params):
-        sort_columns_string = 'member_groups.group_name ASC'
-        if sort_params:
-            entity_dict = {
-                'group_id': 'member_groups.id',
-                'group_leader_id': 'member_groups.group_leader_id',
-                'group_name': 'member_groups.group_name',
-                'group_exchange_option': 'member_groups.group_exchange_option',
-                'group_status': 'member_groups.group_status',
-                'group_role': 'member_groups.group_role',
-                'group_create_date': 'member_groups.group_create_date',
-                'group_update_date': 'member_groups.group_update_date',
-                'group_join_date': 'member_groups.group_join_date',
-                'group_leader_first_name': 'member.first_name',
-                'group_leader_last_name': 'member.last_name',
-                'group_leader_email': 'member.email',
-                'total_member': 'total_member',
-                'total_files': 'total_files'
-            }
-            sort_columns_string = cls.formatSortingParams(
-                sort_params, entity_dict) or sort_columns_string
-
-        group_list = list()
-        query = (f"""
-          SELECT member_groups.group_id,
-                member_groups.group_leader_id,
-                member_groups.group_name,
-                member_groups.group_exchange_option,
-                member_groups.group_status,
-                member_groups.group_role,
-                member_groups.group_create_date,
-                member_groups.group_update_date,
-                member_groups.group_join_date,
-                member.first_name AS group_leader_first_name,
-                member.last_name AS group_leader_last_name,
-                member.email AS group_leader_email,
-                count(DISTINCT group_membership_member.member_id) AS total_member,
-                count(DISTINCT file_tree_item.id) AS total_files,
-                 --     Members TODO: THIS QUERY NEEDS IMPROVEMENT
-                (
-                    SELECT json_agg(group_members) as members
-                    FROM (
-                        SELECT
-                            member_group_membership.member_id as id,
-                            member.first_name as first_name,
-                            member.last_name as last_name,
-                            member.email as email,
-                            member.company_name as company,
-                            job_title.name as title,
-                            file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url,
-                            member_group_membership.create_date as create_date
-                        FROM member_group_membership
-                        LEFT JOIN member ON member_group_membership.member_id = member.id 
-                        LEFT JOIN job_title ON member.job_title_id = job_title.id
-                        LEFT JOIN member_profile ON member.id = member_profile.member_id
-                        LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id 
-                        WHERE member_group_membership.group_id = member_groups.group_id
-                    ) AS group_members
-                )
-          FROM ( SELECT member_group.id AS group_id,
-                      member_group.group_leader_id,
-                      member_group.group_name,
-                      member_group.exchange_option AS group_exchange_option,
-                      member_group.status AS group_status,
-                      'group_leader' as group_role,
-                      member_group.create_date AS group_create_date,
-                      member_group.update_date AS group_update_date,
-                      NULL as group_join_date,
-                      member_group.main_file_tree,
-                      member_group.bin_file_tree
-              FROM member_group
-              WHERE member_group.group_leader_id = %s
-              UNION
-              SELECT member_group.id AS group_id,
-                          member_group.group_leader_id,
-                          member_group.group_name,
-                          member_group.exchange_option AS group_exchange_option,
-                          member_group.status AS group_status,
-                          'group_member' as group_role,
-                          member_group.create_date AS group_create_date,
-                          member_group.update_date AS group_update_date,
-                          member_group_membership.create_date as group_join_date,
-                          member_group.main_file_tree,
-                          member_group.bin_file_tree
-              FROM member_group
-              INNER JOIN member_group_membership ON (member_group.id = member_group_membership.group_id)
-              WHERE member_group_membership.member_id = %s ) AS member_groups
-          LEFT OUTER JOIN member_group_membership AS group_membership_member ON (group_membership_member.group_id = member_groups.group_id)
-          LEFT OUTER JOIN member AS group_member_detail ON (group_membership_member.member_id = group_member_detail.id)
-          LEFT OUTER JOIN file_tree ON (file_tree.id = member_groups.main_file_tree)
-          LEFT OUTER JOIN (
-            SELECT id, file_tree_id
-            FROM file_tree_item
-            WHERE file_tree_item.member_file_id is NOT NULL
-          ) as file_tree_item ON (file_tree_item.file_tree_id = file_tree.id)
-          INNER JOIN member ON member_groups.group_leader_id = member.id
-          GROUP BY member_groups.group_id,
-                  member_groups.group_leader_id,
-                  member_groups.group_name,
-                  member_groups.group_exchange_option,
-                  member_groups.group_status,
-                  member_groups.group_role,
-                  member_groups.group_create_date,
-                  member_groups.group_update_date,
-                  member_groups.group_join_date,
-                  member.first_name,
-                  member.last_name,
-                  member.email
-          ORDER BY {sort_columns_string}
-        """)
-        params = (member_id, member_id)
         cls.source.execute(query, params)
 
         if cls.source.has_results():
@@ -353,17 +391,10 @@ class GroupDA(object):
                     "group_leader_last_name": row[10],
                     "group_leader_email": row[11],
                     "total_member": row[12],
-                    "total_files": row[13],
-                    "members": row[14],
+                    "total_files": row[14],
+                    "members": row[13],
                     "group_leader_name": f'{row[9]} {row[10]}'
                 }
-                # group["members"] = [{
-                #     "id": m["f1"],
-                #     "first_name": m["f2"],
-                #     "last_name": m["f3"],
-                #     "email": m["f4"],
-                #     "create_date": m["f5"]
-                # } for m in group["members"]]
                 group_list.append(group)
 
         return group_list
@@ -406,15 +437,15 @@ class GroupDA(object):
         return id
 
     @classmethod
-    def create_expanded_group(cls, member_id, group_name, picture_file_id, pin, exchange_option, main_file_tree, bin_file_tree, commit=True):
+    def create_expanded_group(cls, group_name, picture_file_id, pin, main_file_tree, bin_file_tree, exchange_option, group_type='contact', commit=True):
         query = ("""
-            INSERT INTO member_group (group_leader_id, group_name, picture_file_id, pin, exchange_option, main_file_tree, bin_file_tree)
+            INSERT INTO member_group (group_name, picture_file_id, pin, exchange_option, main_file_tree, bin_file_tree, group_type)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING id
         """)
 
-        params = (member_id, group_name, picture_file_id, pin,
-                  exchange_option, main_file_tree, bin_file_tree)
+        params = (group_name, picture_file_id, pin,
+                  exchange_option, main_file_tree, bin_file_tree, group_type)
 
         cls.source.execute(query, params)
         id = cls.source.get_last_row_id()
@@ -439,13 +470,17 @@ class GroupDA(object):
         except Exception as err:
             raise err
 
+    """
+    Used only in population scripts so no need to separate project and contact groups
+    """
     @classmethod
     def get_all_groups(cls):
         groups = list()
         query = ("""
-            SELECT 
-                id, 
-                main_file_tree, 
+            SELECT
+                id,
+                group_leader_id,
+                main_file_tree,
                 bin_file_tree
             FROM member_group
         """)
@@ -453,11 +488,13 @@ class GroupDA(object):
         if cls.source.has_results():
             for (
                     group_id,
+                    group_leader_id,
                     main_file_tree,
                     bin_file_tree
             ) in cls.source.cursor:
                 group = {
                     "group_id": group_id,
+                    "group_leader_id": group_leader_id,
                     "main_file_tree": main_file_tree,
                     "bin_file_tree": bin_file_tree
                 }
@@ -468,7 +505,7 @@ class GroupDA(object):
 
     @classmethod
     def assign_tree(cls, tree_type, group_id, tree_id):
-        ''' 
+        '''
             This is used to assign a tree id to an existing groups for migration purposes
         '''
         main_query = ("""
@@ -490,7 +527,10 @@ class GroupDA(object):
     @classmethod
     def get_security(cls, group_id):
         query = """
-            SELECT member_group.picture_file_id, member_group.pin, member_group.exchange_option,
+            SELECT
+                member_group.picture_file_id,
+                member_group.pin,
+                member_group.exchange_option,
                 file_storage_engine.storage_engine_id as security_picture
             FROM member_group
                 LEFT JOIN file_storage_engine ON file_storage_engine.id = member_group.picture_file_id
@@ -534,6 +574,26 @@ class GroupDA(object):
             raise err
 
     @classmethod
+    def create_group_with_trees(cls, name, exchange_option, group_type, file_id=None, pin=None):
+        # First we create empty file trees
+        main_file_tree_id, file_tree_id = FileTreeDA().create_tree('main', 'group', True)
+        bin_file_tree_id = FileTreeDA().create_tree('bin', 'group')
+
+        # Add default folders for Drive
+        default_drive_folders = settings.get('drive.default_folders')
+        default_drive_folders.sort()
+
+        for folder_name in default_drive_folders:
+            FileTreeDA().create_file_tree_entry(
+                tree_id=main_file_tree_id,
+                parent_id=file_tree_id,
+                member_file_id=None,
+                display_name=folder_name
+            )
+
+        group_id = cls.create_expanded_group(group_name=name,picture_file_id=file_id, pin=pin, exchange_option=exchange_option,main_file_tree=main_file_tree_id,bin_file_tree=bin_file_tree_id,group_type=group_type)
+        return group_id
+
     def get_all_group_invitations_by_member_id(cls, member_id, is_history=False):
         groups = list()
 
@@ -604,25 +664,14 @@ class GroupMembershipDA(object):
     source = source
 
     @classmethod
-    def create_group_membership(cls, group_id, member_id, commit=True):
+    def create_group_membership(cls, group_id, member_id, status=GroupMemberStatus.INVITED.value, group_role=GroupRole.STANDARD.value, commit=True):
         try:
             query = ("""
-                SELECT group_leader_id
-                FROM member_group
-                WHERE id = %s
-            """)
-            params = (group_id,)
-            cls.source.execute(query, params)
-            group_leader_id = cls.source.cursor.fetchone()[0]
-            if group_leader_id == member_id:
-                return None
-
-            query = ("""
-                INSERT INTO member_group_membership (group_id, member_id, status)
-                VALUES (%s, %s, %s)
+                INSERT INTO member_group_membership (group_id, member_id, status, group_role)
+                VALUES (%s, %s, %s, %s)
                 RETURNING member_id
             """)
-            params = (group_id, member_id, 'invited')
+            params = (group_id, member_id, status, group_role)
             cls.source.execute(query, params)
             id = cls.source.get_last_row_id()
             if commit:
@@ -636,154 +685,22 @@ class GroupMembershipDA(object):
     def bulk_create_group_membership(cls, group_leader_id, group_id, members, commit=True):
         try:
             query = ("""
-                INSERT INTO member_group_membership (group_id, member_id, status)
+                INSERT INTO member_group_membership (group_id, member_id, status, group_role)
                 VALUES %s
             """)
 
-            members = filter(lambda x: x != group_leader_id, members)
-
-            params = [(group_id, x, 'invited') for x in members]
+            params = [(group_id, x, GroupMemberStatus.INVITED.value,
+                       GroupRole.STANDARD.value) for x in members]
+            params.append((group_id, group_leader_id,
+                           GroupMemberStatus.ACTIVE.value, GroupRole.OWNER.value))
             params = tuple(params)
 
             cls.source.execute(query, params, True)
-
             if commit:
                 cls.source.commit()
+
         except Exception:
             logger.exception('UNable to bulk create group membership')
-            return None
-
-    @classmethod
-    def get_group_membership_by_member_id(cls, member_id, sort_params, search_key=None):
-        sort_columns_string = 'member_group.create_date DESC'
-        if sort_params:
-            group_dict = {
-                'group_id': 'member_group.id',
-                'group_name': 'member_group.group_name',
-                'group_create_date': 'member_group.create_date',
-                'group_update_date': 'member_group.update_date',
-                'group_leader_id': 'member.id',
-                'group_leader_first_name': 'member.first_name',
-                'group_leader_last_name': 'member.last_name',
-                'group_leader_email': 'member.email',
-                'create_date': 'member_group_membership.create_date',
-                'update_date': 'member_group_membership.update_date',
-                'total_member': 'member_count',
-                'total_files': 'file_count'
-            }
-            sort_columns_string = formatSortingParams(
-                sort_params, group_dict) or sort_columns_string
-        try:
-            query = (f"""
-                SELECT 
-                    member_group.id AS group_id,
-                    member_group.group_name,
-                    member_group.create_date,
-                    member_group.update_date,
-                    member.id AS member_id,
-                    member.first_name,
-                    member.last_name,
-                    member.email,
-                    member_group_membership.create_date,
-                    member_group_membership.update_date,
-                    count(DISTINCT group_membership_member.member_id) AS member_count,
-                    count(DISTINCT file_tree_item.id) AS file_count,
-                    json_agg(DISTINCT ( group_member_detail.id,
-                                group_member_detail.first_name,
-                                group_member_detail.last_name,
-                                group_member_detail.email,
-                                group_membership_member.create_date)
-                        ) AS members
-                FROM member_group_membership
-                INNER JOIN member_group ON (member_group.id = member_group_membership.group_id)
-                LEFT OUTER JOIN member_group_membership AS group_membership_member ON (group_membership_member.group_id = member_group.id)
-                LEFT OUTER JOIN member AS group_member_detail ON (group_membership_member.member_id = group_member_detail.id)
-                LEFT OUTER JOIN file_tree ON (file_tree.id = member_group.main_file_tree)
-                LEFT OUTER JOIN (
-                  SELECT id, file_tree_id
-                  FROM file_tree_item
-                  WHERE file_tree_item.member_file_id is NOT NULL
-                ) as file_tree_item ON (file_tree_item.file_tree_id = file_tree.id)
-                INNER JOIN member ON member_group.group_leader_id = member.id
-                WHERE 
-                    member_group_membership.member_id = %s
-                    AND
-                    (
-                        member_group.group_name ILIKE %s
-                        OR concat_ws(' ', member.first_name, member.last_name) ILIKE %s
-                        OR member.email ILIKE %s
-                        OR concat('create year ', EXTRACT(YEAR FROM member_group.create_date)) LIKE %s
-                        OR concat('create month ', EXTRACT(MONTH FROM member_group.create_date)) LIKE %s
-                        OR concat('create month ', to_char(member_group.create_date, 'month')) LIKE %s
-                        OR concat('create day ', EXTRACT(DAY FROM member_group.create_date)) LIKE %s
-                        OR concat('create day ', to_char(member_group.create_date, 'day')) LIKE %s
-                        OR concat('update year ', EXTRACT(YEAR FROM member_group.update_date)) LIKE %s
-                        OR concat('update month ', EXTRACT(MONTH FROM member_group.update_date)) LIKE %s
-                        OR concat('update month ', to_char(member_group.update_date, 'month')) LIKE %s
-                        OR concat('update day ', EXTRACT(DAY FROM member_group.update_date)) LIKE %s
-                        OR concat('update day ', to_char(member_group.update_date, 'day')) LIKE %s
-                    )
-                GROUP BY member_group.id,
-                        member_group.group_name,
-                        member_group.create_date,
-                        member_group.update_date,
-                        member.id,
-                        member.first_name,
-                        member.last_name,
-                        member.email,
-                        member_group_membership.create_date,
-                        member_group_membership.update_date
-                ORDER BY {sort_columns_string}
-            """)
-
-            if not search_key:
-                search_key = ''
-
-            like_search_key = f"%{search_key}%"
-            params = (member_id, ) + tuple(13 * [like_search_key])
-            group_list = list()
-            cls.source.execute(query, params)
-            if cls.source.has_results():
-                for elem in cls.source.cursor.fetchall():
-                    # {
-                    #     "f1": 3,
-                    #     "f2": "taylor" ,
-                    #     "f3": "user",
-                    #     "f4": "donald@email.com",
-                    #     "f5":"2020-09-23T16:27:16.11328+00:00"
-                    # }
-                    # id
-                    # first_name
-                    # last_name
-                    # email
-                    # create_date
-                    group = {
-                        "group_id": elem[0],
-                        "group_name": elem[1],
-                        "group_create_date": elem[2],
-                        "group_update_date": elem[3],
-                        "group_leader_id": elem[4],
-                        "group_leader_name": f'{elem[5]} {elem[6]}',
-                        "group_leader_first_name": elem[5],
-                        "group_leader_last_name": elem[6],
-                        "group_leader_email": elem[7],
-                        "create_date": elem[8],
-                        "update_date": elem[9],
-                        "total_member": elem[10],
-                        "total_files": elem[11],
-                        "members": elem[12]
-                    }
-                    group["members"] = [{
-                        "id": m["f1"],
-                        "first_name": m["f2"],
-                        "last_name": m["f3"],
-                        "email": m["f4"],
-                        "create_date": m["f5"]
-                    } for m in group["members"]]
-
-                    group_list.append(group)
-            return group_list
-        except Exception as e:
             return None
 
     @classmethod
@@ -925,6 +842,39 @@ class GroupMembershipDA(object):
         except Exception as err:
             logger.exception('Unable to update group membership')
             raise err
+
+    @classmethod
+    def get_members_without_role(cls):
+        query = """
+            SELECT * 
+            FROM member_group_membership
+            WHERE group_role IS NULL
+        """
+        result = list()
+        cls.source.execute(query, None)
+        if cls.source.has_results():
+            memberships = cls.source.cursor.fetchall()
+            for row in memberships:
+                membership = {
+                    "group_id": row[0],
+                    "member_id": row[1],
+                }
+                result.append(membership)
+            return result
+        else:
+            return None
+
+    @classmethod
+    def set_member_group_role(cls, member_id, group_id, group_role):
+        query = ("""
+            UPDATE member_group_membership
+            SET group_role = %s
+            WHERE group_id = %s AND member_id = %s
+            RETURNING group_id
+        """)
+        params = (group_role, group_id, member_id)
+        cls.source.execute(query, params)
+        cls.source.commit()
 
 
 class GroupMemberInviteDA(object):

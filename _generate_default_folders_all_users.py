@@ -66,7 +66,8 @@ if __name__ == "__main__":
 
     for member in members:
         # print(f"Member: {member}")
-        print(f"Member ID: {member['member_id']} email: {member['email']} main_file_tree: {member['main_file_tree']}")
+        print(
+            f"Member ID: {member['member_id']} email: {member['email']} main_file_tree: {member['main_file_tree']}")
 
         tree_id = member['main_file_tree']
         logger.debug(f"Main file tree: {tree_id}")

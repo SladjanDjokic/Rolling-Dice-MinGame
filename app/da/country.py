@@ -9,19 +9,20 @@ class CountryCodeDA(object):
         country_list = list()
         get_active_countries_query = ("""
             SELECT
-                id,
+                country_code.id AS id, 
                 alpha2,
                 alpha3,
                 name,
                 phone,
-                currency_code,
-                currency_name,
-                currency_id,
-                currency_minor_unit,
+                currency_code.currency_code,
+                currency_code.currency_name,
+                currency_code.id as currency_id,
+                currency_code.currency_minor_unit,
                 domain,
                 display_order,
                 cell_regexp
             FROM country_code
+            LEFT JOIN currency_code ON currency_code_id = currency_code.id
             WHERE country_code.is_enabled = TRUE
             ORDER BY id ASC
         """)

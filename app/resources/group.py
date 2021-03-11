@@ -2,6 +2,7 @@ from app.resources.invite import MemberInviteResource
 import pdb
 import uuid
 import app.util.json as json
+from app.util.auth import check_session
 import logging
 from pprint import pformat
 from datetime import datetime
@@ -50,21 +51,15 @@ class MemberGroupResource(object):
                                    },
                            "DELETE": {"event_type": settings.get('kafka.event_types.delete.member_group_resource'),
                                       "topic": settings.get('kafka.topics.member')
-                                   },
+                                      },
                            }
 
+    @check_session
     def on_post(self, req, resp):
         (name, pin, members, exchange_option) = request.get_json_or_form(
             "name", "pin", "members", "exchangeOption", req=req)
-
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            group_leader_id = session["member_id"]
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
-
-        group_exist = GroupDA().get_group_by_name_and_leader_id(group_leader_id, name)
+        group_leader_id = req.context.auth['session']['member_id']
+        group_exist = GroupDA().get_group_by_name_and_owner_id(group_leader_id, name)
         members = json.loads(members)
 
         if group_exist:
@@ -79,31 +74,9 @@ class MemberGroupResource(object):
             else:
                 pin = None
 
-            # First we create empty file trees
-            main_file_tree_id, file_tree_id = FileTreeDA().create_tree('main', 'group', True)
-            bin_file_tree_id = FileTreeDA().create_tree('bin', 'group')
+            group_id = GroupDA().create_group_with_trees(
+                name=name, file_id=file_id, pin=pin, exchange_option=exchange_option, group_type='contact')
 
-            # Add default folders for Drive
-            default_drive_folders = settings.get('drive.default_folders')
-            default_drive_folders.sort()
-
-            for folder_name in default_drive_folders:
-                FileTreeDA().create_file_tree_entry(
-                    tree_id=main_file_tree_id,
-                    parent_id=file_tree_id,
-                    member_file_id=None,
-                    display_name=folder_name
-                )
-
-            group_id = GroupDA().create_expanded_group(group_leader_id, name,
-                                                       file_id, pin,
-                                                       exchange_option,
-                                                       main_file_tree_id,
-                                                       bin_file_tree_id)
-
-            # group_id = GroupDA().create_expanded_group(group_leader_id, name,
-            #                                            file_id, pin,
-            #                                            exchange_option)
             GroupMembershipDA().bulk_create_group_membership(
                 group_leader_id, group_id, members)
             # self.bulk_create_invite(group_leader_id, group_id, members, req)
@@ -117,15 +90,9 @@ class MemberGroupResource(object):
             }, default_parser=json.parser)
             return
 
-    @staticmethod
-    def on_get(req, resp):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            # group_leader_id = session["member_id"]
-            member_id = session["member_id"]
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
+    @check_session
+    def on_get(self, req, resp):
+        member_id = req.context.auth['session']['member_id']
 
         get_all = req.get_param('get_all')
         # sort_params = '-member_group.group_name' names in descending order
@@ -133,11 +100,11 @@ class MemberGroupResource(object):
         search_key = req.get_param('search_key')
 
         if get_all:
-            resp_list = GroupDA().get_all_groups_by_member_id(
+            resp_list = GroupDA.get_all_groups_by_member_id(
                 member_id, sort_params)
         else:
-            resp_list = GroupDA().get_groups_by_group_leader_id(
-                member_id, sort_params, search_key)
+            resp_list = GroupDA.get_groups_by_group_leader_id(
+                group_leader_id=member_id, sort_params=sort_params, search_key=search_key)
 
         resp.body = json.dumps({
             "data": resp_list,
@@ -195,19 +162,18 @@ class MemberGroupResource(object):
             except InviteInvalidInviterError:
                 continue
 
+    @check_session
     def on_delete(self, req, resp):
         (group_ids) = request.get_json_or_form("groupIds", req=req)
         group_ids = group_ids[0].split(',')
 
-        session_id = get_session_cookie(req)
-        session = validate_session(session_id)
-        member_id = session["member_id"]
+        member_id = req.context.auth['session']['member_id']
 
         delete_status = {}
         for group_id in group_ids:
             group = GroupDA().get_group(group_id)
             if group:
-                if group["group_leader_id"] == member_id:
+                if group["group_leader_id"] == member_id:  # FIXME:
                     GroupDA().change_group_status(group_id, 'deleted')
                     delete_status[group_id] = True
                 else:
@@ -226,10 +192,10 @@ class GroupDetailResource(object):
 
     def __init__(self):
         self.kafka_data = {
-                           "GET": {"event_type": settings.get('kafka.event_types.get.member_group_detail'),
-                                   "topic": settings.get('kafka.topics.member')
-                                   },
-                           }
+            "GET": {"event_type": settings.get('kafka.event_types.get.member_group_detail'),
+                    "topic": settings.get('kafka.topics.member')
+                    },
+        }
 
     def on_get(self, req, resp, group_id=None):
         # TODO: Build pagination
@@ -260,9 +226,10 @@ class GroupMembershipResource(object):
                                    "topic": settings.get('kafka.topics.member')
                                    },
                            "DELETE": {"event_type": settings.get('kafka.event_types.delete.group_crud'),
-                                   "topic": settings.get('kafka.topics.member')
-                                   },
+                                      "topic": settings.get('kafka.topics.member')
+                                      },
                            }
+
 
     @staticmethod
     def on_post(req, resp):
@@ -284,23 +251,18 @@ class GroupMembershipResource(object):
             "success": True
         }, default_parser=json.parser)
 
-    @staticmethod
-    def on_get(req, resp):
+    @check_session
+    def on_get(self, req, resp):
         member_id = req.get_param('member_id')
         if not member_id:
-            try:
-                session_id = get_session_cookie(req)
-                session = validate_session(session_id)
-                member_id = session["member_id"]
-            except InvalidSessionError as err:
-                raise UnauthorizedSession() from err
+            member_id = req.context.auth['session']['member_id']
 
         # sort_params = '-member_group.group_name' names in descending order
         sort_params = req.get_param('sort')
         search_key = req.get_param('search_key')
 
-        group_list = GroupMembershipDA().get_group_membership_by_member_id(
-            member_id, sort_params, search_key)
+        group_list = GroupDA().get_all_groups_by_member_id(
+            member_id=member_id, sort_params=sort_params, member_only=True, search_key=search_key)
         resp.body = json.dumps({
             "data": group_list,
             "message": "All Group",
@@ -373,7 +335,7 @@ class GroupMemberInviteResource(MemberInviteResource):
         try:
             invite_id = GroupMemberInviteDA().create_invite(**invite_params)
 
-            register_url = self._get_register_url(req, invite_key)        
+            register_url = self._get_register_url(req, invite_key)
 
             self._send_email(
                 email=email,
@@ -418,17 +380,13 @@ class GroupMemberInviteResource(MemberInviteResource):
 class GroupMemberAccept(object):
     def __init__(self):
         self.kafka_data = {"PUT": {"event_type": settings.get('kafka.event_types.put.group_membership_response'),
-                                    "topic": settings.get('kafka.topics.member')
-                                    }
+                                   "topic": settings.get('kafka.topics.member')
+                                   }
                            }
-    def on_put(self, req, resp, group_id=None):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
 
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
+    @check_session
+    def on_put(self, req, resp, group_id=None):
+        member_id = req.context.auth['session']['member_id']
 
         try:
 
@@ -436,7 +394,8 @@ class GroupMemberAccept(object):
                 "status", req=req
             )
 
-            GroupMembershipDA.accept_group_invitation(group_id, member_id, status)
+            GroupMembershipDA.accept_group_invitation(
+                group_id, member_id, status)
             # Headers set for kafka topic routing for notifications
             req.headers['kafka_group_id'] = str(group_id)
             req.headers['kafka_group_status'] = status
@@ -455,26 +414,19 @@ class GroupMembersResource(object):
 
     def __init__(self):
         self.kafka_data = {"GET": {"event_type": settings.get('kafka.event_types.get.retrieve_all_group_members'),
-                                    "topic": settings.get('kafka.topics.member')
-                                    }
+                                   "topic": settings.get('kafka.topics.member')
+                                   }
                            }
-    @staticmethod
-    def on_get(req, resp):
 
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            member_id = session["member_id"]
+    @check_session
+    def on_get(self, req, resp):
 
-            members = MemberDA.get_all_members(member_id)
-
-            resp.body = json.dumps({
-                "members": members,
-                "success": True
-            }, default_parser=json.parser)
-
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
+        member_id = req.context.auth['session']['member_id']
+        members = MemberDA.get_all_members(member_id)
+        resp.body = json.dumps({
+            "members": members,
+            "success": True
+        }, default_parser=json.parser)
 
 
 class MemberGroupSecurity(object):
@@ -488,14 +440,9 @@ class MemberGroupSecurity(object):
                                    },
                            }
 
+    @check_session
     def on_get(self, req, resp, group_id=None):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            # groupMemberGroupSecurity_leader_id = session["member_id"]
-            member_id = session["member_id"]
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
+        member_id = req.context.auth['session']['member_id']
 
         try:
             security = GroupDA().get_security(group_id)
@@ -509,15 +456,10 @@ class MemberGroupSecurity(object):
                 "success": False
             }, default_parser=json.parser)
 
+    @check_session
     def on_post(self, req, resp, group_id=None):
         (picture, pin, exchange_option) = request.get_json_or_form(
             "picture", "pin", "exchange_option", req=req)
-
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
 
         security = GroupDA().get_security(group_id)
 
@@ -542,22 +484,18 @@ class MemberGroupSecurity(object):
                 "success": False
             }, default_parser=json.parser)
 
-class GroupActivityDriveResource(object):
-   def on_get(self, req, resp, group_id=None):
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            # groupMemberGroupSecurity_leader_id = session["member_id"]
-            member_id = session["member_id"]
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
 
+class GroupActivityDriveResource(object):
+    @check_session
+    def on_get(self, req, resp, group_id=None):
+        member_id = req.context.auth['session']['member_id']
         try:
             search_key = req.get_param('search_key') or ''
             page_size = req.get_param_as_int('page_size')
             page_number = req.get_param_as_int('page_number')
             sort_params = req.get_param('sort')
-            drive_activity = ActivityDA().get_group_drive_activity(group_id, search_key, page_size, page_number, sort_params)
+            drive_activity = ActivityDA().get_group_drive_activity(
+                group_id, search_key, page_size, page_number, sort_params)
             resp.body = json.dumps({
                 "data": drive_activity,
                 "success": True
@@ -568,23 +506,18 @@ class GroupActivityDriveResource(object):
                 "success": False
             }, default_parser=json.parser)
 
+
 class GroupActivityCalendarResource(object):
-   def on_get(self, req, resp, group_id=None):
+    @check_session
+    def on_get(self, req, resp, group_id=None):
+        member_id = req.context.auth['session']['member_id']
         try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            # groupMemberGroupSecurity_leader_id = session["member_id"]
-            member_id = session["member_id"]
-        except InvalidSessionError as err:
-            raise UnauthorizedSession() from err
-
-        try:
-
             search_key = req.get_param('search_key') or ''
             page_size = req.get_param_as_int('page_size')
             page_number = req.get_param_as_int('page_number')
             sort_params = req.get_param('sort')
-            calendar_activity = ActivityDA().get_group_calendar_activity(group_id, search_key, page_size, page_number, sort_params)
+            calendar_activity = ActivityDA().get_group_calendar_activity(
+                group_id, search_key, page_size, page_number, sort_params)
             resp.body = json.dumps({
                 "data": calendar_activity,
                 "success": True

@@ -52,6 +52,8 @@ services:
       - 9443:443
       - 443:443
     # command: [nginx-debug, "-g", "daemon off;"] # Uncomment if want to enable debug mode
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway" # For Linux
     networks:
       amera-net:
         aliases:
@@ -123,67 +125,67 @@ services:
   #     timeout: 10s
   #     retries: 22
 
-  amera-web-main:
-    container_name: amera-web-main
-    image: amera-web-main:latest
-    restart: always
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "1"
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-        reservations:
-          memory: 12M
-    build:
-      context: ../web
-      dockerfile: Dockerfile.dev
-    networks:
-      - amera-net
-    expose:
-      - 5001
-    volumes:
-      - ../web:/app
-      - web-main-python-packages:/root/.local/share
-    command: ["pipenv", "run", "dev"]
-    depends_on:
-      amera-web-api:
-        condition: service_healthy
+  # amera-web-main:
+  #   container_name: amera-web-main
+  #   image: amera-web-main:latest
+  #   restart: always
+  #   logging:
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "1"
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 256M
+  #       reservations:
+  #         memory: 12M
+  #   build:
+  #     context: ../web
+  #     dockerfile: Dockerfile.dev
+  #   networks:
+  #     - amera-net
+  #   expose:
+  #     - 5001
+  #   volumes:
+  #     - ../web:/app
+  #     - web-main-python-packages:/root/.local/share
+  #   command: ["pipenv", "run", "dev"]
+  #   depends_on:
+  #     amera-web-api:
+  #       condition: service_healthy
 
-  amera-web-share:
-    container_name: amera-web-share
-    image: amera-web-share:latest
-    restart: always
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "1"
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-    user: node
-    build:
-      context: ../web-share
-      dockerfile: Dockerfile.dev
-    environment:
-      NODE_ENV: development
-      PUBLIC_URL: /share
-    networks:
-      - amera-net
-    expose:
-      - 3000
-    volumes:
-      - web-share-yarn-packages:/home/node/yarn-cache:cached
-      - web-share-node_modules:/home/node/app/node_modules:cached
-      - ../web-share:/home/node/app
-    stdin_open: true
-    command: ["yarn", "start"]
-    depends_on:
-      amera-web-api:
-        condition: service_healthy
+  # amera-web-share:
+  #   container_name: amera-web-share
+  #   image: amera-web-share:latest
+  #   restart: always
+  #   logging:
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "1"
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 1G
+  #   user: node
+  #   build:
+  #     context: ../web-share
+  #     dockerfile: Dockerfile.dev
+  #   environment:
+  #     NODE_ENV: development
+  #     PUBLIC_URL: /share
+  #   networks:
+  #     - amera-net
+  #   expose:
+  #     - 3000
+  #   volumes:
+  #     - web-share-yarn-packages:/home/node/yarn-cache:cached
+  #     - web-share-node_modules:/home/node/app/node_modules:cached
+  #     - ../web-share:/home/node/app
+  #   stdin_open: true
+  #   command: ["yarn", "start"]
+  #   depends_on:
+  #     amera-web-api:
+  #       condition: service_healthy
 
   amera-web-api:
     container_name: amera-web-api
@@ -384,6 +386,8 @@ services:
       - ../web-api/datasource/postgresql/project.sql:/docker-entrypoint-initdb.d/n-project.sql
       - ../web-api/datasource/postgresql/state_code.sql:/docker-entrypoint-initdb.d/o-state_code.sql
       - ../web-api/datasource/postgresql/video_mail.sql:/docker-entrypoint-initdb.d/p-video_mail.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-02-25_currency.sql:/docker-entrypoint-initdb.d/p-0-currency.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-02-25_project.sql:/docker-entrypoint-initdb.d/p-1-project.sql
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/z-3-test-schedule.sql
@@ -410,46 +414,46 @@ services:
       timeout: 5s
       retries: 15
 
-#  amera-web-notifications:
-#    container_name: amera-web-notifications
-#    image: amera-web-notifications:latest
-#    restart: always
-#    user: node
-#    build:
-#      context: ../web-notifications
-#      dockerfile: Dockerfile.dev
-#    deploy:
-#      resources:
-#        limits:
-#          memory: 96M
-#        reservations:
-#          memory: 48M
-#    networks:
-#      amera-net:
-#        aliases:
-#          - amera-eventserver
-#    ports:
-#      - 5070:5070
-#    expose:
-#      - 5070
-#    environment:
-#      NODE_ENV: development
-#      PORT: 5070
-#      SSE_KEEPALIVE_RATE_SECS: 2
-#      SSE_PING_RATE_SECS: 2
-#      PG_USER: amera
-#      PG_HOST: amera-web-db
-#      PG_DATABASE: ameraiot
-#      PG_PASSWORD: amera
-#      PG_PORT: 5432
-#      DEBUG: express:*
-#    volumes:
-#      - ../web-notifications:/home/node/app
-#    stdin_open: true
-#    command: ['yarn', 'start']
-#    depends_on:
-#      amera-web-db:
-#        condition: service_healthy
+  # amera-web-notifications:
+  #   container_name: amera-web-notifications
+  #   image: amera-web-notifications:latest
+  #   restart: always
+  #   user: node
+  #   build:
+  #     context: ../web-notifications
+  #     dockerfile: Dockerfile.dev
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 96M
+  #       reservations:
+  #         memory: 48M
+  #   networks:
+  #     amera-net:
+  #       aliases:
+  #         - amera-eventserver
+  #   ports:
+  #     - 5070:5070
+  #   expose:
+  #     - 5070
+  #   environment:
+  #     NODE_ENV: development
+  #     PORT: 5070
+  #     SSE_KEEPALIVE_RATE_SECS: 2
+  #     SSE_PING_RATE_SECS: 2
+  #     PG_USER: amera
+  #     PG_HOST: amera-web-db
+  #     PG_DATABASE: ameraiot
+  #     PG_PASSWORD: amera
+  #     PG_PORT: 5432
+  #     DEBUG: express:*
+  #   volumes:
+  #     - ../web-notifications:/home/node/app
+  #   stdin_open: true
+  #   command: ['yarn', 'start']
+  #   depends_on:
+  #     amera-web-db:
+  #       condition: service_healthy
 
   amera-call-consumer:
     container_name: amera-call-consumer

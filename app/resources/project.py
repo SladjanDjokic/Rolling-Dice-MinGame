@@ -3,6 +3,7 @@ from app.util.auth import check_session
 import app.util.json as json
 import app.util.request as request
 from app.da.project import ProjectDA
+from app.da.group import GroupDA, GroupMembershipDA, GroupRole, GroupMemberStatus, GroupExchangeOptions
 from operator import itemgetter
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ class ProjectResource(object):
                 projects = []
             resp.body = json.dumps({
                 "success": True,
-                "description": "Projects data fetched succefully",
+                "description": "Projects data fetched successfully",
                 "data": projects
             })
         except Exception as err:
@@ -32,9 +33,21 @@ class ProjectResource(object):
     @check_session
     def on_post(self, req, resp):
         try:
-            member_id = req.context.auth['session']['member_id']
+            creator_member_id = req.context.auth["session"]["member_id"]
             (company_id, creator_project_role_id, owner_member_id, project_title, project_type, project_description, project_start_date, project_estimated_days,) = request.get_json_or_form(
                 "company_id", "creator_project_role_id", "owner_member_id", "project_title", "project_type", "project_description", "project_start_date", "project_estimated_days", req=req)
+
+            # Create project group
+            group_id = GroupDA().create_group_with_trees(
+                name=project_title, exchange_option=GroupExchangeOptions.NO_ENCRYPTION.value, group_type='project')
+
+            # Create group membership
+            owner_status = GroupMemberStatus.ACTIVE.value if creator_member_id == owner_member_id else GroupMemberStatus.ACTIVE.INVITED
+            GroupMembershipDA().create_group_membership(group_id=group_id,
+                                                        member_id=owner_member_id, status=owner_status, group_role=GroupRole.OWNER.value)
+            if owner_member_id != creator_member_id:
+                GroupMembershipDA().create_group_membership(group_id=group_id, member_id=creator_member_id,
+                                                            status=GroupMemberStatus.INVITED.value, group_role=GroupRole.ADMIN.value)
 
             # Create project
             project_id = ProjectDA.create_project_entry({'company_id': company_id,
@@ -42,16 +55,13 @@ class ProjectResource(object):
                                                          'project_type': project_type,
                                                          'project_description': project_description,
                                                          'start_date': project_start_date,
-                                                         'estimated_days': f"{project_estimated_days} days"}
+                                                         'estimated_days': f"{project_estimated_days} days",
+                                                         "group_id": group_id}
                                                         )
 
             # Create project members for creator and owner
-            creator_member_id = member_id
             creator_project_member_id = ProjectDA.create_project_member({'project_id': project_id,
                                                                          'member_id': creator_member_id,
-                                                                         'pay_rate': 0,
-                                                                         'pay_type': 'hourly',
-                                                                         'currency_id': 666,
                                                                          'privileges': ['approve', 'create', 'view', 'edit']
                                                                          })
 
@@ -59,9 +69,6 @@ class ProjectResource(object):
             if creator_member_id != owner_member_id:
                 owner_project_member_id = ProjectDA.create_project_member({'project_id': project_id,
                                                                            'member_id': owner_member_id,
-                                                                           'pay_rate': 0,
-                                                                           'pay_type': 'hourly',
-                                                                           'currency_id': 666,
                                                                            'privileges': ['approve', 'create', 'view', 'edit']
                                                                            })
 
@@ -75,6 +82,7 @@ class ProjectResource(object):
 
             resp.body = json.dumps({
                 "success": True,
+                "data": {"project_id": project_id},
                 "description": 'Project created successfully'
             })
 
@@ -87,10 +95,239 @@ class ProjectResource(object):
             raise err
 
     @check_session
+    def on_put(self, req, resp, project_id):
+        try:
+            member_id = req.context.auth["session"]["member_id"]
+            (company_id, creator_project_role_id, owner_member_id, project_title, project_type, project_description, project_start_date, project_estimated_days,) = request.get_json_or_form(
+                "company_id", "creator_project_role_id", "owner_member_id", "project_title", "project_type", "project_description", "project_start_date", "project_estimated_days", req=req)
+            author_id = ProjectDA.get_project_member_id(project_id, member_id)
+
+            # Check who's the owner now
+            current_owner_project_member_id = ProjectDA.get_current_owner(
+                project_id)
+
+            # New owner -- First check if alreadty a team member
+            new_owner_project_member_id = ProjectDA.get_project_member_id(
+                project_id, owner_member_id)
+            if not new_owner_project_member_id:
+                # Not in the team yet
+                new_owner_project_member_id = ProjectDA.create_project_member(
+                    {"project_id": project_id, "member_id": owner_member_id, 'privileges': ['approve', 'create', 'view', 'edit']})
+
+            # If there was no owner, or new owner is different
+            if not current_owner_project_member_id or new_owner_project_member_id != current_owner_project_member_id:
+                ProjectDA.assign_owner(
+                    {'project_id': project_id, 'owner_id': new_owner_project_member_id})
+
+            # Update the rest
+            updated = ProjectDA.update_project_entry({"project_id": project_id,
+                                                      'company_id': company_id,
+                                                      'project_title': project_title,
+                                                      'project_type': project_type,
+                                                      'project_description': project_description,
+                                                      'start_date': project_start_date,
+                                                      'estimated_days': f"{project_estimated_days} days",
+                                                      "author_id": author_id})
+            if updated:
+                resp.body = json.dumps({
+                    "success": True,
+                    "description": 'Project updated successfully'
+                })
+            else:
+                resp.body = json.dumps({
+                    "success": True,
+                    "description": 'Something went wrong when updating the project'
+                })
+
+        except Exception as err:
+            resp.body = json.dumps({
+                "success": False,
+                "description": err
+            })
+            logger.exception(err)
+            raise err
+
+    @check_session
+    def on_delete(self, req, resp, project_id):
+        try:
+            deleted = ProjectDA.hard_delete_project_entry(project_id)
+
+            if deleted:
+                resp.body = json.dumps({
+                    "success": True,
+                    "description": 'Project deleted successfully'
+                })
+            else:
+                resp.body = json.dumps({
+                    "success": False,
+                    "description": 'Something went wrong when deleting the project'
+                })
+
+        except Exception as err:
+            resp.body = json.dumps({
+                "success": False,
+                "description": err
+            })
+            logger.exception(err)
+            raise err
+
+    @check_session
+    # Will perform soft-delete of all tasks
+    def on_post_soft_delete(self, req, resp, project_id):
+        try:
+            member_id = req.context.auth["session"]["member_id"]
+            author_id = ProjectDA.get_project_member_id(project_id, member_id)
+            element_ids = ProjectDA.get_ids_of_project(
+                project_id=project_id, tasks_only=False, exclude_status='delete')
+
+            if not element_ids:
+                resp.body = json.dumps({
+                    "success": True,
+                    "description": 'No tasks to delete'
+                })
+
+            deleted = []
+            for el_id in element_ids:
+                ok = ProjectDA.add_element_status_record(
+                    element_id=el_id, author_id=author_id, status="delete")
+                deleted.append(ok)
+
+            if len(deleted) > 0 and not None in deleted:
+                resp.body = json.dumps({
+                    "success": True,
+                    "description": 'All project tasks marked deleted successfully'
+                })
+            else:
+                resp.body = json.dumps({
+                    "success": False,
+                    "description": 'Something went wrong marking project deleted'
+                })
+
+        except Exception as err:
+            resp.body = json.dumps({
+                "success": False,
+                "description": err
+            })
+            logger.exception(err)
+            raise err
+
+    @check_session
+    # WIll set previous status for all soft-deleted items
+    def on_post_project_restore(self, req, resp, project_id):
+        try:
+            member_id = req.context.auth["session"]["member_id"]
+            author_id = ProjectDA.get_project_member_id(project_id, member_id)
+            element_ids = ProjectDA.get_ids_of_project(
+                project_id=project_id, tasks_only=False)
+
+            restored = []
+            for el_id in element_ids:
+                last_status = ProjectDA.get_last_status(el_id, 'delete')
+                if not last_status:
+                    last_status = None
+                ok = ProjectDA.add_element_status_record(
+                    el_id, author_id, last_status)
+                restored.append(ok)
+
+            if len(restored) > 0 and not None in restored:
+                resp.body = json.dumps({
+                    "success": True,
+                    "description": 'All project tasks restored'
+                })
+            else:
+                resp.body = json.dumps({
+                    "success": False,
+                    "description": 'Something went when restoring project tasks'
+                })
+        except Exception as err:
+            resp.body = json.dumps({
+                "success": False,
+                "description": err
+            })
+            logger.exception(err)
+            raise err
+
+    @check_session
+    def on_post_project_suspend(self, req, resp, project_id):
+        try:
+            member_id = req.context.auth["session"]["member_id"]
+            author_id = ProjectDA.get_project_member_id(project_id, member_id)
+            element_ids = ProjectDA.get_ids_of_project(
+                project_id=project_id, tasks_only=False, exclude_status='suspend')
+
+            if not element_ids:
+                resp.body = json.dumps({
+                    "success": True,
+                    "description": 'No tasks to delete'
+                })
+
+            suspended = []
+            for el_id in element_ids:
+                ok = ProjectDA.add_element_status_record(
+                    element_id=el_id, author_id=author_id, status="suspend")
+                suspended.append(ok)
+
+            if len(suspended) > 0 and not None in suspended:
+                resp.body = json.dumps({
+                    "success": True,
+                    "description": 'All project tasks marked suspended successfully'
+                })
+
+            else:
+                resp.body = json.dumps({
+                    "success": False,
+                    "description": 'Something went when marking tasks suspended'
+                })
+        except Exception as err:
+            resp.body = json.dumps({
+                "success": False,
+                "description": err
+            })
+            logger.exception(err)
+            raise err
+
+    @check_session
+    def on_post_project_unsuspend(self, req, resp, project_id):
+        try:
+            member_id = req.context.auth["session"]["member_id"]
+            author_id = ProjectDA.get_project_member_id(project_id, member_id)
+            element_ids = ProjectDA.get_ids_of_project(
+                project_id=project_id, tasks_only=False)
+
+            restored = []
+            for el_id in element_ids:
+                last_status = ProjectDA.get_last_status(el_id, 'suspend')
+                if not last_status:
+                    last_status = None
+                ok = ProjectDA.add_element_status_record(
+                    el_id, author_id, last_status)
+                restored.append(ok)
+
+            if len(restored) > 0 and not None in restored:
+                resp.body = json.dumps({
+                    "success": True,
+                    "description": 'All project tasks restored'
+                })
+            else:
+                resp.body = json.dumps({
+                    "success": False,
+                    "description": 'Something went when restoring project tasks'
+                })
+        except Exception as err:
+            resp.body = json.dumps({
+                "success": False,
+                "description": err
+            })
+            logger.exception(err)
+            raise err
+
+    @check_session
     def on_post_member(self, req, resp):
         try:
+            member_id = req.context.auth["session"]["member_id"]
             (project_id, members,) = request.get_json_or_form(
                 "project_id", "members", req=req)
+            group_id = ProjectDA.group_id_by_project_id(project_id)
 
             member_id = req.context.auth['session']['member_id']
 
@@ -106,11 +343,14 @@ class ProjectResource(object):
 
                 if len(new_members) > 0:
                     for member_id in new_members:
+                        GroupMembershipDA().create_group_membership(
+                            group_id=group_id, member_id=member_id)
                         project_member_id = ProjectDA.create_project_member(
                             {"project_id": project_id, "member_id": member_id, "pay_rate": 0, "pay_type": "hourly", "currency_id": 666, "privileges": ['view']})
 
                 if len(discarded_members) > 0:
                     for member_id in discarded_members:
+                        GroupMembershipDA().remove_group_member(group_id=group_id, member_id=member_id)
                         ProjectDA.delete_project_member(
                             {"project_id": project_id, "member_id": member_id})
 
@@ -140,6 +380,10 @@ class ProjectResource(object):
 
                     existing_roles = ProjectDA.get_project_roles_for_member(
                         {"project_id": project_id, "project_member_id": project_member_id})
+                    if not existing_roles:
+                        existing_roles = []
+                    if not role_ids:
+                        role_ids = []
 
                     new_roles = set(role_ids) - set(existing_roles)
                     cancelled_roles = set(existing_roles) - set(role_ids)
@@ -218,26 +462,32 @@ class ProjectResource(object):
             logger.exception(err)
             raise err
 
-    # Epics
+    # Epics/tremors/stories/tasks
     @check_session
-    def on_post_epic(self, req, resp):
+    def on_post_element(self, req, resp):
         try:
-            member_id = req.context.auth['session']['member_id']
-            (project_id, epic_title, epic_description) = request.get_json_or_form(
-                "project_id", "epic_title", "epic_description", req=req)
+            member_id = req.context.auth["session"]["member_id"]
+            (project_id, parent_id, element_type, title, description, est_hours) = request.get_json_or_form(
+                "project_id", "parent_id", "element_type", "title", "description", "est_hours", req=req)
+            author_id = ProjectDA.get_project_member_id(
+                project_id, member_id)
 
-            inserted = ProjectDA.insert_epic({"project_id": project_id, "epic_title": epic_title,
-                                              "epic_description": epic_description, "member_id": member_id})
+            if json.convert_null(est_hours):
+                est_hours = f"INTERVAL {est_hours} hours"
+            else:
+                est_hours = None
 
+            inserted = ProjectDA.insert_element({"project_id": project_id, "parent_id": json.convert_null(parent_id), "element_type": element_type,
+                                                 "title": title, "description": description, "contract_id": None, "est_hours": est_hours, "author_id": author_id})
             if inserted:
                 resp.body = json.dumps({
                     "success": True,
-                    "description": "Epic created successfully"
+                    "description": f"{element_type.capitalize()} created successfully"
                 })
             else:
                 resp.body = json.dumps({
                     "success": False,
-                    "description": "Something went wrong when creating epic"
+                    "description": f"Something went wrong when creating {element_type}"
                 })
 
         except Exception as err:
@@ -249,24 +499,30 @@ class ProjectResource(object):
             raise err
 
     @check_session
-    def on_put_epic(self, req, resp, epic_id):
+    def on_put_element(self, req, resp, element_id):
         try:
-            member_id = req.context.auth['session']['member_id']
-            (epic_title, epic_description) = request.get_json_or_form(
-                "epic_title", "epic_description", req=req)
+            member_id = req.context.auth["session"]["member_id"]
+            (project_id, parent_id, element_type, title, description, project_member_id, est_hours, element_status) = request.get_json_or_form(
+                "project_id", "parent_id", "element_type", "title", "description", "project_member_id", "est_hours", "element_status", req=req)
+            author_id = ProjectDA.get_project_member_id(
+                project_id, member_id)
 
-            updated = ProjectDA.update_epic({"epic_id": epic_id, "epic_title": epic_title,
-                                             "epic_description": epic_description, "member_id": member_id})
+            if json.convert_null(est_hours):
+                est_hours = f"INTERVAL {est_hours} hours"
+            else:
+                est_hours = None
 
+            updated = ProjectDA.update_element({"project_id": project_id, "parent_id": json.convert_null(parent_id), "element_type": element_type, "title": title, "description": description,
+                                                "project_member_id": project_member_id, "est_hours": est_hours, "element_status": json.convert_null(element_status), "update_by": author_id})
             if updated:
                 resp.body = json.dumps({
                     "success": True,
-                    "description": "Epic updated successfully"
+                    "description": f"{element_type.capitalize()} updated successfully"
                 })
             else:
                 resp.body = json.dumps({
                     "success": False,
-                    "description": "Something went wrong when updating epic"
+                    "description": f"Something went wrong when updating {element_type}"
                 })
 
         except Exception as err:
@@ -278,19 +534,232 @@ class ProjectResource(object):
             raise err
 
     @check_session
-    def on_delete_epic(self, req, resp, epic_id):
+    def on_delete_element(self, req, resp, element_id):
         try:
-            deleted = ProjectDA.delete_epic(epic_id=epic_id)
+            member_id = req.context.auth["session"]["member_id"]
+            project_id = ProjectDA.get_elements_project(element_id)
+            author_id = ProjectDA.get_project_member_id(
+                project_id, member_id)
+
+            family_ids = ProjectDA.get_ids_of_family(
+                element_id=element_id, tasks_only=False, exclude_status="delete")
+
+            deleted = []
+            for family_member_id in family_ids:
+                item_success = ProjectDA.add_element_status_record(
+                    element_id=family_member_id, author_id=author_id, status="delete")
+                deleted.append(item_success)
+
+            if None not in deleted:
+                resp.body = json.dumps({
+                    "success": True,
+                    "description": "Items deleted successfully"
+                })
+            else:
+                resp.body = json.dumps({
+                    "success": False,
+                    "description": "Something went wrong when deleting items"
+                })
+
+        except Exception as err:
+            resp.body = json.dumps({
+                "success": False,
+                "description": err
+            })
+            logger.exception(err)
+            raise err
+
+    @check_session
+    def on_post_element_restore(self, req, resp, element_id):
+        try:
+            member_id = req.context.auth["session"]["member_id"]
+            project_id = ProjectDA.get_elements_project(element_id)
+            author_id = ProjectDA.get_project_member_id(
+                project_id, member_id)
+
+            family_ids = ProjectDA.get_ids_of_family(
+                element_id=element_id, tasks_only=False)
+
+            restored = []
+            for family_member_id in family_ids:
+                last_status = ProjectDA.get_last_status(
+                    family_member_id, 'delete')
+                if not last_status:
+                    last_status = None
+                item_success = ProjectDA.add_element_status_record(
+                    element_id=family_member_id, author_id=author_id, status=last_status)
+                restored.append(item_success)
+
+            if None not in restored:
+                resp.body = json.dumps({
+                    "success": True,
+                    "description": "Items restored successfully"
+                })
+            else:
+                resp.body = json.dumps({
+                    "success": False,
+                    "description": "Something went wrong when restoring items"
+                })
+
+        except Exception as err:
+            resp.body = json.dumps({
+                "success": False,
+                "description": err
+            })
+            logger.exception(err)
+            raise err
+
+    @check_session
+    def on_post_element_suspend(self, req, resp, element_id):
+        try:
+            member_id = req.context.auth["session"]["member_id"]
+            project_id = ProjectDA.get_elements_project(element_id)
+            author_id = ProjectDA.get_project_member_id(
+                project_id, member_id)
+
+            family_ids = ProjectDA.get_ids_of_family(
+                element_id=element_id, tasks_only=True, exclude_status='suspend')
+
+            suspended = []
+            for family_member_id in family_ids:
+                item_success = ProjectDA.add_element_status_record(
+                    element_id=family_member_id, author_id=author_id, status="suspend")
+                suspended.append(item_success)
+
+            if None not in suspended:
+                resp.body = json.dumps({
+                    "success": True,
+                    "description": "Items suspended successfully"
+                })
+            else:
+                resp.body = json.dumps({
+                    "success": False,
+                    "description": "Something went wrong when suspending items"
+                })
+
+        except Exception as err:
+            resp.body = json.dumps({
+                "success": False,
+                "description": err
+            })
+            logger.exception(err)
+            raise err
+
+    @check_session
+    def on_post_element_unsuspend(self, req, resp, element_id):
+        try:
+            member_id = req.context.auth["session"]["member_id"]
+            project_id = ProjectDA.get_elements_project(element_id)
+            author_id = ProjectDA.get_project_member_id(
+                project_id, member_id)
+
+            family_ids = ProjectDA.get_ids_of_family(
+                element_id=element_id, tasks_only=True)
+
+            unsuspended = []
+            for family_member_id in family_ids:
+                last_status = ProjectDA.get_last_status(
+                    family_member_id, 'suspend')
+                if not last_status:
+                    last_status = None
+                item_success = ProjectDA.add_element_status_record(
+                    element_id=family_member_id, author_id=author_id, status=last_status)
+                unsuspended.append(item_success)
+
+            if None not in unsuspended:
+                resp.body = json.dumps({
+                    "success": True,
+                    "description": "Items unsuspended successfully"
+                })
+            else:
+                resp.body = json.dumps({
+                    "success": False,
+                    "description": "Something went wrong when unsuspending items"
+                })
+
+        except Exception as err:
+            resp.body = json.dumps({
+                "success": False,
+                "description": err
+            })
+            logger.exception(err)
+            raise err
+
+    # Note
+    @check_session
+    def on_post_note(self, req, resp):
+        try:
+            member_id = req.context.auth["session"]["member_id"]
+            (element_note, element_id) = request.get_json_or_form(
+                "element_note", "element_id", req=req)
+            project_id = ProjectDA.get_elements_project(element_id)
+            author_id = ProjectDA.get_project_member_id(project_id, member_id)
+
+            inserted = ProjectDA.add_note(
+                {"project_element_id": element_id, "element_note": element_note, "author_id": author_id})
+            if inserted:
+                resp.body = json.dumps({
+                    "success": True,
+                    "description": "Comment added successfully"
+                })
+            else:
+                resp.body = json.dumps({
+                    "success": False,
+                    "description": "Something went wrong when creataing comment"
+                })
+
+        except Exception as err:
+            resp.body = json.dumps({
+                "success": False,
+                "description": err
+            })
+            logger.exception(err)
+            raise err
+
+    @check_session
+    def on_put_note(self, req, resp, note_id):
+        try:
+            member_id = req.context.auth["session"]["member_id"]
+            (element_note, element_id) = request.get_json_or_form(
+                "element_note", "element_id", req=req)
+            project_id = ProjectDA.get_project_by_note_id(note_id)
+            author_id = ProjectDA.get_project_member_id(project_id, member_id)
+
+            updated = ProjectDA.update_note(
+                {"note_id": note_id, "element_note": element_note, "author_id": author_id})
+            if updated:
+                resp.body = json.dumps({
+                    "success": True,
+                    "description": "Comment updated successfully"
+                })
+            else:
+                resp.body = json.dumps({
+                    "success": False,
+                    "description": "Something went wrong when updating comment"
+                })
+
+        except Exception as err:
+            resp.body = json.dumps({
+                "success": False,
+                "description": err
+            })
+            logger.exception(err)
+            raise err
+
+    @check_session
+    def on_delete_note(self, req, resp, note_id):
+        try:
+            deleted = ProjectDA.delete_note(note_id)
 
             if deleted:
                 resp.body = json.dumps({
                     "success": True,
-                    "description": "Epic deleted successfully"
+                    "description": "Comment deleted successfully"
                 })
             else:
                 resp.body = json.dumps({
                     "success": False,
-                    "description": "Something went wrong when deleting epic"
+                    "description": "Something went wrong when deleting comment"
                 })
 
         except Exception as err:
@@ -301,26 +770,27 @@ class ProjectResource(object):
             logger.exception(err)
             raise err
 
-    # Tremors
+    # Time
     @check_session
-    def on_post_tremor(self, req, resp):
+    def on_post_time(self, req, resp):
         try:
-            member_id = req.context.auth['session']['member_id']
-            (project_id, project_epic_id, tremor_title, tremor_description) = request.get_json_or_form(
-                "project_id", "project_epic_id", "tremor_title", "tremor_description", req=req)
-
-            inserted = ProjectDA.insert_tremor({"project_id": project_id, "project_epic_id": project_epic_id,
-                                                "tremor_title": tremor_title, "tremor_description": tremor_description, "member_id": member_id})
-
+            member_id = req.context.auth["session"]["member_id"]
+            (element_summary, element_time, element_id) = request.get_json_or_form(
+                "element_summary", "element_time", "element_id", req=req)
+            project_id = ProjectDA.get_elements_project(element_id)
+            author_id = ProjectDA.get_project_member_id(
+                project_id, member_id)
+            inserted = ProjectDA.add_time(
+                {"project_element_id": element_id, "element_summary": element_summary, "element_time": element_time, "author_id": author_id})
             if inserted:
                 resp.body = json.dumps({
                     "success": True,
-                    "description": "Tremor created successfully"
+                    "description": "Time record added successfully"
                 })
             else:
                 resp.body = json.dumps({
                     "success": False,
-                    "description": "Something went wrong when creating tremor"
+                    "description": "Something went wrong when adding time record"
                 })
 
         except Exception as err:
@@ -332,24 +802,26 @@ class ProjectResource(object):
             raise err
 
     @check_session
-    def on_put_tremor(self, req, resp, tremor_id):
+    def on_put_time(self, req, resp, time_id):
         try:
-            member_id = req.context.auth['session']['member_id']
-            (project_id, tremor_title, tremor_description) = request.get_json_or_form(
-                "project_id", "tremor_title", "tremor_description", req=req)
+            member_id = req.context.auth["session"]["member_id"]
+            project_id = ProjectDA.get_project_by_time_id(time_id)
+            author_id = ProjectDA.get_project_member_id(
+                project_id, member_id)
+            (element_summary, element_time) = request.get_json_or_form(
+                "element_summary", "element_time", req=req)
 
-            updated = ProjectDA.update_tremor({"project_id": project_id, "tremor_id": tremor_id,
-                                               "tremor_title": tremor_title, "tremor_description": tremor_description, "member_id": member_id})
-
+            updated = ProjectDA.update_time(
+                {"time_id": time_id, "element_summary": element_summary, "element_time": element_time, "author_id": author_id})
             if updated:
                 resp.body = json.dumps({
                     "success": True,
-                    "description": "Tremor updated successfully"
+                    "description": "TIme record updated successfully"
                 })
             else:
                 resp.body = json.dumps({
                     "success": False,
-                    "description": "Something went wrong when updating tremor"
+                    "description": "Something went wrong when updating time record"
                 })
 
         except Exception as err:
@@ -361,19 +833,19 @@ class ProjectResource(object):
             raise err
 
     @check_session
-    def on_delete_tremor(self, req, resp, tremor_id):
+    def on_delete_time(self, req, resp, time_id):
         try:
-            deleted = ProjectDA.delete_tremor(tremor_id=tremor_id)
+            deleted = ProjectDA.delete_time(time_id)
 
             if deleted:
                 resp.body = json.dumps({
                     "success": True,
-                    "description": "Tremor deleted successfully"
+                    "description": "Time record deleted successfully"
                 })
             else:
                 resp.body = json.dumps({
                     "success": False,
-                    "description": "Something went wrong when deleting tremor"
+                    "description": "Something went wrong when deleting time record"
                 })
 
         except Exception as err:
@@ -383,91 +855,3 @@ class ProjectResource(object):
             })
             logger.exception(err)
             raise err
-
-    # Story
-    @check_session
-    def on_post_story(self, req, resp):
-        member_id = req.context.auth['session']['member_id']
-        try:
-            (project_id, project_tremor_id, story_title, story_description) = request.get_json_or_form(
-                "project_id", "project_tremor_id", "story_title", "story_description", req=req)
-
-            inserted = ProjectDA.insert_story({"project_id": project_id, "project_tremor_id": project_tremor_id,
-                                               "story_title": story_title, "story_description": story_description, "member_id": member_id})
-
-            if inserted:
-                resp.body = json.dumps({
-                    "success": True,
-                    "description": "Story created successfully"
-                })
-            else:
-                resp.body = json.dumps({
-                    "success": False,
-                    "description": "Something went wrong when creating story"
-                })
-
-        except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
-            logger.exception(err)
-            raise err
-
-    @check_session
-    def on_put_story(self, req, resp, story_id):
-        member_id = req.context.auth['session']['member_id']
-        try:
-            (project_id, story_title, story_description) = request.get_json_or_form(
-                "project_id", "story_title", "story_description", req=req)
-
-            updated = ProjectDA.update_tremor({"project_id": project_id, "story_id": story_id,
-                                               "story_title": story_title, "story_description": story_description, "member_id": member_id})
-
-            if updated:
-                resp.body = json.dumps({
-                    "success": True,
-                    "description": "Story updated successfully"
-                })
-            else:
-                resp.body = json.dumps({
-                    "success": False,
-                    "description": "Something went wrong when updating story"
-                })
-
-        except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
-            logger.exception(err)
-            raise err
-
-    @check_session
-    def on_delete_story(self, req, resp, story_id):
-        try:
-            deleted = ProjectDA.delete_story(story_id=story_id)
-
-            if deleted:
-                resp.body = json.dumps({
-                    "success": True,
-                    "description": "Story deleted successfully"
-                })
-            else:
-                resp.body = json.dumps({
-                    "success": False,
-                    "description": "Something went wrong when deleting story"
-                })
-
-        except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
-            logger.exception(err)
-            raise err
-
-    # Task
-    @check_session
-    def on_post_task(self, req, resp):
-        logger.debug('task')
