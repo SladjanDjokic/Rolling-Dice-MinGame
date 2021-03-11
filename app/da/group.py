@@ -475,7 +475,7 @@ class GroupDA(object):
     """
     @classmethod
     def get_all_groups(cls):
-        groups = list()
+        groups = []
         query = ("""
             SELECT
                 id,
@@ -850,7 +850,7 @@ class GroupMembershipDA(object):
             FROM member_group_membership
             WHERE group_role IS NULL
         """
-        result = list()
+        result = []
         cls.source.execute(query, None)
         if cls.source.has_results():
             memberships = cls.source.cursor.fetchall()
@@ -860,9 +860,7 @@ class GroupMembershipDA(object):
                     "member_id": row[1],
                 }
                 result.append(membership)
-            return result
-        else:
-            return None
+        return result
 
     @classmethod
     def set_member_group_role(cls, member_id, group_id, group_role):
