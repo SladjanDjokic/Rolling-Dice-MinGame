@@ -1652,20 +1652,24 @@ class MemberContactDA(object):
                     receiver_contact.id,
                     receiver_contact.status,
                     receiver_contact.create_date,
+                    receiver_contact.update_date,
                     member.id as create_user_id,
                     member.first_name,
                     member.last_name,
                     member.email,
-                    file_storage_engine.storage_engine_id
+                    file_storage_engine.storage_engine_id,
+                    contact.id as requester_contact_id
                 FROM contact
-                INNER JOIN contact receiver_contact on contact.contact_member_id = receiver_contact.member_id AND receiver_contact.contact_member_id = contact.member_id
+                INNER JOIN contact receiver_contact ON 
+                        contact.contact_member_id = receiver_contact.member_id 
+                    AND contact.member_id = receiver_contact.contact_member_id
                 INNER JOIN member ON contact.member_id = member.id
                 LEFT JOIN member_profile ON member.id = member_profile.member_id
                 LEFT JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
                 WHERE 
                     receiver_contact.member_id = %s
                     {pending}
-                ORDER BY receiver_contact.create_date DESC
+                ORDER BY receiver_contact.update_date DESC
                 LIMIT 10
             """
 
@@ -1677,21 +1681,25 @@ class MemberContactDA(object):
                         id,
                         status,
                         create_date,
+                        update_date,
                         create_user_id,
                         first_name,
                         last_name,
                         email,
-                        storage_engine_id
+                        storage_engine_id,
+                        requester_contact_id
                 ) in cls.source.cursor:
                     contact = {
                         "id": id,
                         "status": status,
                         "create_date": create_date,
+                        "update_date": update_date,
                         "create_user_id": create_user_id,
                         "first_name": first_name,
                         "last_name": last_name,
                         "email": email,
                         "amera_avatar_url": amerize_url(storage_engine_id),
+                        "requester_contact_id": requester_contact_id,
                         "invitation_type": "contact_invitation"
                     }
                     contacts.append(contact)

@@ -62,7 +62,6 @@ from app.resources.bug_report import BugReportResource, BugReportUsersResource
 
 from app.resources.admin import AdminMemberResource
 
-from app.da.__init__ import migrate_group_members, check_trees
 from app.util.config import setup_vyper
 from app.util.error import error_handler
 from app.util.logging import setup_logging
@@ -128,10 +127,6 @@ def create_app():
     app.add_error_handler(Exception, error_handler)
 
     _setup_routes(app)
-
-    # This will migrate existing data to new group tables
-    migrate_group_members()
-    # check_trees()
 
     return app
 
