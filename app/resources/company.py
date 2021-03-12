@@ -1,8 +1,9 @@
 import app.util.json as json
 import logging
+import falcon
 
 import app.util.request as request
-from app.util.auth import check_session_administrator
+from app.util.auth import check_session, check_session_administrator
 from app.da.file_sharing import FileStorageDA
 
 from app.da.company import CompanyDA
@@ -52,13 +53,20 @@ class CompanyResource(object):
                 "success": False
             }, default_parser=json.parser)
 
-    @staticmethod
-    def on_get(req, resp):
-        member_id = req.get_param('member_id')
+    @check_session
+    def on_get(self, req, resp):
+        member_id = req.get_param_as_int('member_id')
+        sort_params = req.get_param('sort')
+        page_size = req.get_param_as_int('page_size')
+        page_number = req.get_param_as_int('page_number')
 
-        companies = CompanyDA.get_companies(member_id)
+        if member_id and member_id != req.context.auth['session']['member_id']:
+            raise falcon.HTTPForbidden()
+
+        data = CompanyDA.get_companies(member_id, sort_params, page_size, page_number)
         resp.body = json.dumps({
-            "data": companies,
+            "data": data,
+            "description": "load successfully",
             "success": True
         }, default_parser=json.parser)
 
@@ -172,12 +180,15 @@ class CompanyResource(object):
 class CompanyUnregisteredResource(object):
 
     def on_get(self, req, resp):
+        sort_params = req.get_param('sort')
+        page_size = req.get_param_as_int('page_size')
+        page_number = req.get_param_as_int('page_number')
 
         try:
-            companies = CompanyDA.get_unregistered_company()
+            data = CompanyDA.get_unregistered_company(sort_params, page_size, page_number)
 
             resp.body = json.dumps({
-                "data": companies,
+                "data": data,
                 "description": "load successfully",
                 "success": True
             }, default_parser=json.parser)
