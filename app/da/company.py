@@ -19,6 +19,8 @@ class CompanyDA(object):
                 company.address_1,
                 company.address_2,
                 company.city,
+                company.state,
+                company.postal,
                 company.country_code_id,
                 country_code.name as country,
                 currency_code.id AS currency_code_id,
@@ -51,6 +53,8 @@ class CompanyDA(object):
                 company.address_1,
                 company.address_2,
                 company.city,
+                company.state,
+                company.postal,
                 company.country_code_id,
                 country_code.name,
                 currency_code.id,
@@ -73,6 +77,8 @@ class CompanyDA(object):
                 address_1,
                 address_2,
                 city,
+                state,
+                postal,
                 country_code_id,
                 country,
                 currency_code_id,
@@ -91,6 +97,8 @@ class CompanyDA(object):
                 "address_1": address_1,
                 "address_2": address_2,
                 "city": city,
+                "state": state,
+                "postal": postal,
                 "country_code_id": country_code_id,
                 "country": country,
                 "currency_code_id": currency_code_id,
@@ -115,6 +123,8 @@ class CompanyDA(object):
                 company.address_1,
                 company.address_2,
                 company.city,
+                company.state,
+                company.postal,
                 company.country_code_id,
                 country_code.name as country,
                 currency_code.id AS currency_code_id,
@@ -158,6 +168,8 @@ class CompanyDA(object):
                 company.address_1,
                 company.address_2,
                 company.city,
+                company.state,
+                company.postal,
                 company.country_code_id,
                 currency_code.id,
                 currency_code.currency_code,
@@ -183,6 +195,8 @@ class CompanyDA(object):
                 address_1,
                 address_2,
                 city,
+                state,
+                postal,
                 country_code_id,
                 country,
                 currency_code_id,
@@ -202,6 +216,8 @@ class CompanyDA(object):
                     "address_1": address_1,
                     "address_2": address_2,
                     "city": city,
+                    "state": state,
+                    "postal": postal,
                     "country_code_id": country_code_id,
                     "country": country,
                     "currency_code_id": currency_code_id,
@@ -221,14 +237,15 @@ class CompanyDA(object):
         return companies
 
     @classmethod
-    def create_company(cls, name, address_1, address_2, city, country_code_id, main_phone, primary_url, logo_storage_id, commit=True):
+    def create_company(cls, name, address_1, address_2, city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id, commit=True):
         query = ("""
-            INSERT INTO company (name, address_1, address_2, city, country_code_id, main_phone, primary_url, logo_storage_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO company (name, address_1, address_2, city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
         """)
 
-        params = (name, address_1, address_2, city, country_code_id,
+        params = (name, address_1, address_2, city,
+                  state, postal, country_code_id,
                   main_phone, primary_url, logo_storage_id)
         cls.source.execute(query, params)
         id = cls.source.get_last_row_id()
@@ -239,7 +256,7 @@ class CompanyDA(object):
         return id
 
     @classmethod
-    def update_company(cls, company_id, name, address_1, address_2, city, country_code_id, main_phone, primary_url, logo_storage_id, commit=True):
+    def update_company(cls, company_id, name, address_1, address_2, city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id, commit=True):
         query = ("""
             UPDATE company
             SET
@@ -247,6 +264,8 @@ class CompanyDA(object):
                 address_1 = %s,
                 address_2 = %s,
                 city = %s,
+                state = %s,
+                postal = %s,
                 country_code_id = %s,
                 main_phone = %s,
                 primary_url = %s,
@@ -254,7 +273,8 @@ class CompanyDA(object):
             WHERE id = %s
         """)
 
-        params = (name, address_1, address_2, city, country_code_id,
+        params = (name, address_1, address_2, city,
+                  state, postal, country_code_id,
                   main_phone, primary_url, logo_storage_id, company_id)
 
         cls.source.execute(query, params)

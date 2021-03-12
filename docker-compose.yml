@@ -388,6 +388,7 @@ services:
       - ../web-api/datasource/postgresql/video_mail.sql:/docker-entrypoint-initdb.d/p-video_mail.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-02-25_currency.sql:/docker-entrypoint-initdb.d/p-0-currency.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-02-25_project.sql:/docker-entrypoint-initdb.d/p-1-project.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-02-22_company.sql:/docker-entrypoint-initdb.d/p-2-company.sql
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/z-3-test-schedule.sql

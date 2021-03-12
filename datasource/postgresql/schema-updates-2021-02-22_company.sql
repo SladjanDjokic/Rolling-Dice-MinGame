@@ -1,0 +1,3 @@
+ALTER TABLE company
+  ADD COLUMN state    VARCHAR(10) NULL,
+  ADD COLUMN province VARCHAR(10) NULL;

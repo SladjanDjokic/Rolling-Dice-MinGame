@@ -31,7 +31,7 @@ def validate_session_request(request):
 def validate_session_administrator(request):
     session = validate_session_request(request)
 
-    logger.debug(f"Resource Class: {cls}")
+    # logger.debug(f"Resource Class: {cls}")
     logger.debug(f"User Type: {session['user_type']}")
 
     if session["user_type"] != 'administrator':
