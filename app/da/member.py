@@ -959,7 +959,7 @@ class MemberContactDA(object):
             SELECT 
                 contact.id as id,
                 contact.contact_member_id as contact_member_id,
-                member_rate.pay_rate as default_pay_rate,
+                CASE WHEN member_rate.pay_rate IS NOT NULL THEN member_rate.pay_rate ELSE 0 END as default_pay_rate,
                 member_rate.currency_code_id,
                 member.first_name as first_name,
                 member.middle_name as middle_name,
@@ -1065,7 +1065,7 @@ class MemberContactDA(object):
                     contact = {
                         "id": id,
                         "contact_member_id": contact_member_id,
-                        "default_pay_rate": float(default_pay_rate),
+                        "default_pay_rate": default_pay_rate,
                         "currency_code_id": currency_code_id,
                         "first_name": first_name,
                         "middle_name": middle_name,

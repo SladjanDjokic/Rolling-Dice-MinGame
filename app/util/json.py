@@ -39,6 +39,9 @@ def parser(obj):
     if isinstance(obj, cgi.FieldStorage):
         return '<byte-data>'
 
+    if hasattr(obj, 'radix'):
+        return float(obj)
+
     msg = (
         'Object of type {} with value of {} is'
         ' not JSON serializable'

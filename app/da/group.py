@@ -148,6 +148,23 @@ class GroupDA(object):
             sort_columns_string = cls.formatSortingParams(
                 sort_params, group_dict) or sort_columns_string
 
+        search_query = ("""
+        AND (
+            member_group.group_name ILIKE %s
+            OR concat_ws(' ', member.first_name, member.last_name) ILIKE %s
+            OR member.email ILIKE %s
+            OR concat('create year ', EXTRACT(YEAR FROM member_group.create_date)) LIKE %s
+            OR concat('create month ', EXTRACT(MONTH FROM member_group.create_date)) LIKE %s
+            OR concat('create month ', to_char(member_group.create_date, 'month')) LIKE %s
+            OR concat('create day ', EXTRACT(DAY FROM member_group.create_date)) LIKE %s
+            OR concat('create day ', to_char(member_group.create_date, 'day')) LIKE %s
+            OR concat('update year ', EXTRACT(YEAR FROM member_group.update_date)) LIKE %s
+            OR concat('update month ', EXTRACT(MONTH FROM member_group.update_date)) LIKE %s
+            OR concat('update month ', to_char(member_group.update_date, 'month')) LIKE %s
+            OR concat('update day ', EXTRACT(DAY FROM member_group.update_date)) LIKE %s
+            OR concat('update day ', to_char(member_group.update_date, 'day')) LIKE %s
+        )
+        """)
         query = (f"""
             SELECT
                 member_group.id AS group_id,
@@ -162,51 +179,37 @@ class GroupDA(object):
                 member.first_name AS group_leader_first_name,
                 member.last_name AS group_leader_last_name,
                 member.email AS group_leader_email,
-                COUNT(DISTINCT(members.id)) AS total_member,
-                (SELECT json_agg(members)) AS members,
-                count(DISTINCT file_tree_item.id) AS total_files
+                COUNT(DISTINCT(membership_members.id)) AS total_member,
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'id', member_group_membership.member_id,
+                            'first_name', member.first_name,
+                            'last_name', member.last_name,
+                            'email', member.email,
+                            'company', member.company_name,
+                            'title', job_title.name,
+                            'amera_avatar_url', file_path(file_storage_engine.storage_engine_id, '/member/file'),
+                            'create_date', member_group_membership.create_date,
+                            'group_id', member_group_membership.group_id 
+                            
+                        )
+                    )
+                ) AS members,
+                count(DISTINCT file_tree_item.id) AS total_files,
+                group_type
             FROM member_group
             INNER JOIN member_group_membership ON member_group.id = member_group_membership.group_id
             LEFT JOIN member ON member.id = member_group_membership.member_id
-            LEFT JOIN (
-                SELECT
-                    member_group_membership.member_id as id,
-                    member.first_name as first_name,
-                    member.last_name as last_name,
-                    member.email as email,
-                    member.company_name as company,
-                    job_title.name as title,
-                    file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url,
-                    member_group_membership.create_date as create_date,
-                    member_group_membership.group_id as group_id
-                FROM member_group_membership
-                LEFT JOIN member ON member_group_membership.member_id = member.id
-                LEFT JOIN job_title ON member.job_title_id = job_title.id
-                LEFT JOIN member_profile ON member.id = member_profile.member_id
-                LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
-            ) AS members ON members.group_id = member_group.id
-            LEFT JOIN file_tree ON (file_tree.id = member_group.main_file_tree)
-            LEFT JOIN (
-                        SELECT id, file_tree_id
-                        FROM file_tree_item
-                        WHERE file_tree_item.member_file_id IS NOT NULL
-                    ) as file_tree_item ON file_tree_item.file_tree_id = file_tree.id
+            LEFT OUTER JOIN member_group_membership AS members ON members.group_id = member_group.id
+            LEFT OUTER JOIN member AS membership_members ON members.member_id = membership_members.id
+            LEFT OUTER JOIN job_title ON membership_members.job_title_id = job_title.id
+            LEFT OUTER JOIN member_profile ON membership_members.id = member_profile.member_id
+            LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+            LEFT OUTER JOIN file_tree ON (file_tree.id = member_group.main_file_tree)
+            LEFT OUTER JOIN file_tree_item ON file_tree_item.member_file_id IS NOT NULL AND file_tree_item.file_tree_id = file_tree.id
             WHERE member_group_membership.member_id = %s AND member_group_membership.group_role = 'owner' AND group_type = %s
-            AND (
-                    member_group.group_name ILIKE %s
-                    OR concat_ws(' ', member.first_name, member.last_name) ILIKE %s
-                    OR member.email ILIKE %s
-                    OR concat('create year ', EXTRACT(YEAR FROM member_group.create_date)) LIKE %s
-                    OR concat('create month ', EXTRACT(MONTH FROM member_group.create_date)) LIKE %s
-                    OR concat('create month ', to_char(member_group.create_date, 'month')) LIKE %s
-                    OR concat('create day ', EXTRACT(DAY FROM member_group.create_date)) LIKE %s
-                    OR concat('create day ', to_char(member_group.create_date, 'day')) LIKE %s
-                    OR concat('update year ', EXTRACT(YEAR FROM member_group.update_date)) LIKE %s
-                    OR concat('update month ', EXTRACT(MONTH FROM member_group.update_date)) LIKE %s
-                    OR concat('update month ', to_char(member_group.update_date, 'month')) LIKE %s
-                    OR concat('update day ', EXTRACT(DAY FROM member_group.update_date)) LIKE %s
-                    OR concat('update day ', to_char(member_group.update_date, 'day')) LIKE %s
-                )
+            {search_query if search_key else ""}
             GROUP BY member_group.id,
                     member_group_membership.member_id,
                     group_name,
@@ -224,11 +227,11 @@ class GroupDA(object):
 
         group_list = list()
 
-        if not search_key:
-            search_key = ""
+        params = (group_leader_id, group_type)
 
-        like_search_key = f"%{search_key}%"
-        params = (group_leader_id, group_type) + tuple(13 * [like_search_key])
+        if search_key:
+            like_search_key = f"%{search_key}%"
+            params = params + tuple(13 * [like_search_key])
         cls.source.execute(query, params)
         if cls.source.has_results():
             all_group = cls.source.cursor.fetchall()

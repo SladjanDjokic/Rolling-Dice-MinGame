@@ -30,6 +30,8 @@ from falcon_multipart.parser import Parser
 
 
 logger = logging.getLogger(__name__)
+logger_kafka = logging.getLogger(f"{__name__}_kafka")
+logger_kafka.setLevel(logging.ERROR)
 
 # Topic route table based on resource and method.
 # TODO move this to env file or vyper
@@ -174,11 +176,11 @@ class KafkaProducerMiddleware(object):
         #   Connection refused (after 50ms in state CONNECT)"}
         # KafkaError{code=_ALL_BROKERS_DOWN,val=-187,
         #   str="1/1 brokers are down"}
-        logger.error(f"Kafka Error: {err}")
+        logger_kafka.error(f"Kafka Error: {err}")
         if err.name() in ['_ALL_BROKERS_DOWN', '_TRANSPORT']:
             self.producer_connected = False
             self.p.abort_transaction()
-            logger.error(f"Kafka Connection issue: {err}")
+            logger_kafka.error(f"Kafka Connection issue: {err}")
 
     def __init__(self):
 
@@ -204,10 +206,10 @@ class KafkaProducerMiddleware(object):
         self.topic_data = TopicData()
         self.db_query_data = {}
         try:
-            self.p = Producer(producer_conf, logger=logger)
+            self.p = Producer(producer_conf, logger=logger_kafka)
             self.producer_connected = True
         except KafkaException as e:
-            logger.debug(f"KafkaException: {e}")
+            logger_kafka.debug(f"KafkaException: {e}")
             self.__handle_kafka_errors(e.args[0])
 
         # self.p = Producer({
@@ -216,12 +218,12 @@ class KafkaProducerMiddleware(object):
 
     def process_request(self, req, resp):
         if req.path in ignore_routes:
-            # logger.debug(f"Ignoring route: {req.path}")
+            # logger_kafka.debug(f"Ignoring route: {req.path}")
             return
 
     def process_resource(self, req, resp, resource, params):
         if req.path in ignore_routes:
-            # logger.debug(f"Ignoring route: {req.path}")
+            # logger_kafka.debug(f"Ignoring route: {req.path}")
             return
 
         topic_data = TopicData()
@@ -236,15 +238,15 @@ class KafkaProducerMiddleware(object):
             topic, event = self._resource_topic_event(req, resource)
             topic_data.event_type = event
         except Exception as e:
-            logger.debug(f"""
+            logger_kafka.debug(f"""
                 Failed to retrieve topic from: {resource.__class__.__name__}
                 Request Method: {req.method}
                 Template: {req.uri_template}
                 Path: {req.path}
             """)
-            logger.exception(
+            logger_kafka.exception(
                 f'Failed to retrieve topic from: {resource.__class__.__name__}')
-            logger.error(e)
+            logger_kafka.error(e)
 
             pass
 
@@ -305,13 +307,13 @@ class KafkaProducerMiddleware(object):
 
             ActivityDA.insert_activity(**db_query_data)
         except Exception as e:
-            logger.error(e, exc_info=True)
+            logger_kafka.error(e, exc_info=True)
 
         return
 
     def process_response(self, req, resp, resource, req_succeeded):
         if req.path in ignore_routes:
-            # logger.debug(f"Ignoring route: {req.path}")
+            # logger_kafka.debug(f"Ignoring route: {req.path}")
             return
 
         topic_data = TopicData()
@@ -327,15 +329,15 @@ class KafkaProducerMiddleware(object):
             topic, event = self._resource_topic_event(req, resource)
             topic_data.event_type = event
         except Exception as e:
-            logger.debug(f"""
+            logger_kafka.debug(f"""
                 Failed to retrieve topic from: {resource.__class__.__name__}
                 Request Method: {req.method}
                 Template: {req.uri_template}
                 Path: {req.path}
             """)
-            logger.exception(
+            logger_kafka.exception(
                 f'Failed to retrieve topic from: {resource.__class__.__name__}')
-            logger.error(e)
+            logger_kafka.error(e)
 
             pass
 
@@ -414,7 +416,7 @@ class KafkaProducerMiddleware(object):
             if 200 <= int(topic_data.http_status[:3]) < 300:
                 # Check if event_type matches a notification
                 notification_type = event_type_to_notification.get(topic_data.event_type)
-                logger.debug(f"### {topic_data.event_type}")
+                logger_kafka.debug(f"### {topic_data.event_type}")
                 if notification_type:
                     notification_sent = False
                     member_id = None
@@ -424,7 +426,7 @@ class KafkaProducerMiddleware(object):
                         #  from req_url_params
                         # member_id = BaseMailDA.get_mail_detail(topic_data.req_url_params.get('member'))
                     elif notification_type == "RequestToJoinGroup":
-                        logger.debug("RequestTOJoinGroup Notification")
+                        logger_kafka.debug("RequestTOJoinGroup Notification")
                         member_id = req.headers.get('kafka_invitee_id')
                         topic_data_dict['kafka_invitee_id'] = member_id
                         topic_data_dict['kafka_group_name'] = req.headers.get('kafka_group_name')
@@ -439,11 +441,11 @@ class KafkaProducerMiddleware(object):
                         # topic_data_dict['kafka_group_id'] = req.headers.get('kafka_group_id')
                         topic_data_dict['kafka_group_status'] = req.headers.get('kafka_group_status')
                     elif notification_type == "RequestContact":
-                        logger.debug(" REQUEST CONTACT")
+                        logger_kafka.debug(" REQUEST CONTACT")
                         contact_list = req.headers.get('kafka_contact_id_list')
                         # req.set_header('kafka_contact_member_id_list', "")
                         if contact_list:
-                            logger.debug(f"### {contact_list}")
+                            logger_kafka.debug(f"### {contact_list}")
                             topic_data_dict['kafka_contact_id_list'] = json.loads(contact_list)
                             self.producer_async("sms", [json.dumps(topic_data_dict,
                                                                    default_parser=json.parser)])
@@ -461,7 +463,7 @@ class KafkaProducerMiddleware(object):
                         self.produce_notification(member_id, notification_type, topic_data_dict)
 
         except Exception as e:
-            logger.error(e, exc_info=True)
+            logger_kafka.error(e, exc_info=True)
 
         return
 
@@ -481,16 +483,16 @@ class KafkaProducerMiddleware(object):
                 # will be triggered from poll() above, or flush() below, when the message has
                 # been successfully delivered or failed permanently.
                 data = data.encode('utf-8')
-                logger.debug(f"PRODUCING to {topic} {data}")
+                logger_kafka.debug(f"PRODUCING to {topic} {data}")
                 self.p.produce(topic, value=data, callback=self.delivery_report)
             except KafkaException as exc:
-                logger.error('KafkaException When Producing or Polling')
+                logger_kafka.error('KafkaException When Producing or Polling')
                 self.__handle_kafka_errors(exc.args[0])
             except KafkaError as exc:
-                logger.error('KafkaError When Producing or Polling')
+                logger_kafka.error('KafkaError When Producing or Polling')
                 self.__handle_kafka_errors(exc)
             except Exception as exc:
-                logger.exception(exc, exc_info=True)
+                logger_kafka.exception(exc, exc_info=True)
 
         # Wait for any outstanding messages to be delivered and delivery report
         # callbacks to be triggered.
@@ -510,7 +512,7 @@ class KafkaProducerMiddleware(object):
 
     @staticmethod
     def _resource_topic_event(req, resource):
-        logger.debug(f"Attempt to get route method: {req.method}")
+        logger_kafka.debug(f"Attempt to get route method: {req.method}")
         # Get kafka data from resource for  topic routing and event_type
         if not hasattr(resource, "kafka_data"):
             raise KeyError("No need to go further, no kafka_data")
@@ -519,7 +521,7 @@ class KafkaProducerMiddleware(object):
 
         try:
             uri_map = method_map["uri"]
-            logger.debug(f"""
+            logger_kafka.debug(f"""
             Attempt to get
                 URI event: {uri_map}
                 FROM: {req.uri_template}
@@ -538,7 +540,7 @@ class KafkaProducerMiddleware(object):
         if not topic:
             raise KeyError(f"Topic is: {topic} which is invalid - KeyError")
 
-        logger.debug(
+        logger_kafka.debug(
             f"TOPIC AND EVENT_TYPE FOUND: {topic}, {event}")
         return topic, event
 
@@ -547,9 +549,9 @@ class KafkaProducerMiddleware(object):
         """ Called once for each message produced to indicate delivery result.
             Triggered by poll() or flush(). """
         if err is not None:
-            logger.debug('Message delivery failed: {}'.format(err))
+            logger_kafka.debug('Message delivery failed: {}'.format(err))
         else:
-            logger.debug('Message delivered to {} [{}] {}'.format(
+            logger_kafka.debug('Message delivered to {} [{}] {}'.format(
                 msg.topic(), msg.partition(), msg.value()))
 
     def produce_notification(self, member_id, notification_type, topic_data_dict):
@@ -566,4 +568,4 @@ class KafkaProducerMiddleware(object):
                 self.producer_async('email', [json.dumps(topic_data_dict,
                                                          default_parser=json.parser)])
         else:
-            logger.error("No notificaiton settings for user")
+            logger_kafka.error("No notificaiton settings for user")

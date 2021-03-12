@@ -57,3 +57,5 @@ def setup_vyper(parser, overrides):
     v.set_config_type("toml")
     v.set_config_name(config_name)
     v.read_in_config()
+    # Override logging for Vyper only
+    logging.getLogger("vyper").setLevel(logging.ERROR)
