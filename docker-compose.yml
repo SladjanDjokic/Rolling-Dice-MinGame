@@ -216,7 +216,21 @@ services:
     ports:
       - 5000:5000
     environment:
+      # Application Defaults
+      - AMERA_API_ENV_NAME=LOCAL
+      - AMERA_API_LOG_LEVEL=INFO
+      - AMERA_API_DATABASE.LOG_LEVEL=INFO
+      - AMERA_API_WEB.SESSION_EXPIRATION=31536000
+      # Application Kafka
+      - AMERA_API_KAFKA.CALLS_TOPIC=calls
+      - AMERA_API_KAFKA.SMS_TOPIC=sms
+      - AMERA_API_KAFKA.EMAIL_TOPIC=email
+      - AMERA_API_KAFKA.CHAT_TOPIC=chat
+      - AMERA_API_KAFKA.CALENDAR_TOPIC=calendar
       - AMERA_API_KAFKA.BOOTSTRAP_SERVERS=kafka:9092
+      # Github OAuth
+      - AMERA_API_SERVICES.GITHUB.AUTHORIZATION_URL=https://github.com/login/oauth/authorize
+      - AMERA_API_SERVICES.GITHUB.TOKEN_URL=https://github.com/login/oauth/access_token
     volumes:
       - ../web-api:/app
       - web-api-python-packages:/root/.local/share
@@ -271,6 +285,22 @@ services:
       #   condition: service_started
       amera-web-api:
         condition: service_healthy
+    environment:
+      # Application Defaults
+      - AMERA_API_ENV_NAME=LOCAL
+      - AMERA_API_LOG_LEVEL=INFO
+      - AMERA_API_DATABASE.LOG_LEVEL=INFO
+      - AMERA_API_WEB.SESSION_EXPIRATION=31536000
+      # Application Kafka
+      - AMERA_API_KAFKA.CALLS_TOPIC=calls
+      - AMERA_API_KAFKA.SMS_TOPIC=sms
+      - AMERA_API_KAFKA.EMAIL_TOPIC=email
+      - AMERA_API_KAFKA.CHAT_TOPIC=chat
+      - AMERA_API_KAFKA.CALENDAR_TOPIC=calendar
+      - AMERA_API_KAFKA.BOOTSTRAP_SERVERS=kafka:9092
+      # Github OAuth
+      - AMERA_API_SERVICES.GITHUB.AUTHORIZATION_URL=https://github.com/login/oauth/authorize
+      - AMERA_API_SERVICES.GITHUB.TOKEN_URL=https://github.com/login/oauth/access_token
     networks:
       - amera-net
     expose:
@@ -476,7 +506,22 @@ services:
       - ../web-api:/app
       - web-api-python-packages:/root/.local/share
     environment:
+      # Application Defaults
+      - AMERA_API_ENV_NAME=LOCAL
+      - AMERA_API_LOG_LEVEL=INFO
+      - AMERA_API_DATABASE.LOG_LEVEL=INFO
+      - AMERA_API_WEB.SESSION_EXPIRATION=31536000
+      # Application Kafka
+      - AMERA_API_KAFKA.CALLS_TOPIC=calls
+      - AMERA_API_KAFKA.SMS_TOPIC=sms
+      - AMERA_API_KAFKA.EMAIL_TOPIC=email
+      - AMERA_API_KAFKA.CHAT_TOPIC=chat
+      - AMERA_API_KAFKA.CALENDAR_TOPIC=calendar
+      - AMERA_API_KAFKA.BOOTSTRAP_SERVERS=kafka:9092
       - AMERA_API_KAFKA.SERVER=kafka:9092
+      # Github OAuth
+      - AMERA_API_SERVICES.GITHUB.AUTHORIZATION_URL=https://github.com/login/oauth/authorize
+      - AMERA_API_SERVICES.GITHUB.TOKEN_URL=https://github.com/login/oauth/access_token
     depends_on:
       kafka:
         condition: service_healthy
@@ -507,7 +552,22 @@ services:
       - ../web-api:/app
       - web-api-python-packages:/root/.local/share
     environment:
+      # Application Defaults
+      - AMERA_API_ENV_NAME=LOCAL
+      - AMERA_API_LOG_LEVEL=INFO
+      - AMERA_API_DATABASE.LOG_LEVEL=INFO
+      - AMERA_API_WEB.SESSION_EXPIRATION=31536000
+      # Application Kafka
+      - AMERA_API_KAFKA.CALLS_TOPIC=calls
+      - AMERA_API_KAFKA.SMS_TOPIC=sms
+      - AMERA_API_KAFKA.EMAIL_TOPIC=email
+      - AMERA_API_KAFKA.CHAT_TOPIC=chat
+      - AMERA_API_KAFKA.CALENDAR_TOPIC=calendar
+      - AMERA_API_KAFKA.BOOTSTRAP_SERVERS=kafka:9092
       - AMERA_API_KAFKA.SERVER=kafka:9092
+      # Github OAuth
+      - AMERA_API_SERVICES.GITHUB.AUTHORIZATION_URL=https://github.com/login/oauth/authorize
+      - AMERA_API_SERVICES.GITHUB.TOKEN_URL=https://github.com/login/oauth/access_token
     depends_on:
       kafka:
         condition: service_started
@@ -540,7 +600,22 @@ services:
       - ../web-api:/app
       - web-api-python-packages:/root/.local/share
     environment:
+      # Application Defaults
+      - AMERA_API_ENV_NAME=LOCAL
+      - AMERA_API_LOG_LEVEL=INFO
+      - AMERA_API_DATABASE.LOG_LEVEL=INFO
+      - AMERA_API_WEB.SESSION_EXPIRATION=31536000
+      # Application Kafka
+      - AMERA_API_KAFKA.CALLS_TOPIC=calls
+      - AMERA_API_KAFKA.SMS_TOPIC=sms
+      - AMERA_API_KAFKA.EMAIL_TOPIC=email
+      - AMERA_API_KAFKA.CHAT_TOPIC=chat
+      - AMERA_API_KAFKA.CALENDAR_TOPIC=calendar
+      - AMERA_API_KAFKA.BOOTSTRAP_SERVERS=kafka:9092
       - AMERA_API_KAFKA.SERVER=kafka:9092
+      # Github OAuth
+      - AMERA_API_SERVICES.GITHUB.AUTHORIZATION_URL=https://github.com/login/oauth/authorize
+      - AMERA_API_SERVICES.GITHUB.TOKEN_URL=https://github.com/login/oauth/access_token
     depends_on:
       kafka:
         condition: service_started

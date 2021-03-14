@@ -597,6 +597,7 @@ class GroupDA(object):
         group_id = cls.create_expanded_group(group_name=name,picture_file_id=file_id, pin=pin, exchange_option=exchange_option,main_file_tree=main_file_tree_id,bin_file_tree=bin_file_tree_id,group_type=group_type)
         return group_id
 
+    @classmethod
     def get_all_group_invitations_by_member_id(cls, member_id, is_history=False):
         groups = list()
 

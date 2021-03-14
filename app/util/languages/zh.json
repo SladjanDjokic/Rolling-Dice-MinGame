@@ -23,6 +23,7 @@
   "app.settings.notification.title": "Notifications",
   "app.settings.payment.title": "Payments",
   "app.settings.security.title": "Security Preferences",
+  "app.password.manager.title": "Password Manager",
   "app.guest.header.aboutUs": "About Us",
   "app.guest.header.pricing": "Plans & Pricing",
   "app.guest.header.features": "Features",
