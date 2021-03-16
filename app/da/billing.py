@@ -10,7 +10,7 @@ class BillingDA(object):
     @classmethod
     def get_currency_list(cls, only_enabled):
         query = (f"""
-            SELECT 
+            SELECT DISTINCT
                 currency_code.id as currency_code_id,
                 currency_code,
                 currency_name,

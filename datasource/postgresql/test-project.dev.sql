@@ -59,13 +59,27 @@ INSERT INTO project_element (project_id, title, parent_id, element_type, descrip
     (1,'Another story',5,'story','Not so cool title', 1,1),
     (1,'Fixed story',5,'story','Some description', 1,1);
 
-INSERT INTO project_member_contract (project_member_id, pay_rate, rate_type, currency_code_id, contract_status, rate_start_date, create_by, update_by) VALUES 
-    (1, 40, 'hourly', 132, 'active', CURRENT_TIMESTAMP, 1, 1),
-    (2, 30, 'hourly', 132, 'pending', CURRENT_TIMESTAMP, 1, 1),
-    (3, 500, 'fixed', 132, 'active', CURRENT_TIMESTAMP, 1, 1),
-    (4, 30, 'hourly', 132, 'active', CURRENT_TIMESTAMP, 1, 1),
-    (5, 25, 'hourly', 132, 'suspend', CURRENT_TIMESTAMP, 1, 1),
-    (6, 30, 'hourly', 132, 'pending', CURRENT_TIMESTAMP, 1, 1);
+INSERT INTO project_member_contract (project_member_id, pay_rate, rate_type, currency_code_id, create_by, update_by) VALUES 
+    (1, 40, 'hourly', 132,  1, 1),
+    (2, 30, 'hourly', 132,  1, 1),
+    (3, 500, 'fixed', 132,  1, 1),
+    (4, 30, 'hourly', 132,  1, 1),
+    (5, 25, 'hourly', 132,  1, 1),
+    (6, 30, 'hourly', 132,  1, 1);
+
+INSERT INTO project_contract_status (contract_id, contract_status, update_by, update_date) VALUES
+    (1, 'pending', 1, CURRENT_TIMESTAMP - INTERVAL '3 weeks'),
+    (1, 'active', 1,  CURRENT_TIMESTAMP - INTERVAL '1 weeks'),
+    (2, 'pending', 1, CURRENT_TIMESTAMP - INTERVAL '3 weeks'),
+    (2, 'active', 1,  CURRENT_TIMESTAMP - INTERVAL '1 weeks'),
+    (3, 'pending', 1, CURRENT_TIMESTAMP - INTERVAL '3 weeks'),
+    (3, 'active', 1,  CURRENT_TIMESTAMP - INTERVAL '1 weeks'),
+    (4, 'pending', 1, CURRENT_TIMESTAMP - INTERVAL '3 weeks'),
+    (4, 'active', 1,  CURRENT_TIMESTAMP - INTERVAL '1 weeks'),
+    (5, 'pending', 1, CURRENT_TIMESTAMP - INTERVAL '3 weeks'),
+    (5, 'active', 1,  CURRENT_TIMESTAMP - INTERVAL '1 weeks'),
+    (6, 'pending', 1, CURRENT_TIMESTAMP - INTERVAL '3 weeks'),
+    (6, 'active', 1,  CURRENT_TIMESTAMP - INTERVAL '1 weeks');
 
 -- Task
 INSERT INTO project_element (project_id, title, parent_id, element_type, description, create_by, update_by, est_hours, contract_id, currency_code_id) VALUES

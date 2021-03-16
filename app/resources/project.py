@@ -328,10 +328,14 @@ class ProjectResource(object):
             (project_id, members,) = request.get_json_or_form(
                 "project_id", "members", req=req)
             group_id = ProjectDA.group_id_by_project_id(project_id)
+            author_id = ProjectDA.get_project_member_id(
+                project_id, member_id)
 
             member_id = req.context.auth['session']['member_id']
+            if not members:
+                members = list()
 
-            if len(members) > 0:
+            if isinstance(members, list):
                 # Member ids of persons already in the project
                 onboarded_member_ids = ProjectDA.get_member_ids_for_project(
                     project_id=project_id)
@@ -345,14 +349,27 @@ class ProjectResource(object):
                     for member_id in new_members:
                         GroupMembershipDA().create_group_membership(
                             group_id=group_id, member_id=member_id)
+
                         project_member_id = ProjectDA.create_project_member(
-                            {"project_id": project_id, "member_id": member_id, "pay_rate": 0, "pay_type": "hourly", "currency_id": 666, "privileges": ['view']})
+                            {"project_id": project_id, "member_id": member_id, "privileges": ['view']})
+                        default_rate = ProjectDA.get_member_default_rate(
+                            member_id)
+                        contract_id = ProjectDA.create_contract(
+                            {'project_member_id': project_member_id, "pay_rate": default_rate["pay_rate"], "currency_code_id": default_rate["currency_code_id"], "rate_type": "hourly", "author_id": author_id})
+                        status_updated = ProjectDA.create_contract_status_entry(
+                            contract_id=contract_id, contract_status="pending", author_id=author_id)
 
                 if len(discarded_members) > 0:
                     for member_id in discarded_members:
                         GroupMembershipDA().remove_group_member(group_id=group_id, member_id=member_id)
+                        discarded_project_member_id = ProjectDA.get_project_member_id(
+                            project_id, member_id)
+                        contract_id = ProjectDA.get_id_by_project_member(
+                            project_member_id=discarded_project_member_id)
+                        status_updated = ProjectDA.create_contract_status_entry(
+                            contract_id=contract_id, contract_status="cancel", author_id=author_id)
                         ProjectDA.delete_project_member(
-                            {"project_id": project_id, "member_id": member_id})
+                            project_member_id=discarded_project_member_id)
 
                 resp.body = json.dumps({
                     "success": True,

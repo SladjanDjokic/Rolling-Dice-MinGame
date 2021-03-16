@@ -19,6 +19,7 @@ from app.exceptions.invite import InviteNotFound, InviteExpired
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 from app.da.member import MemberContactDA, MemberVideoMailDA
 from app.da.mail import MailServiceDA
+from app.da.project import ProjectDA
 import app.util.email as sendmail
 
 logger = logging.getLogger(__name__)
@@ -401,15 +402,16 @@ class ContactMembersResource(object):
             "success": True
         }, default_parser=json.parser)
 
+
 class ContactMembersOtherInvitationsResource(object):
 
     def __init__(self):
         self.kafka_data = {
-                           "GET": {"event_type": settings.get('kafka.event_types.get.other_invitations'),
-                                   "topic": settings.get('kafka.topics.event')
-                                   },
+            "GET": {"event_type": settings.get('kafka.event_types.get.other_invitations'),
+                    "topic": settings.get('kafka.topics.event')
+                    },
 
-                           }
+        }
 
     def on_get(self, req, resp):
         try:
@@ -417,16 +419,20 @@ class ContactMembersOtherInvitationsResource(object):
             session = validate_session(session_id)
             member_id = session["member_id"]
 
-
             # contact invitation
-            contact_invitations = MemberContactDA.get_all_contact_invitations_by_member_id(session["member_id"])
+            contact_invitations = MemberContactDA.get_all_contact_invitations_by_member_id(
+                session["member_id"])
             # new text message
-            new_messages = MailServiceDA.get_all_text_mails(session["member_id"])
+            new_messages = MailServiceDA.get_all_text_mails(
+                session["member_id"])
             # new media message
-            new_media_messages = MemberVideoMailDA.get_all_media_mails(session["member_id"])
+            new_media_messages = MemberVideoMailDA.get_all_media_mails(
+                session["member_id"])
             # group invite
-            group_invitations = GroupDA.get_all_group_invitations_by_member_id(session["member_id"])
-            result = contact_invitations + new_messages + new_media_messages + group_invitations
+            group_invitations = GroupDA.get_all_group_invitations_by_member_id(
+                session["member_id"])
+            result = contact_invitations + new_messages + \
+                new_media_messages + group_invitations
 
             resp.body = json.dumps({
                 "data": result,
@@ -656,11 +662,14 @@ class MemberInfoResource(object):
     def on_put(self, req, resp):
         member_id = req.context.auth["session"]["member_id"]
 
-        (member, member_profile, member_achievement, member_contact_2, member_location) = request.get_json_or_form(
-            "member", "member_profile", "member_achievement", "member_contact_2", "member_location", req=req)
+        (member, member_profile, member_achievement, member_contact_2, member_location, member_rate) = request.get_json_or_form(
+            "member", "member_profile", "member_achievement", "member_contact_2", "member_location", "member_rate", req=req)
 
         updated = MemberInfoDA().update_member_info(member_id,
                                                     member, member_profile, member_achievement, member_contact_2, member_location)
+
+        updated = ProjectDA().update_member_default_rate(member_id=member_id,
+                                                         pay_rate=member_rate["pay_rate"], currency_code_id=member_rate["currency_code_id"])
 
         if updated:
             member_info = MemberInfoDA().get_member_info(member_id)
@@ -717,6 +726,7 @@ class MemberSettingResource(object):
                 "data": member_info,
                 "success": True
             }, default_parser=json.parser)
+
 
 class MemberInfoByIdResource(object):
     @check_session
@@ -880,6 +890,7 @@ class MemberContactAccept(object):
                 "success": False
             }, default_parser=json.parser)
 
+
 class MemberVideoMailResource(object):
     def __init__(self) -> None:
         self.kafka_data = {
@@ -941,7 +952,8 @@ class MemberVideoMailResource(object):
                 video_mail_id = MemberVideoMailDA.create_reply_video_mail(
                     logged_member_id, video_storage_id, subject, media_type, replied_id)
 
-            MemberVideoMailDA.create_contact_video_mail_xref(member_id, video_mail_id)
+            MemberVideoMailDA.create_contact_video_mail_xref(
+                member_id, video_mail_id)
 
             resp.body = json.dumps({
                 "video_mail_id": video_mail_id,

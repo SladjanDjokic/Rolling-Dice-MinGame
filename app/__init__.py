@@ -68,7 +68,8 @@ from app.util.error import error_handler
 from app.util.logging import setup_logging
 
 try:
-    imsecure_spec = importlib.util.find_spec(".imsecure.image_secure", package="imsecure")
+    imsecure_spec = importlib.util.find_spec(
+        ".imsecure.image_secure", package="imsecure")
 except ModuleNotFoundError:
     imsecure_spec = None
 
@@ -157,7 +158,8 @@ def start():
 
 
 def _setup_routes(app):
-    logger.debug(f"Spec checker: {imsecure_found} {imsecure_spec} {imsecure_spec.name if imsecure_spec else ''}")
+    logger.debug(
+        f"Spec checker: {imsecure_found} {imsecure_spec} {imsecure_spec.name if imsecure_spec else ''}")
 
     app.add_route('/healthz', HealthResource())
     app.add_route('/healthz/headers', HeadersResource())
@@ -177,7 +179,8 @@ def _setup_routes(app):
     app.add_route("/member/info", MemberInfoResource())
     member_setting_resource = MemberSettingResource()
     app.add_route("/member/setting", member_setting_resource)
-    app.add_route("/member/payment-setting", member_setting_resource, suffix="payment")
+    app.add_route("/member/payment-setting",
+                  member_setting_resource, suffix="payment")
     app.add_route("/member/invite/{invite_key:uuid}", MemberInviteResource())
     app.add_route("/member/register/{invite_key:uuid}", MemberRegisterResource())  # noqa: E501
     app.add_route("/member/register", MemberRegisterResource())  # noqa: E501
@@ -207,7 +210,8 @@ def _setup_routes(app):
     app.add_route("/member/contacts/countries", MemberContactsCountries())
     app.add_route("/member/file/{file_path}", FileDownloadResource())
     app.add_route("/member-contacts", ContactMembersResource())
-    app.add_route("/member/other-invitations", ContactMembersOtherInvitationsResource())
+    app.add_route("/member/other-invitations",
+                  ContactMembersOtherInvitationsResource())
 
     app.add_route("/valid-session", ValidateSessionResource())
 
@@ -246,10 +250,12 @@ def _setup_routes(app):
 
     # Activity New version
     app.add_route("/system/activity/activity", SystemActivitySessionResource())
-    app.add_route("/system/activity/security", SystemActivitySecurityResource())
+    app.add_route("/system/activity/security",
+                  SystemActivitySecurityResource())
     app.add_route("/system/activity/message", SystemActivityMessageResource())
     app.add_route("/system/activity/group", SystemActivityGroupResource())
-    app.add_route("/system/activity/invitations", SystemActivityInvitationsResource())
+    app.add_route("/system/activity/invitations",
+                  SystemActivityInvitationsResource())
 
     app.add_route("/languages", LanguageResource())
 
@@ -372,14 +378,18 @@ def _setup_routes(app):
                   mail_member_folder_resource, suffix="move")
 
     # Routes for video mail
-    
+
     video_mail_resource = MemberVideoMailResource()
 
     app.add_route("/mail/video/all", video_mail_resource, suffix="all")
-    app.add_route("/mail/video/contact/{member_id:int}", video_mail_resource, suffix="contact")
-    app.add_route("/mail/video/contact/{member_id:int}/video_mail/{video_mail_id:int}", video_mail_resource, suffix="contact")
-    app.add_route("/mail/video/group/{group_id:int}", video_mail_resource, suffix="group")
-    app.add_route("/mail/video/group/{group_id:int}/video_mail/{video_mail_id:int}", video_mail_resource, suffix="group")
+    app.add_route(
+        "/mail/video/contact/{member_id:int}", video_mail_resource, suffix="contact")
+    app.add_route(
+        "/mail/video/contact/{member_id:int}/video_mail/{video_mail_id:int}", video_mail_resource, suffix="contact")
+    app.add_route("/mail/video/group/{group_id:int}",
+                  video_mail_resource, suffix="group")
+    app.add_route(
+        "/mail/video/group/{group_id:int}/video_mail/{video_mail_id:int}", video_mail_resource, suffix="group")
 
     # Routes for Chat App
     app.add_route("/chat", ChatView())
@@ -421,6 +431,9 @@ def _setup_routes(app):
                   project_resource, suffix="time")
     app.add_route("/project/element/time/{time_id:int}",
                   project_resource, suffix="time")
+    # app.add_route("/project/contract", project_resource, suffix="contract")
+    # app.add_route(
+    #     "/project/contract/{contract_id:int}", project_resource, suffix="contract")
 
     # Upcoming Events
     app.add_route("/member/event/upcoming", MemberUpcomingEvents())

@@ -10,7 +10,7 @@ class ProjectDA(object):
     def get_all_projects(cls):
         query = ("""
         SELECT json_agg(result) as projects
-            FROM (
+        FROM (
                 SELECT 
                     project.id as project_id,
                     -- Company info
@@ -143,7 +143,7 @@ class ProjectDA(object):
                             LEFT JOIN department ON department_id = department.id
                             LEFT JOIN member_profile ON member.id = member_profile.member_id
                             LEFT JOIN file_storage_engine ON file_storage_engine.id = member_profile.profile_picture_storage_id
-                            WHERE project_member.project_id = project.id
+                            WHERE project_member.project_id = project.id AND project_member.is_active = TRUE
                         ) AS ROWS
                     ),
                     -- All contracts
@@ -156,12 +156,25 @@ class ProjectDA(object):
                                 pay_rate,
                                 rate_type,
                                 currency_code_id,
-                                contract_status,
-                                rate_start_date
-                                create_date,
-                                create_by,
+                                -- status
+                                (
+                                    SELECT json_agg(rows) AS status_history
+                                    FROM (
+                                        SELECT 
+                                            id,
+                                            contract_status,
+                                            update_date,
+                                            update_by
+                                        FROM project_contract_status
+                                        WHERE contract_id = project_member_contract.id
+                                        ORDER BY update_by DESC
+                                        LIMIT 10
+                                    ) AS rows
+                                ),
+                                project_member_contract.create_date,
+                                project_member_contract.create_by,
                                 project_member_contract.update_date,
-                                update_by
+                                project_member_contract.update_by
                             FROM project_member_contract
                             LEFT JOIN project_member ON project_member.id = project_member_id
                             WHERE project_member.project_id = project.id AND project_member_contract.id IN (
@@ -256,9 +269,9 @@ class ProjectDA(object):
                         ) AS temp
                         WHERE temp.element_status != 'cancel' OR temp.element_status != 'delete' OR temp.element_status != 'suspend' 
                     )
-                FROM project
-                LEFT JOIN member_group ON member_group.id = group_id
-            ) as result
+            FROM project
+            LEFT JOIN member_group ON member_group.id = group_id
+        ) as result
         """)
         cls.source.execute(query, None)
         if cls.source.has_results():
@@ -415,12 +428,25 @@ class ProjectDA(object):
                                 pay_rate,
                                 rate_type,
                                 currency_code_id,
-                                contract_status,
-                                rate_start_date
-                                create_date,
-                                create_by,
+                                -- status
+                                (
+                                    SELECT json_agg(rows) AS status_history
+                                    FROM (
+                                        SELECT 
+                                            id,
+                                            contract_status,
+                                            update_date,
+                                            update_by
+                                        FROM project_contract_status
+                                        WHERE contract_id = project_member_contract.id
+                                        ORDER BY update_by DESC
+                                        LIMIT 10
+                                    ) AS rows
+                                ),
+                                project_member_contract.create_date,
+                                project_member_contract.create_by,
                                 project_member_contract.update_date,
-                                update_by
+                                project_member_contract.update_by
                             FROM project_member_contract
                             LEFT JOIN project_member ON project_member.id = project_member_id
                             WHERE project_member.project_id = project.id AND project_member_contract.id IN (
@@ -707,7 +733,7 @@ class ProjectDA(object):
             SELECT ARRAY(
                 SELECT member_id
                 FROM project_member
-                WHERE project_id = %s 
+                WHERE project_id = %s AND is_active = TRUE
             ) AS member_ids
         """)
         cls.source.execute(query, (project_id,))
@@ -728,24 +754,19 @@ class ProjectDA(object):
         return None
 
     @classmethod
-    def delete_project_member(cls, params):
+    def delete_project_member(cls, project_member_id):
         query = ("""
-            WITH deleted AS (
-                DELETE FROM project_member
-                WHERE project_id = %(project_id)s AND member_id = %(member_id)s
-            ) SELECT COUNT(*) FROM deleted
+            UPDATE project_member
+                SET is_active = FALSE
+                WHERE id = %s
+                RETURNING id
         """)
-        cls.source.execute(query, params)
+        cls.source.execute(query, (project_member_id,))
         cls.source.commit()
+        id = cls.source.get_last_row_id()
         logger.debug(
             f"[delete_project_member] TRANSACTION IDENTIFIER: {id}")
-        if cls.source.has_results():
-            if cls.source.cursor.fetchone()[0] == 1:
-                return True
-            else:
-                return None
-        else:
-            return None
+        return id
 
     @classmethod
     def get_ids_of_family(cls, element_id, tasks_only=False, exclude_status=None):
@@ -1032,3 +1053,83 @@ class ProjectDA(object):
         if cls.source.has_results():
             return cls.source.cursor.fetchone()[0]
         return None
+
+    # Contract
+    @classmethod
+    def create_contract(cls, params):
+        query = ("""
+            INSERT INTO project_member_contract (project_member_id, pay_rate, rate_type, currency_code_id, create_by, update_by) VALUES
+            (%(project_member_id)s, %(pay_rate)s, %(rate_type)s, %(currency_code_id)s, %(author_id)s, %(author_id)s)
+            RETURNING id
+        """)
+        cls.source.execute(query, params)
+        cls.source.commit()
+        id = cls.source.get_last_row_id()
+        logger.debug(
+            f"[create_contract] TRANSACTION IDENTIFIER: {id}")
+        return id
+
+    @classmethod
+    def create_contract_status_entry(cls, contract_id, contract_status, author_id):
+        query = ("""
+            INSERT INTO project_contract_status (contract_id, contract_status, update_by) VALUES
+            (%s, %s, %s)
+            RETURNING id                
+        """)
+        params = (contract_id, contract_status, author_id)
+        cls.source.execute(query, params)
+        cls.source.commit()
+        id = cls.source.get_last_row_id()
+        logger.debug(
+            f"[create_contract_entry] TRANSACTION IDENTIFIER: {id}")
+        return id
+
+    @classmethod
+    def get_id_by_project_member(cls, project_member_id, limit_rate_type=None):
+        query = (f"""
+            SELECT id
+            FROM project_member_contract
+            WHERE project_member_id = %s {"AND rate_type = %s" if limit_rate_type else ""}
+        """)
+        params = (project_member_id,) if not limit_rate_type else (
+            project_member_id, limit_rate_type)
+        cls.source.execute(query, params)
+        cls.source.commit()
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        return None
+
+    @classmethod
+    def get_member_default_rate(cls, member_id):
+        query = ("""
+            SELECT
+                pay_rate,
+                currency_code_id
+            FROM member_rate
+            WHERE member_id = %s
+        """)
+        cls.source.execute(query, (member_id,))
+        if cls.source.has_results():
+            for (pay_rate, currency_code_id) in cls.source.cursor:
+                rate = {
+                    "pay_rate": pay_rate,
+                    "currency_code_id": currency_code_id
+                }
+                return rate
+
+    @classmethod
+    def update_member_default_rate(cls, member_id, pay_rate, currency_code_id):
+        query = ("""
+            UPDATE member_rate
+            SET pay_rate = %s,
+                currency_code_id = %s
+            WHERE member_id =%s
+            RETURNING member_id
+        """)
+        params = (pay_rate, currency_code_id, member_id)
+        cls.source.execute(query, params)
+        cls.source.commit()
+        id = cls.source.get_last_row_id()
+        logger.debug(
+            f"[update_member_default_rate] TRANSACTION IDENTIFIER: {id}")
+        return id

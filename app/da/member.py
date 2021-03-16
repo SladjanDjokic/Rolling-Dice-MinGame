@@ -1642,11 +1642,11 @@ class MemberContactDA(object):
         contacts = list()
 
         try:
-            pending= ""
+            pending = ""
 
             if not is_history:
                 pending = " AND receiver_contact.status = 'pending'"
-            
+
             query = f"""
                 SELECT
                     receiver_contact.id,
@@ -1709,12 +1709,13 @@ class MemberContactDA(object):
             logger.error(e, exc_info=True)
             return None
 
+
 class MemberInfoDA(object):
     source = source
 
     def get_member_info(cls, member_id):
         get_member_info_query = ("""
-            SELECT
+           SELECT
                 member.first_name as first_name,
                 member.middle_name as middle_name,
                 member.last_name as last_name,
@@ -1731,7 +1732,9 @@ class MemberInfoDA(object):
                 COALESCE(json_agg(DISTINCT member_achievement.*) FILTER (WHERE member_achievement.id IS NOT NULL), '[]') AS achievement_information,
                 file_storage_engine.storage_engine_id as s3_avatar_url,
                 member_profile.biography as biography,
-                member_security_preferences.facial_recognition as facial_recognition
+                member_security_preferences.facial_recognition as facial_recognition,
+                member_rate.pay_rate,
+                member_rate.currency_code_id
             FROM member
                 LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
                 LEFT OUTER JOIN member_location ON member_location.member_id = member.id
@@ -1742,6 +1745,7 @@ class MemberInfoDA(object):
                 LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
                 LEFT OUTER JOIN member_security_preferences ON member.id = member_security_preferences.member_id
+                LEFT JOIN member_rate ON member.id = member_rate.member_id
             WHERE member.id = %s
             GROUP BY
                 member.id,
@@ -1757,7 +1761,9 @@ class MemberInfoDA(object):
                 member.update_date,
                 file_storage_engine.storage_engine_id,
                 member_profile.biography,
-                member_security_preferences.facial_recognition
+                member_security_preferences.facial_recognition,
+                member_rate.pay_rate,
+                member_rate.currency_code_id
             """)
         get_member_info_params = (member_id,)
         cls.source.execute(get_member_info_query, get_member_info_params)
@@ -1779,7 +1785,9 @@ class MemberInfoDA(object):
                     achievement_information,
                     s3_avatar_url,
                     biography,
-                    facial_recognition
+                    facial_recognition,
+                    pay_rate,
+                    currency_code_id
             ) in cls.source.cursor:
                 member = {
                     "member_id": member_id,
@@ -1799,7 +1807,9 @@ class MemberInfoDA(object):
                     "achievement_information": achievement_information,
                     "amera_avatar_url": amerize_url(s3_avatar_url),
                     "biography": biography,
-                    "facial_recognition": facial_recognition
+                    "facial_recognition": facial_recognition,
+                    "pay_rate": pay_rate,
+                    "currency_code_id": currency_code_id
                 }
 
                 return member
@@ -2140,7 +2150,7 @@ class MemberSettingDA(object):
         except Exception as e:
             logger.debug("iss+++++ {}".format(e))
             pass
-    
+
     @classmethod
     def update_member_payment_setting(cls, member_id, member_location):
 
@@ -2199,6 +2209,7 @@ class MemberSettingDA(object):
             logger.debug("iss+++++ {}".format(e))
             pass
 
+
 class MemberNotificationsSettingDA(object):
     source = source
 
@@ -2245,6 +2256,7 @@ class MemberNotificationsSettingDA(object):
         except Exception as e:
             logger.debug(e.message)
 
+
 class MemberVideoMailDA(object):
     source = source
 
@@ -2256,7 +2268,8 @@ class MemberVideoMailDA(object):
                 VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING ID
             """
-            params = (message_from, video_storage_id, subject, 'reply', media_type, replied_id)
+            params = (message_from, video_storage_id, subject,
+                      'reply', media_type, replied_id)
 
             cls.source.execute(query, params)
             id = cls.source.get_last_row_id()
@@ -2274,7 +2287,8 @@ class MemberVideoMailDA(object):
                 VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING ID
             """
-            params = (message_from, group_id, video_storage_id, subject, "group", media_type)
+            params = (message_from, group_id, video_storage_id,
+                      subject, "group", media_type)
 
             cls.source.execute(query, params)
             id = cls.source.get_last_row_id()
@@ -2284,7 +2298,7 @@ class MemberVideoMailDA(object):
 
         except Exception as e:
             logger.debug(e)
-        
+
     @classmethod
     def create_contact_video_mail(cls, message_from, video_storage_id, subject, media_type):
         try:
@@ -2293,7 +2307,8 @@ class MemberVideoMailDA(object):
                 VALUES (%s, %s, %s, %s, %s)
                 RETURNING ID
             """
-            params = (message_from, video_storage_id, subject, 'contact', media_type)
+            params = (message_from, video_storage_id,
+                      subject, 'contact', media_type)
 
             cls.source.execute(query, params)
             id = cls.source.get_last_row_id()
@@ -2312,13 +2327,13 @@ class MemberVideoMailDA(object):
                 cls.source.commit()
 
             else:
-                group_leader_query ="""SELECT
+                group_leader_query = """SELECT
                     group_leader_id
                     FROM member_group
                     WHERE id = %s
                 """
                 group_param = (receiver,)
-                
+
                 cls.source.execute(group_leader_query, group_param)
 
                 if cls.source.has_results():
@@ -2331,21 +2346,20 @@ class MemberVideoMailDA(object):
                     WHERE member_group_membership.group_id = %s AND member_group_membership.member_id <> %s
                 """
                 params = (id, receiver, message_from)
-                
+
                 cls.source.execute(group_member_query, params)
                 cls.source.commit()
 
                 params = (group_leader_id, id)
-                
+
                 if group_leader_id is not message_from:
                     cls.source.execute(query, params)
                     cls.source.commit()
 
-
             return id
         except Exception as e:
             logger.debug(e)
-    
+
     @classmethod
     def create_contact_video_mail_xref(cls, message_to, video_mail_id):
         try:
@@ -2360,7 +2374,7 @@ class MemberVideoMailDA(object):
             cls.source.commit()
         except Exception as e:
             logger.debug(e)
-    
+
     @classmethod
     def create_group_video_mail_xref(cls, message_from, group_id, video_mail_id):
         try:
@@ -2372,12 +2386,12 @@ class MemberVideoMailDA(object):
                 WHERE member_group_membership.group_id = %s AND member_group_membership.member_id <> %s
             """
             params = (video_mail_id, group_id, message_from)
-                
+
             cls.source.execute(group_member_query, params)
             cls.source.commit()
         except Exception as e:
             logger.debug(e)
-            
+
     @classmethod
     def get_video_mails(cls, member_id, search_key='', page_number=None, page_size=None):
         query = """
@@ -2504,7 +2518,7 @@ class MemberVideoMailDA(object):
             return
         except Exception as e:
             logger.debug(e.message)
-    
+
     @classmethod
     def delete_video_mail(cls, member_id, mail_id):
         try:
@@ -2571,7 +2585,6 @@ class MemberVideoMailDA(object):
             """
 
             param_mails = (member_id,)
-
 
             cls.source.execute(query_mails, param_mails)
             if cls.source.has_results():
