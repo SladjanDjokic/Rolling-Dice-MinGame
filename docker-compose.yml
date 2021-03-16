@@ -229,6 +229,8 @@ services:
       - AMERA_API_KAFKA.CALENDAR_TOPIC=calendar
       - AMERA_API_KAFKA.BOOTSTRAP_SERVERS=kafka:9092
       # Github OAuth
+      - AMERA_API_SERVICES.GITHUB.CALLBACK_URI_PATH=/api/github/oauth
+      - AMERA_API_SERVICES.GITHUB.API_URL=https://api.github.com/user
       - AMERA_API_SERVICES.GITHUB.AUTHORIZATION_URL=https://github.com/login/oauth/authorize
       - AMERA_API_SERVICES.GITHUB.TOKEN_URL=https://github.com/login/oauth/access_token
     volumes:
@@ -344,6 +346,7 @@ services:
         reservations:
           memory: 2G
     volumes:
+      # Schema creation/updates
       - ../web-api/datasource/postgresql/members.sql:/docker-entrypoint-initdb.d/1-members.sql
       - ../web-api/datasource/postgresql/group.sql:/docker-entrypoint-initdb.d/2-group.sql
       - ../web-api/datasource/postgresql/schema-updates-2020-07-21.sql:/docker-entrypoint-initdb.d/3-1-schema-updates.sql
@@ -419,6 +422,8 @@ services:
       - ../web-api/datasource/postgresql/schema-updates-2021-02-25_currency.sql:/docker-entrypoint-initdb.d/p-0-currency.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-02-25_project.sql:/docker-entrypoint-initdb.d/p-1-project.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-02-22_company.sql:/docker-entrypoint-initdb.d/p-2-company.sql
+      - ../web-api/datasource/postgresql/member_external_account.sql:/docker-entrypoint-initdb.d/q-member_external_account.sql
+      # Test data
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
       - ../web-api/datasource/postgresql/test-schedule.dev.sql:/docker-entrypoint-initdb.d/z-3-test-schedule.sql
@@ -431,6 +436,7 @@ services:
       - ../web-api/datasource/postgresql/test-company-role_xref.dev.sql:/docker-entrypoint-initdb.d/z-9-1-test-company-roles.dev.sql
       - ../web-api/datasource/postgresql/test-project.dev.sql:/docker-entrypoint-initdb.d/z-9-2-test-project-dev.sql
       - ../web-api/datasource/postgresql/test-member-contact-2.sql:/docker-entrypoint-initdb.d/z-9-3-test-member-contact-2.sql
+
     environment:
       POSTGRES_DB: ameraiot
       POSTGRES_USER: amera

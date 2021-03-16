@@ -1040,7 +1040,7 @@ class MemberEventDA(object):
         cls.source.execute(query, params)
         if cls.source.has_results():
             (data,) = cls.source.cursor.fetchone()
-            return data
+            return data if data else []
         else:
             return None
 

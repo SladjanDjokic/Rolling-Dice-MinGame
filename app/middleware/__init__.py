@@ -1,8 +1,6 @@
 import copy
-import inspect
 import logging
 from datetime import datetime, timezone
-from inspect import Signature
 
 import falcon
 import uuid
@@ -12,14 +10,10 @@ from confluent_kafka import Producer, KafkaError, KafkaException
 # from app.events.publishers.publisher import producer_async
 
 import app.util.json as json
-from pprint import pformat
 from app.config import settings
 from app.da import GroupDA
-from app.da.mail import BaseMailDA
 from app.da.member import MemberNotificationsSettingDA
-from app.events.publishers.publisher import BaseProducer
-from app.exceptions.session import UnauthorizedSession, InvalidSessionError
-from app.util import request
+from app.exceptions.session import InvalidSessionError
 from app.util.error import HTTPError
 from app.util.session import get_session_cookie, validate_session
 from app.da.activity import ActivityDA
@@ -37,7 +31,7 @@ logger_kafka.setLevel(logging.ERROR)
 # TODO move this to env file or vyper
 # TODO add event type to resource dict as well
 
-ignore_routes = ['/healthz']
+ignore_routes = ['/healthz', '/healthz/headers']
 
 
 def pickle_field_storage(c):

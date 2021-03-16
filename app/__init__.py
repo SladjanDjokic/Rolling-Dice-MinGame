@@ -1,5 +1,4 @@
 import logging
-import sys
 import os
 import falcon
 
@@ -13,6 +12,8 @@ from app.chat.views import ChatView
 from app.config import parser, settings
 from app.middleware import CrossDomain, KafkaProducerMiddleware  # , JSONTranslator
 from app.resources.facial_recognition import FacialRecognitionResource
+from app.resources.github import GithubWebhooksResource, GithubRepoListResource, GithubLoginResource, \
+    GithubOAuthResource
 from app.resources.member import MemberRegisterResource, MemberSearchResource, \
     MemberGroupSearchResource, MemberContactResource, MemberContactAccept, ContactMembersResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms, MemberDepartments, MemberContactsRoles, \
@@ -61,7 +62,7 @@ from app.resources.notifications_setting import MemberNotificationsSetting
 from app.resources.bug_report import BugReportResource, BugReportUsersResource
 
 from app.resources.admin import AdminMemberResource
-
+from app.util.request import get_request_host
 from app.util.config import setup_vyper
 from app.util.error import error_handler
 from app.util.logging import setup_logging
@@ -133,7 +134,22 @@ def create_app():
 
 class HealthResource:
     def on_get(self, req, resp):
-        resp.media = {'status': 'OK', 'health': 1.0}
+        resp.media = {'status': 'OK', 'health': 1.0, 'domain': get_request_host(req)}
+
+
+class HeadersResource:
+     def on_get(self, req, resp):
+        data = dict(req.env)
+        data.pop('wsgi.file_wrapper', None)
+        data.pop('wsgi.input', None)
+        data.pop('wsgi.errors', None)
+        data.pop('gunicorn.socket', None)
+        data.pop('meinheld.client', None)
+        data['domain'] = get_request_host(req)
+        data['req.host'] = req.host
+        data['req.forwarded'] = req.forwarded_host
+        logger.debug(data)
+        resp.media = data
 
 
 def start():
@@ -144,6 +160,7 @@ def _setup_routes(app):
     logger.debug(f"Spec checker: {imsecure_found} {imsecure_spec} {imsecure_spec.name if imsecure_spec else ''}")
 
     app.add_route('/healthz', HealthResource())
+    app.add_route('/healthz/headers', HeadersResource())
 
     if imsecure_found:
         app.add_route('/demo/image-upload', KeyGenFileUpload())
@@ -444,3 +461,9 @@ def _setup_routes(app):
                   admin_resource, suffix="member")
 
     app.add_route("/facial-recognition", FacialRecognitionResource())
+
+    # Github Webhook
+    app.add_route("/github/webhooks", GithubWebhooksResource())
+    app.add_route("/github/repo/setup", GithubRepoListResource())
+    app.add_route("/github/oauth/login", GithubLoginResource())
+    app.add_route("/github/oauth", GithubOAuthResource())

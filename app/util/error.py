@@ -20,7 +20,7 @@ class HTTPError(falcon.HTTPError):
 def error_handler(ex, req, resp, params):
     logger.debug('Exception Happened in Request:')
     logger.debug(traceback.format_exc())
-    if not isinstance(ex, falcon.HTTPError):
+    if not isinstance(ex, falcon.HTTPError) and not isinstance(ex, falcon.HTTPStatus):
         logger.exception("Unhandled error while processing request: {}".format(ex))
         raise HTTPError(500, str(ex))
     else:

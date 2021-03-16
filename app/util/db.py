@@ -75,10 +75,9 @@ class DataSource (object):
             try:
                 if not self.cursor:
                     self.connect()
-                if debug_query:
-                    ds_logger.debug(f"BULK_INSERT: {bulk_insert}")
-                    ds_logger.debug(f"EXECUTE_QUERY: {query}")
-                    ds_logger.debug(f"EXECUTE_PARAMS: {params}")
+                ds_logger.debug(f"BULK_INSERT: {bulk_insert}")
+                ds_logger.debug(f"EXECUTE_QUERY: {query}")
+                ds_logger.debug(f"EXECUTE_PARAMS: {params}")
                 if bulk_insert:
                     return extras.execute_values(self.cursor, query, params)
                 else:

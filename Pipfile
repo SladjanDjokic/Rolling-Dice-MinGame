@@ -54,6 +54,8 @@ mock = "*"
 numpy = "*"
 falcon-auth2 = {extras = ["async"], version = "*"}
 ujson = "*"
+oauthlib = "*"
+pyopenssl = "*"
 
 [requires]
 python_version = "3.9"

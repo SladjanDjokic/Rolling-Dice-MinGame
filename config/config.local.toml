@@ -45,6 +45,10 @@ secret_access_key = "${AWS_SECRET_ACCESS_KEY}"
 [services.twilio]
 totp_length = 6
 totp_lifetime_seconds=60
+[services.github]
+callback_url = "/api/github/oauth"
+admin_repo_redirect_url = "/github_notification"
+api_url = "https://api.github.com/user"
 
 [storage]
 [storage.s3]

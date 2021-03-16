@@ -2047,7 +2047,7 @@ class MailServiceDA(BaseDA):
             unread= ""
 
             if not is_history:
-                unread = " AND xref.read = false AND xref.deleted = false"
+                unread = " AND xref.read = false"
 
             query_mails = f"""
                 SELECT
@@ -2080,7 +2080,7 @@ class MailServiceDA(BaseDA):
                         head.message_bcc->'amera' @> to_char(%s, '999')::jsonb
                     )
                     AND
-                    xref.member_id = %s
+                    xref.member_id = %s  AND xref.deleted = false
                     {unread}
                 ORDER BY head.message_ts DESC
                 LIMIT 10

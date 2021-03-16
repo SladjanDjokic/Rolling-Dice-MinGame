@@ -1,6 +1,7 @@
 import logging
 import socket
 from pprint import pformat
+from urllib.parse import urlunsplit
 from falcon import uri
 
 logger = logging.getLogger(__name__)
@@ -37,12 +38,38 @@ def get_json_or_form(*params, req):
     return results
 
 
-def get_url_base(req):
+def get_request_host(req):
+    host = req.host
+    if host == 'localhost':
+        host = req.env.get(
+            'HTTP_ORIGIN', req.env.get(
+                'HTTP_X_FORWARDED_HOST_ORIGINAL',
+                req.forwarded_host or req.host))
+    return host
+
+
+def get_request_scheme(req):
     scheme = 'https'
     if req.forwarded_scheme:
         scheme = req.forwarded_scheme
+    return scheme
 
-    host = req.host
+
+def build_url_from_request(req, path="", query="", fragment=""):
+    parts = (
+        get_request_scheme(req),
+        get_request_host(req),
+        path,
+        query,
+        fragment
+    )
+
+    logger.debug(f'URL Parts: {parts}')
+    return urlunsplit(parts)
+
+def get_url_base(req):
+    scheme = get_request_scheme(req)
+    host = get_request_host(req)
     return '{}://{}'.format(scheme, host)
 
 

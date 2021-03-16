@@ -83,5 +83,4 @@ class ChatProducer(BaseProducer):
 class CallingProducer(BaseProducer):
     def __init__(self):
         super().__init__()
-        print("TOPIC ###")
         self.topic = settings.get('kafka.calls_topic')

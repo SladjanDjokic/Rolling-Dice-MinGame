@@ -25,7 +25,7 @@ def init_app():
 
 
 # Global to hold notification data before its sent to client
-CALL_NOTIFICATIONS = {}
+NOTIFICATIONS = {}
 
 
 async def consumer_call_event(request):
@@ -40,25 +40,35 @@ async def consumer_call_event(request):
             # Incoming call to single user. Route call to callee connected to sse
             logger.debug("INCOMING CALL")
             member_id = int(data.get('callee_id'))
-            CALL_NOTIFICATIONS[member_id] = data
+            NOTIFICATIONS[member_id] = data
         elif reply_type == 'decline':
             logger.debug("DECLINE PERSON")
             # Decline notification. Route to caller_id
             member_id = int(data.get('caller_id'))
-            CALL_NOTIFICATIONS[member_id] = data
+            NOTIFICATIONS[member_id] = data
     elif call_type == 'group':
         if reply_type == 'decline':
             logger.debug("DECLINE GROUP")
             # Decline group call notification. Route to caller_id
             member_id = int(data.get('caller_id'))
-            CALL_NOTIFICATIONS[member_id] = data
+            NOTIFICATIONS[member_id] = data
         elif reply_type is None:
             logger.debug("SENDING GROUP CALL")
             member_id = data.get('callee_id')
-            CALL_NOTIFICATIONS[int(member_id)] = data
+            NOTIFICATIONS[int(member_id)] = data
         # TODO wht about accept. Maybe any reply type should be sent to caller_id
 
     response = {"data": "call notification message stored"}
+    return JSONResponse(response, status_code=201)
+
+
+async def github_webhook_notifications(request: Request):
+    data = await request.json()
+    logger.debug(f"Received github data {data}")
+    member_ids = data.get('notifiee_ids')
+    for m in member_ids:
+        NOTIFICATIONS[int(m)] = data
+    response = {"data": "github notification stored"}
     return JSONResponse(response, status_code=201)
 
 
@@ -70,6 +80,8 @@ async def calls_sse(request: Request):
     # TODO Throttle status checks so its not 10000 a second
     call_data_gen = status_event_generator(request, int(member_id))
     return EventSourceResponse(call_data_gen)
+
+# TODO Add handling webhook events
 
 
 async def check_health(request: Request):
@@ -96,21 +108,18 @@ async def status_event_generator(request, member_id):
                 logger.debug('Request disconnected')
                 break
 
-            if previous_status and previous_status == 'call_delivered':
+            if previous_status and previous_status == 'notification_delivered':
+                # TODO Probably shouldn't disconnect. Test this
                 logger.debug('Request completed. Disconnecting now')
-                # yield {
-                #     "event": "end",
-                #     "data": ''
-                # }
                 break
             data = None
-            if CALL_NOTIFICATIONS.get(member_id):
-                data = CALL_NOTIFICATIONS.pop(int(member_id))
+            if NOTIFICATIONS.get(member_id):
+                data = NOTIFICATIONS.pop(int(member_id))
 
             if data:
                 payload = {"data": json.dumps(data), "event": "NOTIFY"}
                 yield payload
-                previous_status = 'call_delivered'
+                previous_status = 'notification_delivered'
 
             time.sleep(1)
     except Exception as exc:

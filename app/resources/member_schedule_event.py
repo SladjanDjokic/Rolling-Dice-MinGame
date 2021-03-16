@@ -148,16 +148,6 @@ class MemberScheduleEventResource(object):
             group_id=invited_group
         )
 
-        '''
-            If we have attachments, bind them only to the first instance
-            TODO: We can change this logic based on the desired UX.
-            Like we can have some of the files marked to be available on all instances of the
-            recurring event
-        '''
-        if len(attachments) > 0:
-            for file_id in attachments:
-                MemberEventDA().bind_attachment(main_event_id, file_id)
-
         # if recurring -> add events for each instance
         all_event_ids = [main_event_id]
 
@@ -486,7 +476,8 @@ class EventAttachmentResorce(object):
         file_name = req.get_param("fileName")
         file_size_bytes = req.get_param("size")
         mime_type = req.get_param("mime")
-        member_id = req.context.auth["session"]["member_id"]
+        member = req.context.auth["session"]
+        member_id = member["member_id"]
 
         storage_file_id = FileStorageDA().put_file_to_storage(
             file, file_size_bytes, mime_type)
