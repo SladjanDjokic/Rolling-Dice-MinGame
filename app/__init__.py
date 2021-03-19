@@ -52,6 +52,7 @@ from app.resources.avatar import MemberAvatarResource
 from app.resources.activity import ActivitiesResource
 from app.resources.project import ProjectResource
 from app.resources.company import CompanyResource, CompanyUnregisteredResource
+from app.resources.forum import ForumResource
 from app.resources.billing import BillingResource
 from app.resources.activity_new import SystemActivitySessionResource, SystemActivitySecurityResource, SystemActivityMessageResource, \
     SystemActivityGroupResource, SystemActivityInvitationsResource
@@ -391,6 +392,15 @@ def _setup_routes(app):
     app.add_route(
         "/mail/video/group/{group_id:int}/video_mail/{video_mail_id:int}", video_mail_resource, suffix="group")
 
+    # Routes for forum
+
+    forum_resource = ForumResource()
+
+    app.add_route("/groups/{group_id:int}/forum/topics", forum_resource)
+    app.add_route("/forum/topics/post/{post_id}/like", forum_resource, suffix="like")    
+    app.add_route("/forum/topics/post", forum_resource, suffix="post")
+    app.add_route("/forum/topics/{topic_id:int}", forum_resource, suffix="detail")
+    
     # Routes for Chat App
     app.add_route("/chat", ChatView())
 
