@@ -546,7 +546,7 @@ class ProjectDA(object):
                 WHERE project.id IN (
                     SELECT project_id
                     FROM project_member
-                    WHERE project_member.member_id = %s AND 'view'=ANY(project_member.privileges)
+                    WHERE project_member.member_id = %s AND 'view'=ANY(project_member.privileges) AND project_member.is_active = TRUE
                 )
             ) as result
         """)
@@ -695,6 +695,18 @@ class ProjectDA(object):
         return id
 
     @classmethod
+    def get_project_member_privileges(cls, project_member_id):
+        query = ("""
+            SELECT privileges
+            FROM project_member
+            WHERE id = %s
+        """)
+        cls.source.execute(query, (project_member_id,))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        return None
+
+    @classmethod
     def get_project_roles_for_member(cls, params):
         query = ("""
             SELECT ARRAY(
@@ -823,9 +835,9 @@ class ProjectDA(object):
 
     @classmethod
     def insert_element(cls, params):
-        query = ("""
+        query = (f"""
             INSERT INTO project_element (project_id, parent_id, element_type, title, description, contract_id, est_hours, create_by, update_by)
-            VALUES (%(project_id)s, %(parent_id)s, %(element_type)s, %(title)s, %(description)s, %(contract_id)s, %(est_hours)s, %(author_id)s, %(author_id)s)
+            VALUES (%(project_id)s, %(parent_id)s, %(element_type)s, %(title)s, %(description)s, %(contract_id)s, {"INTERVAL '%(est_hours)s'" if params["est_hours"] else "%(est_hours)s" }, %(author_id)s, %(author_id)s)
             RETURNING id
         """)
         cls.source.execute(query, params)
@@ -837,16 +849,15 @@ class ProjectDA(object):
 
     @classmethod
     def update_element(cls, params):
-        query = ("""
+        query = (f"""
             UPDATE project_element
             SET project_id = %(project_id)s,
                 parent_id = %(parent_id)s,
-                element_type = %(parent_id)s,
+                element_type = %(element_type)s,
                 title = %(title)s,
                 description = %(description)s,
-                project_member_id = %(project_member_id)s,
-                est_hours = %(est_hours)s,
-                element_status=%(element_status)s,
+                contract_id = %(contract_id)s,
+                {"est_hours = INTERVAL '%(est_hours)s hours'," if params["est_hours"] else "est_hours = %(est_hours)s,"}
                 update_by = %(author_id)s
             WHERE id = %(element_id)s
             RETURNING id
@@ -922,7 +933,7 @@ class ProjectDA(object):
         return id
 
     @classmethod
-    def get_last_status(cls, element_id, except_status):
+    def get_last_status(cls, element_id, except_status=None):
         query = ("""
             SELECT element_status
             FROM project_element_status
@@ -1133,3 +1144,19 @@ class ProjectDA(object):
         logger.debug(
             f"[update_member_default_rate] TRANSACTION IDENTIFIER: {id}")
         return id
+
+    @classmethod
+    def get_contract_ids_by_project(cls, project_id):
+        query = ("""
+            SELECT ARRAY (
+                SELECT project_member_contract.id as contract_id
+                FROM project_member
+                LEFT JOIN project_member_contract ON project_member_contract.project_member_id = project_member.id
+                WHERE project_id = %s
+            )
+        """)
+        cls.source.execute(query, (project_id,))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        else:
+            return None

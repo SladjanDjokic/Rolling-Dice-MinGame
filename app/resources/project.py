@@ -5,6 +5,7 @@ import app.util.request as request
 from app.da.project import ProjectDA
 from app.da.group import GroupDA, GroupMembershipDA, GroupRole, GroupMemberStatus, GroupExchangeOptions
 from operator import itemgetter
+from app.exceptions.project import ProjectMemberNotFound, NotEnoughPriviliges, ContractDoesNotBelongProject
 
 logger = logging.getLogger(__name__)
 
@@ -87,10 +88,6 @@ class ProjectResource(object):
             })
 
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
@@ -101,6 +98,13 @@ class ProjectResource(object):
             (company_id, creator_project_role_id, owner_member_id, project_title, project_type, project_description, project_start_date, project_estimated_days,) = request.get_json_or_form(
                 "company_id", "creator_project_role_id", "owner_member_id", "project_title", "project_type", "project_description", "project_start_date", "project_estimated_days", req=req)
             author_id = ProjectDA.get_project_member_id(project_id, member_id)
+            if not author_id:
+                raise ProjectMemberNotFound
+
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
 
             # Check who's the owner now
             current_owner_project_member_id = ProjectDA.get_current_owner(
@@ -140,16 +144,22 @@ class ProjectResource(object):
                 })
 
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
     @check_session
     def on_delete(self, req, resp, project_id):
+        member_id = req.context.auth['session']['member_id']
         try:
+            author_id = ProjectDA.get_project_member_id(project_id, member_id)
+            if not author_id:
+                raise ProjectMemberNotFound
+
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
+
             deleted = ProjectDA.hard_delete_project_entry(project_id)
 
             if deleted:
@@ -164,10 +174,6 @@ class ProjectResource(object):
                 })
 
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
@@ -177,6 +183,15 @@ class ProjectResource(object):
         try:
             member_id = req.context.auth["session"]["member_id"]
             author_id = ProjectDA.get_project_member_id(project_id, member_id)
+
+            if not author_id:
+                raise ProjectMemberNotFound
+
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
+
             element_ids = ProjectDA.get_ids_of_project(
                 project_id=project_id, tasks_only=False, exclude_status='delete')
 
@@ -204,10 +219,6 @@ class ProjectResource(object):
                 })
 
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
@@ -217,6 +228,15 @@ class ProjectResource(object):
         try:
             member_id = req.context.auth["session"]["member_id"]
             author_id = ProjectDA.get_project_member_id(project_id, member_id)
+
+            if not author_id:
+                raise ProjectMemberNotFound
+
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
+
             element_ids = ProjectDA.get_ids_of_project(
                 project_id=project_id, tasks_only=False)
 
@@ -240,10 +260,6 @@ class ProjectResource(object):
                     "description": 'Something went when restoring project tasks'
                 })
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
@@ -252,6 +268,15 @@ class ProjectResource(object):
         try:
             member_id = req.context.auth["session"]["member_id"]
             author_id = ProjectDA.get_project_member_id(project_id, member_id)
+
+            if not author_id:
+                raise ProjectMemberNotFound
+
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
+
             element_ids = ProjectDA.get_ids_of_project(
                 project_id=project_id, tasks_only=False, exclude_status='suspend')
 
@@ -279,10 +304,6 @@ class ProjectResource(object):
                     "description": 'Something went when marking tasks suspended'
                 })
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
@@ -291,6 +312,15 @@ class ProjectResource(object):
         try:
             member_id = req.context.auth["session"]["member_id"]
             author_id = ProjectDA.get_project_member_id(project_id, member_id)
+
+            if not author_id:
+                raise ProjectMemberNotFound
+
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
+
             element_ids = ProjectDA.get_ids_of_project(
                 project_id=project_id, tasks_only=False)
 
@@ -314,10 +344,6 @@ class ProjectResource(object):
                     "description": 'Something went when restoring project tasks'
                 })
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
@@ -331,7 +357,14 @@ class ProjectResource(object):
             author_id = ProjectDA.get_project_member_id(
                 project_id, member_id)
 
-            member_id = req.context.auth['session']['member_id']
+            if not author_id:
+                raise ProjectMemberNotFound
+
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
+
             if not members:
                 members = list()
 
@@ -377,10 +410,6 @@ class ProjectResource(object):
                 })
 
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
@@ -389,6 +418,19 @@ class ProjectResource(object):
         try:
             (project_id, roles_data) = request.get_json_or_form(
                 "project_id", "roles_data", req=req)
+
+            member_id = req.context.auth["session"]["member_id"]
+            author_id = ProjectDA.get_project_member_id(
+                project_id, member_id)
+
+            if not author_id:
+                raise ProjectMemberNotFound
+
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
 
             if len(roles_data) > 0:
                 for item in roles_data:
@@ -425,10 +467,6 @@ class ProjectResource(object):
                     "description": "No updates were made as no roles data was passed"
                 })
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
@@ -437,6 +475,19 @@ class ProjectResource(object):
         try:
             (project_id, privileges_data) = request.get_json_or_form(
                 "project_id", "privileges_data", req=req)
+
+            member_id = req.context.auth["session"]["member_id"]
+            author_id = ProjectDA.get_project_member_id(
+                project_id, member_id)
+
+            if not author_id:
+                raise ProjectMemberNotFound
+
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
 
             if len(privileges_data) > 0:
                 for item in privileges_data:
@@ -472,10 +523,6 @@ class ProjectResource(object):
                 "data": roles
             })
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
@@ -484,18 +531,24 @@ class ProjectResource(object):
     def on_post_element(self, req, resp):
         try:
             member_id = req.context.auth["session"]["member_id"]
-            (project_id, parent_id, element_type, title, description, est_hours) = request.get_json_or_form(
-                "project_id", "parent_id", "element_type", "title", "description", "est_hours", req=req)
+            (project_id, parent_id, element_type, title, description, est_hours, contract_id) = request.get_json_or_form(
+                "project_id", "parent_id", "element_type", "title", "description", "est_hours", "contract_id", req=req)
             author_id = ProjectDA.get_project_member_id(
                 project_id, member_id)
 
-            if json.convert_null(est_hours):
-                est_hours = f"INTERVAL {est_hours} hours"
-            else:
-                est_hours = None
+            if not author_id:
+                raise ProjectMemberNotFound
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'create' not in author_privileges:
+                raise NotEnoughPriviliges
+
+            if json.convert_null(contract_id):
+                if contract_id not in ProjectDA.get_contract_ids_by_project(project_id):
+                    raise ContractDoesNotBelongProject
 
             inserted = ProjectDA.insert_element({"project_id": project_id, "parent_id": json.convert_null(parent_id), "element_type": element_type,
-                                                 "title": title, "description": description, "contract_id": None, "est_hours": est_hours, "author_id": author_id})
+                                                 "title": title, "description": description, "contract_id": json.convert_null(contract_id), "est_hours": json.convert_null(est_hours), "author_id": author_id})
             if inserted:
                 resp.body = json.dumps({
                     "success": True,
@@ -508,10 +561,6 @@ class ProjectResource(object):
                 })
 
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
@@ -519,18 +568,27 @@ class ProjectResource(object):
     def on_put_element(self, req, resp, element_id):
         try:
             member_id = req.context.auth["session"]["member_id"]
-            (project_id, parent_id, element_type, title, description, project_member_id, est_hours, element_status) = request.get_json_or_form(
-                "project_id", "parent_id", "element_type", "title", "description", "project_member_id", "est_hours", "element_status", req=req)
+            (project_id, parent_id, element_type, title, description, contract_id, est_hours, element_status) = request.get_json_or_form(
+                "project_id", "parent_id", "element_type", "title", "description", "contract_id", "est_hours", "element_status", req=req)
             author_id = ProjectDA.get_project_member_id(
                 project_id, member_id)
 
-            if json.convert_null(est_hours):
-                est_hours = f"INTERVAL {est_hours} hours"
-            else:
-                est_hours = None
+            if not author_id:
+                raise ProjectMemberNotFound
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
 
-            updated = ProjectDA.update_element({"project_id": project_id, "parent_id": json.convert_null(parent_id), "element_type": element_type, "title": title, "description": description,
-                                                "project_member_id": project_member_id, "est_hours": est_hours, "element_status": json.convert_null(element_status), "update_by": author_id})
+            updated = ProjectDA.update_element({"element_id": element_id, "project_id": project_id, "parent_id": json.convert_null(
+                parent_id), "element_type": element_type, "title": title, "description": description, "contract_id": json.convert_null(contract_id), "est_hours": json.convert_null(est_hours), "author_id": author_id})
+
+            if json.convert_null(element_status):
+                last_status = ProjectDA.get_last_status(element_id=element_id)
+                if not last_status or last_status != element_status:
+                    ProjectDA.add_element_status_record(
+                        element_id=element_id, author_id=author_id, status=element_status)
+
             if updated:
                 resp.body = json.dumps({
                     "success": True,
@@ -543,10 +601,6 @@ class ProjectResource(object):
                 })
 
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
@@ -557,6 +611,13 @@ class ProjectResource(object):
             project_id = ProjectDA.get_elements_project(element_id)
             author_id = ProjectDA.get_project_member_id(
                 project_id, member_id)
+
+            if not author_id:
+                raise ProjectMemberNotFound
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
 
             family_ids = ProjectDA.get_ids_of_family(
                 element_id=element_id, tasks_only=False, exclude_status="delete")
@@ -579,10 +640,6 @@ class ProjectResource(object):
                 })
 
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
@@ -593,6 +650,13 @@ class ProjectResource(object):
             project_id = ProjectDA.get_elements_project(element_id)
             author_id = ProjectDA.get_project_member_id(
                 project_id, member_id)
+
+            if not author_id:
+                raise ProjectMemberNotFound
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
 
             family_ids = ProjectDA.get_ids_of_family(
                 element_id=element_id, tasks_only=False)
@@ -619,10 +683,6 @@ class ProjectResource(object):
                 })
 
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
@@ -633,6 +693,13 @@ class ProjectResource(object):
             project_id = ProjectDA.get_elements_project(element_id)
             author_id = ProjectDA.get_project_member_id(
                 project_id, member_id)
+
+            if not author_id:
+                raise ProjectMemberNotFound
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
 
             family_ids = ProjectDA.get_ids_of_family(
                 element_id=element_id, tasks_only=True, exclude_status='suspend')
@@ -655,10 +722,6 @@ class ProjectResource(object):
                 })
 
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
@@ -669,6 +732,13 @@ class ProjectResource(object):
             project_id = ProjectDA.get_elements_project(element_id)
             author_id = ProjectDA.get_project_member_id(
                 project_id, member_id)
+
+            if not author_id:
+                raise ProjectMemberNotFound
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
 
             family_ids = ProjectDA.get_ids_of_family(
                 element_id=element_id, tasks_only=True)
@@ -695,10 +765,6 @@ class ProjectResource(object):
                 })
 
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
@@ -711,6 +777,13 @@ class ProjectResource(object):
                 "element_note", "element_id", req=req)
             project_id = ProjectDA.get_elements_project(element_id)
             author_id = ProjectDA.get_project_member_id(project_id, member_id)
+
+            if not author_id:
+                raise ProjectMemberNotFound
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
 
             inserted = ProjectDA.add_note(
                 {"project_element_id": element_id, "element_note": element_note, "author_id": author_id})
@@ -726,10 +799,6 @@ class ProjectResource(object):
                 })
 
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
@@ -741,6 +810,13 @@ class ProjectResource(object):
                 "element_note", "element_id", req=req)
             project_id = ProjectDA.get_project_by_note_id(note_id)
             author_id = ProjectDA.get_project_member_id(project_id, member_id)
+
+            if not author_id:
+                raise ProjectMemberNotFound
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
 
             updated = ProjectDA.update_note(
                 {"note_id": note_id, "element_note": element_note, "author_id": author_id})
@@ -756,16 +832,23 @@ class ProjectResource(object):
                 })
 
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
     @check_session
     def on_delete_note(self, req, resp, note_id):
         try:
+            member_id = req.context.auth["session"]["member_id"]
+            project_id = ProjectDA.get_project_by_note_id(note_id)
+            author_id = ProjectDA.get_project_member_id(project_id, member_id)
+
+            if not author_id:
+                raise ProjectMemberNotFound
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
+
             deleted = ProjectDA.delete_note(note_id)
 
             if deleted:
@@ -780,10 +863,6 @@ class ProjectResource(object):
                 })
 
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
@@ -797,6 +876,14 @@ class ProjectResource(object):
             project_id = ProjectDA.get_elements_project(element_id)
             author_id = ProjectDA.get_project_member_id(
                 project_id, member_id)
+
+            if not author_id:
+                raise ProjectMemberNotFound
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
+
             inserted = ProjectDA.add_time(
                 {"project_element_id": element_id, "element_summary": element_summary, "element_time": element_time, "author_id": author_id})
             if inserted:
@@ -811,10 +898,6 @@ class ProjectResource(object):
                 })
 
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
@@ -825,6 +908,14 @@ class ProjectResource(object):
             project_id = ProjectDA.get_project_by_time_id(time_id)
             author_id = ProjectDA.get_project_member_id(
                 project_id, member_id)
+
+            if not author_id:
+                raise ProjectMemberNotFound
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
+
             (element_summary, element_time) = request.get_json_or_form(
                 "element_summary", "element_time", req=req)
 
@@ -842,18 +933,25 @@ class ProjectResource(object):
                 })
 
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
 
     @check_session
     def on_delete_time(self, req, resp, time_id):
         try:
-            deleted = ProjectDA.delete_time(time_id)
+            member_id = req.context.auth["session"]["member_id"]
+            project_id = ProjectDA.get_project_by_time_id(time_id)
+            author_id = ProjectDA.get_project_member_id(
+                project_id, member_id)
 
+            if not author_id:
+                raise ProjectMemberNotFound
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+            if 'edit' not in author_privileges:
+                raise NotEnoughPriviliges
+
+            deleted = ProjectDA.delete_time(time_id)
             if deleted:
                 resp.body = json.dumps({
                     "success": True,
@@ -866,9 +964,5 @@ class ProjectResource(object):
                 })
 
         except Exception as err:
-            resp.body = json.dumps({
-                "success": False,
-                "description": err
-            })
             logger.exception(err)
             raise err
