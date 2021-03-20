@@ -1201,9 +1201,9 @@ class MemberEventDA(object):
         try:
             query = f"""
                 SELECT
-                    event_invite_2.id,
+                    event_sequence.id,
                     event_invite_2.invite_status as status,
-                    event_invite_2.create_date,
+                    event_sequence.create_date,
                     event_2.event_name,
                     event_2.event_type,
                     event_2.event_description,
@@ -1225,8 +1225,9 @@ class MemberEventDA(object):
                         'middle_name', member.middle_name,
                         'last_name', member.last_name
                     ) AS host_member_info
-                FROM event_invite_2
-                INNER JOIN event_2 on event_invite_2.event_id = event_2.id
+                FROM event_sequence
+				INNER JOIN event_2 on event_2.sequence_id = event_sequence.id
+				INNER JOIN event_invite_2 on event_invite_2.event_id = event_2.id
                 INNER JOIN member ON event_2.host_member_id = member.id
                 LEFT OUTER JOIN event_invite_2 AS invitations ON invitations.event_id = event_2.id
                 LEFT OUTER JOIN member AS invited_member ON invitations.invite_member_id = invited_member.id
@@ -1237,11 +1238,13 @@ class MemberEventDA(object):
                     AND
                     event_2.event_status='Active'
                     AND
+                    event_invite_2.invite_status != 'Recurring'
+                    AND
                     event_2.group_id is NULL
                 GROUP BY
-                    event_invite_2.id,
+                    event_sequence.id,
                     event_invite_2.invite_status,
-                    event_invite_2.create_date,
+                    event_sequence.create_date,
                     event_2.event_name,
                     event_2.event_type,
                     event_2.event_description,
@@ -1250,7 +1253,7 @@ class MemberEventDA(object):
                     member.last_name,
                     member.email,
                     file_storage_engine.storage_engine_id
-                ORDER BY event_invite_2.create_date DESC
+                ORDER BY event_sequence.create_date DESC
                 LIMIT 10
             """
 

@@ -1,9 +1,7 @@
-INSERT INTO company (parent_company_id,name, address_1,address_2, city, state_code_id, postal, country_code_id, main_phone, primary_url)
+INSERT INTO company (parent_company_id,name, place_id, address_1,address_2, city, state_code_id, postal, country_code_id, main_phone, primary_url)
 VALUES 
-    (null, 'Coriander', 'Suite 12', '12 Green street', 'Springfield',13,55777, 840, '+15557777777', 'www.coriander.com' ),
-    (1, 'Firewax', 'Suite 25', '12 Green street', 'Springfield',13,55777, 840, '+15557777777', 'www.acme-sub.com' ),
-    (null, 'Jetsilk', 'Suite 616', '1600 Amphitheatre Parkway', 'Mountain View',06,94043, 840, '+16667777777', 'www.jetsilk.com' ),
-    (null, 'Facebook', 'Suite 2', '12 Menlo Park', 'San Franscisco',13,94025, 840, '+161982828888', 'www.facebook.com' ),
-    (null, 'Sony', 'Suite 1', '24 Sony Street', 'Minato City, Tokyo',null,'100-0004', 392, '+8012345678', 'www.sony.jp' );
-
-
+    (null, 'Coriander', 'EikxMiBHcmVlbiBTdCwgU2FuIEZyYW5jaXNjbywgQ0EgOTQxMTEsIFVTQSJQEk4KNAoyCXOm6RVfgIWAEQ1z-i_cayPqGh4LEO7B7qEBGhQKEgnj3DQSX4CFgBH1ZVKe46JYzwwQDCoUChIJQeXXOeiAhYARpzdTxSBim_g', '12 Green Street, San Francisco, CA, USA', '12 Green street', 'San Francisco',13,94111, 840, '+15557777777', 'www.coriander.com' ),
+    (1, 'Firewax', 'EicxMiBHcmVlbiBTdCwgU3ByaW5nZmllbGQsIEtZIDQwMDY5LCBVU0EiUBJOCjQKMgmTcKxo2EhoiBGiX81tMx-6hxoeCxDuwe6hARoUChIJR5xfCBc3aIgRg4WAyj3UBrgMEAwqFAoSCVWoHWnYSGiIEdAIYaZR7H_U', '12 Green street', 'Suite 25', 'Springfield',13,55777, 840, '+15557777777', 'www.acme-sub.com' ),
+    (null, 'Jetsilk', 'ChIJVYBZP-Oxj4ARls-qJ_G3tgM', '1600 Amphitheatre Parkway', 'Suite 616', 'Mountain View',06,94043, 840, '+16667777777', 'www.jetsilk.com' ),
+    (null, 'Facebook', 'ChIJNcejdWOAhYARhxkvgwjkUx8', '81 Fremont St, San Francisco, CA 94105, United States', 'Suite 2', 'San Franscisco',13,94105, 840, '+161982828888', 'www.facebook.com' ),
+    (null, 'Sony', 'ChIJ5776ik-KGGARFq5gxQtNSWw', '1 Chome-7-1 Konan, Minato City, Tokyo, Japan', '24 Sony Street', 'Minato City, Tokyo',null,'108-0075', 392, '+8012345678', 'www.sony.jp' );

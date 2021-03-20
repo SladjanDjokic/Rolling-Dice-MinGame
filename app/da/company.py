@@ -16,6 +16,7 @@ class CompanyDA(object):
             SELECT
                 company.id,
                 company.name,
+                company.place_id,
                 company.address_1,
                 company.address_2,
                 company.city,
@@ -50,6 +51,7 @@ class CompanyDA(object):
             GROUP BY
                 company.id,
                 company.name,
+                company.place_id,
                 company.address_1,
                 company.address_2,
                 company.city,
@@ -74,6 +76,7 @@ class CompanyDA(object):
             (
                 id,
                 name,
+                place_id,
                 address_1,
                 address_2,
                 city,
@@ -94,6 +97,7 @@ class CompanyDA(object):
             return {
                 "id": id,
                 "name": name,
+                "place_id": place_id,
                 "address_1": address_1,
                 "address_2": address_2,
                 "city": city,
@@ -139,6 +143,7 @@ class CompanyDA(object):
         SELECT
             company.id,
             company.name,
+            company.place_id,
             company.address_1,
             company.address_2,
             company.city,
@@ -182,6 +187,7 @@ class CompanyDA(object):
         GROUP BY
             company.id,
             company.name,
+            company.place_id,
             company.address_1,
             company.address_2,
             company.city,
@@ -246,6 +252,7 @@ class CompanyDA(object):
             for (
                 id,
                 name,
+                place_id,
                 address_1,
                 address_2,
                 city,
@@ -267,6 +274,7 @@ class CompanyDA(object):
                 company = {
                     "id": id,
                     "name": name,
+                    "place_id": place_id,
                     "address_1": address_1,
                     "address_2": address_2,
                     "city": city,
@@ -294,14 +302,14 @@ class CompanyDA(object):
         }
 
     @classmethod
-    def create_company(cls, name, address_1, address_2, city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id, commit=True):
+    def create_company(cls, name, place_id, address_1, address_2, city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id, commit=True):
         query = ("""
-            INSERT INTO company (name, address_1, address_2, city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO company (name, place_id, address_1, address_2, city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
         """)
 
-        params = (name, address_1, address_2, city,
+        params = (name, place_id, address_1, address_2, city,
                   state, postal, country_code_id,
                   main_phone, primary_url, logo_storage_id)
         cls.source.execute(query, params)
@@ -313,11 +321,12 @@ class CompanyDA(object):
         return id
 
     @classmethod
-    def update_company(cls, company_id, name, address_1, address_2, city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id, commit=True):
+    def update_company(cls, company_id, name, place_id, address_1, address_2, city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id, commit=True):
         query = ("""
             UPDATE company
             SET
                 name = %s,
+                place_id = %s,
                 address_1 = %s,
                 address_2 = %s,
                 city = %s,
@@ -330,8 +339,8 @@ class CompanyDA(object):
             WHERE id = %s
         """)
 
-        params = (name, address_1, address_2, city,
-                  state, postal, country_code_id,
+        params = (name, place_id, address_1, address_2, 
+                  city, state, postal, country_code_id,
                   main_phone, primary_url, logo_storage_id, company_id)
 
         cls.source.execute(query, params)

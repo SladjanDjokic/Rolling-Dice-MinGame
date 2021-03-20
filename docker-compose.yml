@@ -422,6 +422,7 @@ services:
       - ../web-api/datasource/postgresql/schema-updates-2021-02-25_currency.sql:/docker-entrypoint-initdb.d/p-0-currency.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-02-25_project.sql:/docker-entrypoint-initdb.d/p-1-project.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-02-22_company.sql:/docker-entrypoint-initdb.d/p-2-company.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-03-17_company.sql:/docker-entrypoint-initdb.d/p-3-company.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-03-12_project_upd.sql:/docker-entrypoint-initdb.d/p-3-project.sql
       - ../web-api/datasource/postgresql/member_external_account.sql:/docker-entrypoint-initdb.d/q-member_external_account.sql
       - ../web-api/datasource/postgresql/forum.sql:/docker-entrypoint-initdb.d/q-forum.sql     

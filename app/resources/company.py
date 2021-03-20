@@ -15,11 +15,11 @@ class CompanyResource(object):
 
     @check_session_administrator
     def on_post(self, req, resp):
-        (name, address_1, address_2, city,
+        (name, place_id, address_1, address_2, city,
          state, postal, country_code_id,
          main_phone, primary_url, logo) = request.get_json_or_form(
-            "name", "address_1", "address_2", "city",
-            "state", "postal", "country_code_id",
+            "name", "place_id", "address_1", "address_2", 
+            "city", "state", "postal", "country_code_id",
             "main_phone", "primary_url", "logo", req=req)
 
         try:
@@ -29,6 +29,7 @@ class CompanyResource(object):
                 logo_storage_id = FileStorageDA().put_file_to_storage(logo)
             
             name = None if not name else name
+            place_id = None if not place_id else place_id
             address_1 = None if not address_1 else address_1
             address_2 = None if not address_2 else address_2
             city = None if not city else city
@@ -38,7 +39,7 @@ class CompanyResource(object):
             main_phone = None if not main_phone else main_phone
             primary_url = None if not primary_url else primary_url
 
-            company_id = CompanyDA().create_company(name, address_1, address_2, city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id)
+            company_id = CompanyDA().create_company(name, place_id, address_1, address_2, city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id)
 
             company = CompanyDA.get_company(company_id)
             resp.body = json.dumps({
@@ -93,11 +94,11 @@ class CompanyResource(object):
 
     @check_session_administrator
     def on_put_detail(self, req, resp, company_id=None):
-        (name, address_1, address_2, city,
+        (name, place_id, address_1, address_2, city,
          state, postal, country_code_id,
          main_phone, primary_url, logo) = request.get_json_or_form(
-          "name", "address_1", "address_2", "city",
-          "state", "postal", "country_code_id",
+          "name", "place_id", "address_1", "address_2",
+          "city", "state", "postal", "country_code_id",
           "main_phone", "primary_url", "logo", req=req)
 
         try:
@@ -110,6 +111,7 @@ class CompanyResource(object):
                 logo_storage_id = FileStorageDA().put_file_to_storage(logo)
 
             name = None if not name else name
+            place_id = None if not place_id else place_id
             address_1 = None if not address_1 else address_1
             address_2 = None if not address_2 else address_2
             city = None if not city else city
@@ -119,7 +121,7 @@ class CompanyResource(object):
             main_phone = None if not main_phone else main_phone
             primary_url = None if not primary_url else primary_url
 
-            CompanyDA().update_company(company_id, name, address_1, address_2, city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id)
+            CompanyDA().update_company(company_id, name, place_id, address_1, address_2, city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id)
             company = CompanyDA.get_company(company_id)
             resp.body = json.dumps({
                 "data": company,
