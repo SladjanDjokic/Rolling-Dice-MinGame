@@ -1709,6 +1709,21 @@ class MemberContactDA(object):
             logger.error(e, exc_info=True)
             return None
 
+    @classmethod
+    def get_member_cell(cls, member_id):
+        query = ("""
+        SELECT CONCAT(phone,device) AS cell
+        FROM member_contact_2
+        LEFT JOIN country_code ON country_code.id = device_country
+        WHERE device_type = 'cell' AND device_confirm_date IS NOT NULL AND enabled= TRUE AND member_id = %s
+        LIMIT 1
+        """)
+        cls.source.execute(query, (member_id,))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        else:
+            return None
+
 
 class MemberInfoDA(object):
     source = source

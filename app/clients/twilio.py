@@ -19,7 +19,7 @@ class BaseTwilioClient:
         # TODO Need to expand this to handle various messages
         try:
             message = self.client.messages.create(
-                to=f"+1{cell}",
+                to=f"+{cell}",
                 from_=settings.get('services.twilio.sender_number'),
                 body=message)
             return message.sid

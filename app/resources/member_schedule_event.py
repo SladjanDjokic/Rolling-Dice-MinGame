@@ -7,7 +7,7 @@ from app.util.session import get_session_cookie, validate_session
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 from app.da.member_event import MemberEventDA
 from app.da.member_schedule_event import MemberScheduleEventDA
-from app.da.member import MemberDA
+from app.da.member import MemberDA, MemberContactDA
 from app.da.file_sharing import FileStorageDA, FileTreeDA
 from app.da.member_schedule_event_invite import MemberScheduleEventInviteDA
 from app.da.file_sharing import FileStorageDA
@@ -17,6 +17,7 @@ from app.exceptions.member_schedule_event import ScheduleEventAddingFailed
 from app.exceptions.file_sharing import FileShareExists, FileNotFound, \
     FileUploadCreateException, FileStorageUploadError
 from operator import itemgetter
+from app.util.textmessage import send_sms
 
 logger = logging.getLogger(__name__)
 
@@ -593,3 +594,30 @@ class MemberEventInvitations(object):
                 "description": "Invalid status",
                 "success": False
             }, default_parser=json.parser)
+
+
+class MemberEventDirections(object):
+    @check_session
+    def on_post(self, req, resp):
+        try:
+            (event_name, destination_address, link, member_ids) = request.get_json_or_form("event_name", "destionationAddress",
+                                                                                           "link", "memberIds", req=req)
+
+            success = {id: False for id in member_ids}
+
+            if member_ids and len(member_ids) > 0:
+                for member_id in member_ids:
+                    cell_phone = MemberContactDA.get_member_cell(member_id)
+                    if cell_phone:
+                        sid = send_sms(
+                            cell_phone, f"Driving directions to '{event_name}'\n\n{destination_address}\n\n{link}")
+                        logger.debug(f"sid {sid}")
+                        if sid:
+                            success.update({member_id: True})
+
+            resp.body = json.dumps({
+                "success": success,
+            }, default_parser=json.parser)
+        except Exception as err:
+            logger.exception(err)
+            raise err

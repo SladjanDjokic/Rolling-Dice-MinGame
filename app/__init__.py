@@ -40,7 +40,7 @@ from app.resources.system import SystemActivityUsersResource
 from app.resources.language import LanguageResource
 from app.resources.member_scheduler_setting import MemberSchedulerSettingResource
 from app.resources.member_schedule_event import MemberScheduleEventResource, MemberScheduleEventColors, \
-    EventAttachmentResorce, MemberUpcomingEvents, MemberEventInvitations
+    EventAttachmentResorce, MemberUpcomingEvents, MemberEventInvitations, MemberEventDirections
 from app.resources.member_schedule_holiday import MemberScheduleHolidayResource
 from app.resources.member_schedule_event_invite import MemberScheduleEventInviteResource, \
     MemberScheduleEventInviteSetStatusResource
@@ -136,11 +136,12 @@ def create_app():
 
 class HealthResource:
     def on_get(self, req, resp):
-        resp.media = {'status': 'OK', 'health': 1.0, 'domain': get_request_host(req)}
+        resp.media = {'status': 'OK', 'health': 1.0,
+                      'domain': get_request_host(req)}
 
 
 class HeadersResource:
-     def on_get(self, req, resp):
+    def on_get(self, req, resp):
         data = dict(req.env)
         data.pop('wsgi.file_wrapper', None)
         data.pop('wsgi.input', None)
@@ -266,6 +267,7 @@ def _setup_routes(app):
     app.add_route("/member/schedule/colors", MemberScheduleEventColors())
     app.add_route("/member/schedule/attach", EventAttachmentResorce())
     app.add_route("/member/schedule/holiday", MemberScheduleHolidayResource())
+    app.add_route("/member/schedule/event/directions", MemberEventDirections())
 
     # app.add_route("/member/schedule/event-invite/add-single", MemberScheduleEventInviteAddSingleResource())
     app.add_route("/member/schedule/event-invite",

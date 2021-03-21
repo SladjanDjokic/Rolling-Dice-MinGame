@@ -29,16 +29,19 @@ async def accept_group_join(event):
     # inviter = MemberInfoDA().get_member_info(int(group.get('group_leader_id')))
     # invitee = MemberInfoDA().get_member_info(int(event.get('member_id')))
     group_name = event.get('kafka_group_name')
-    inviter = MemberInfoDA().get_member_info(int(event.get('kafka_group_leader_id')))
+    inviter = MemberInfoDA().get_member_info(
+        int(event.get('kafka_group_leader_id')))
     invitee = MemberInfoDA().get_member_info(int(event.get('member_id')))
     if status == 'active':
-        number = get_cell_info(inviter)
+        number = MemberContactDA().get_member_cell(inviter)
         message = ACCEPT_GROUP_REQUEST_TEMPLATE
-        message = message.format(invitee.get('first_name').capitalize(), group_name.capitalize())
+        message = message.format(invitee.get(
+            'first_name').capitalize(), group_name.capitalize())
     else:
-        number = get_cell_info(inviter)
+        number = MemberContactDA().get_member_cell(inviter)
         message = DECLINE_GROUP_REQUEST_TEMPLATE
-        message = message.format(invitee.get('first_name').capitalize(), group_name.capitalize())
+        message = message.format(invitee.get(
+            'first_name').capitalize(), group_name.capitalize())
     if number:
         # number = "6463151374"
         response = send_sms(number, message)
@@ -47,9 +50,10 @@ async def accept_group_join(event):
 async def invite_to_group(event):
     invitee = MemberInfoDA().get_member_info(int(event.get('kafka_invitee_id')))
     inviter = MemberInfoDA().get_member_info(int(event.get('member_id')))
-    number = get_cell_info(invitee)
+    number = MemberContactDA().get_member_cell(invitee)
     message = INVITE_USER_TO_GROUP_TEMPLATE
-    message = message.format(inviter.get('first_name').capitalize(), event.get('kafka_group_name').capitalize())
+    message = message.format(inviter.get('first_name').capitalize(
+    ), event.get('kafka_group_name').capitalize())
     if number:
         print("SENDING SMS INVITE")
         # number = "6463151374"
@@ -71,11 +75,11 @@ async def request_contact(event):
                 notification_settings = member_profile.get('data')
                 if notification_settings:
                     # Check notificaiton settings for requestee
-                    sms_notificaiton = notification_settings.get('sms').get("RequestContact")
+                    sms_notificaiton = notification_settings.get(
+                        'sms').get("RequestContact")
                     if sms_notificaiton:
                         # Get contact info for contact_requestee
-                        member = MemberInfoDA().get_member_info(m)
-                        number = get_cell_info(member)
+                        number = MemberContactDA().get_member_cell(m)
                         print(number)
                         # number = "16463151374"
                         if number:
@@ -95,21 +99,24 @@ async def request_contact(event):
 async def respond_contact_request(event):
     status = event.get('kafka_contact_request_status')
     print(status)
-    contacter = MemberInfoDA().get_member_info(int(event.get('kafka_contacter_id')))
+    contacter = MemberInfoDA().get_member_info(
+        int(event.get('kafka_contacter_id')))
     contactee = MemberInfoDA().get_member_info(int(event.get('member_id')))
     if status == 'active':
-        number = get_cell_info(contacter)
+        number = MemberContactDA().get_member_cell(contacter)
         # number = "19729032190"
         message = ACCEPT_CONTACT_REQUEST_TEMPLATE
-        message = message.format(contactee.get('first_name').capitalize(), contactee.get('last_name').capitalize())
+        message = message.format(contactee.get(
+            'first_name').capitalize(), contactee.get('last_name').capitalize())
         print(f"#### {message}")
     else:
-        number = get_cell_info(contacter)
+        number = MemberContactDA().get_member_cell(contacter)
         message = DECLINE_CONTACT_REQUEST_TEMPLATE
-        message = message.format(contactee.get('first_name').capitalize(), contactee.get('last_name').capitalize())
+        message = message.format(contactee.get(
+            'first_name').capitalize(), contactee.get('last_name').capitalize())
         print(f"### {message}")
     if number:
-        number = "16463151374"
+        # number = "16463151374"
         response = send_sms(number, message)
 
 
@@ -129,18 +136,18 @@ async def consume_sms():
 
     # Prints all environ variables from the runtime
     # print(f"ALL ENV: {pformat(os.environ.__dict__, indent=2, width=260)}")
-    
+
     # Get the most recent value, environment variable trumps most
     topic = settings.get('kafka.sms_topic')
     server = settings.get('kafka.server')
 
     # Prints the `topic` from kafka.sms_topic in Vyper
-    # Definition of this key is defined by TOML or by a pre-configured key 
+    # Definition of this key is defined by TOML or by a pre-configured key
     print(f"CONSUMING {topic} TOPIC")
     consumer = AIOKafkaConsumer(
         topic,
         loop=loop, bootstrap_servers=server,
-        )
+    )
     # Get cluster layout and join group `my-group`
     await consumer.start()
     try:
