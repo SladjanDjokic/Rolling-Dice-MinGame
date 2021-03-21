@@ -122,6 +122,7 @@ class MemberRegisterResource(object):
             job_title_id = None if job_title_id == 'not_applicable' else job_title_id
             department_id = None if department_id == 'not_applicable' else department_id
             company_name = None if company_name == 'null' else company_name
+            company_id = None if company_id == 'null' else company_id
 
             if company_id is not None:
                 company_name = None

@@ -19,3 +19,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.AMERA_ACTIONS }}
           DEFAULT_BUMP: minor
           WITH_V: true
+          RELEASE_BRANCHES: master
+      - uses: release-drafter/release-drafter@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

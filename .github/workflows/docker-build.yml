@@ -24,7 +24,7 @@ jobs:
         with:
           access_key_id: ${{ secrets.ECR_ACCESS_KEY }}
           secret_access_key: ${{ secrets.ECR_SECRET_ACCESS_KEY }}
-          account_id: 615749211894
+          account_id: ${{ secrets.AWS_ACCOUNT }}
           repo: amera-web-api
           region: us-east-2
           tags: test,${{ steps.vars.outputs.tag }}
