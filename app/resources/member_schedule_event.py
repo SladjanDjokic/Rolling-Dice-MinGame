@@ -600,17 +600,18 @@ class MemberEventDirections(object):
     @check_session
     def on_post(self, req, resp):
         try:
-            (event_name, destination_address, link, member_ids) = request.get_json_or_form("event_name", "destionationAddress",
-                                                                                           "link", "memberIds", req=req)
+            (event_name, destination_address, destination_name, link, member_ids) = request.get_json_or_form("event_name", "destinationAddress", "destinationName",
+                                                                                                             "link", "memberIds", req=req)
 
             success = {id: False for id in member_ids}
 
             if member_ids and len(member_ids) > 0:
                 for member_id in member_ids:
                     cell_phone = MemberContactDA.get_member_cell(member_id)
+                    message = f"Driving directions to \"{event_name}\" at:\n\n{destination_name if destination_name else ''}\n{destination_address}"
                     if cell_phone:
                         sid = send_sms(
-                            cell_phone, f"Driving directions to '{event_name}'\n\n{destination_address}\n\n{link}")
+                            cell_phone, message)
                         logger.debug(f"sid {sid}")
                         if sid:
                             success.update({member_id: True})
