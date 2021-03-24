@@ -3,6 +3,7 @@ version: '3'
 services:
     # Focus component
     jicofo:
+        container_name: amera-jitsi-jiccofo
         image: jitsi/jicofo:latest
         restart: ${RESTART_POLICY}
         volumes:
@@ -28,12 +29,15 @@ services:
 
     # XMPP server
     prosody:
+        container_name: amera-jitsi-prosody
         image: jitsi/prosody:latest
         restart: ${RESTART_POLICY}
         expose:
             - '5222'
             - '5347'
             - '5280'
+        ports:
+            - '5280:5280'
         volumes:
             - ${CONFIG}/prosody/config:/config:Z
             - ${CONFIG}/prosody/prosody-plugins-custom:/prosody-plugins-custom:Z
@@ -42,7 +46,7 @@ services:
             - ENABLE_AUTH
             - ENABLE_GUESTS
             - ENABLE_LOBBY
-            - ENABLE_XMPP_WEBSOCKET
+            - ENABLE_XMPP_WEBSOCKET=1
             - GLOBAL_MODULES
             - GLOBAL_CONFIG
             - LDAP_URL
@@ -90,6 +94,7 @@ services:
 
     # Video bridge
     jvb:
+        container_name: amera-jitsi-jvb
         image: jitsi/jvb:latest
         restart: ${RESTART_POLICY}
         ports:
@@ -124,6 +129,7 @@ services:
 
     # Frontend
     web:
+        container_name: amera-jitsi-web
         image: jitsi/web:latest
         restart: ${RESTART_POLICY}
         ports:
@@ -136,7 +142,7 @@ services:
         environment:
             - ENABLE_LETSENCRYPT
             - ENABLE_HTTP_REDIRECT
-            - ENABLE_XMPP_WEBSOCKET
+            - ENABLE_XMPP_WEBSOCKET=1
             - DISABLE_HTTPS
             - LETSENCRYPT_DOMAIN
             - LETSENCRYPT_EMAIL

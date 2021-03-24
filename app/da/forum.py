@@ -66,9 +66,18 @@ class ForumDA(object):
             return False
 
     @classmethod
-    def get_topics(cls, group_id, search_key, page_size=None, page_number=None):
+    def get_topics(cls, group_id, search_key, members=[], sort_params=None, page_size=None, page_number=None):
+        sort_columns_string = 'ft.create_date DESC'
+        forum_dict = {
+            'create_date'    : 'ft.create_date'
+        }
 
-        query = """
+        logger.debug(f"members=>{members}")
+        
+        if sort_params:
+            sort_columns_string = formatSortingParams(sort_params, forum_dict) or sort_columns_string
+
+        query = (f"""
             SELECT
                 ft.id as topic_id,
                 ft.topic_title,
@@ -82,7 +91,8 @@ class ForumDA(object):
             LEFT OUTER JOIN file_storage_engine as fse ON fse.id = ft.cover_image_file_id
             WHERE
                 group_id = %s
-                AND ft.topic_title like %s 
+                {'AND ft.topic_title like %s' if search_key and len(search_key) > 0 else ''}
+                {'AND fp.member_id in %s' if len(members) > 0 else ''}
             GROUP BY
                 ft.id,
                 ft.topic_title,
@@ -91,19 +101,26 @@ class ForumDA(object):
                 ft.cover_image_file_id,
                 fse.storage_engine_id,
                 file_size_bytes
-            ORDER BY ft.create_date DESC
-        """
+            ORDER BY {sort_columns_string}
+        """)
         like_search_key = """%{}%""".format(search_key)
-        params = (group_id, like_search_key)
+        params = [group_id]
+        if len(search_key) > 0:
+            params.append(search_key)
+        if len(members) > 0:
+            params.append(tuple(members))
 
-        countQuery = """
+        countQuery = f"""
             SELECT
-                COUNT(*)
+                COUNT(DISTINCT ft.id)
             FROM forum_topic as ft
+            LEFT OUTER JOIN forum_post as fp ON ft.id = fp.forum_topic_id AND fp.parent_post_id is NULL
             WHERE
                 group_id = %s
-                AND ft.topic_title like %s """
-        cls.source.execute(countQuery, params)
+                {'AND ft.topic_title like %s' if search_key and len(search_key) > 0 else ''}
+                {'AND fp.member_id in %s' if len(members) > 0 else ''}
+        """
+        cls.source.execute(countQuery, tuple(params))
 
         count = 0
         if cls.source.has_results():
@@ -514,4 +531,21 @@ class ForumDA(object):
         cls.source.execute(query, params)
         cls.source.commit()
 
-    
+def formatSortingParams(sort_by, entity_dict):
+    columns_list = sort_by.split(',')
+    new_columns_list = list()
+
+    for column in columns_list:
+        if column[0] == '-':
+            column = column[1:]
+            column = entity_dict.get(column)
+            if column:
+                column = column + ' DESC'
+                new_columns_list.append(column)
+        else:
+            column = entity_dict.get(column)
+            if column:
+                column = column + ' ASC'
+                new_columns_list.append(column)
+
+    return (',').join(column for column in new_columns_list)

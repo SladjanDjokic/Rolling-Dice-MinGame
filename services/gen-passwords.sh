@@ -3,6 +3,14 @@
 function generatePassword() {
     openssl rand -hex 16
 }
+ENV_FILE=$(dirname "$0")/.env
+
+if [ -f "$ENV_FILE" ]; then
+    echo "$ENV_FILE exists."
+else 
+    echo "Creating $ENV_FILE from env.jitsi.example."
+    cp env.jitsi.example $ENV_FILE
+fi
 
 JICOFO_COMPONENT_SECRET=$(generatePassword)
 JICOFO_AUTH_PASSWORD=$(generatePassword)

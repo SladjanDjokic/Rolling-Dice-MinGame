@@ -127,6 +127,8 @@ def create_app():
         ],
     )
 
+    app.req_options.auto_parse_qs_csv = True
+
     app.add_error_handler(Exception, error_handler)
 
     _setup_routes(app)

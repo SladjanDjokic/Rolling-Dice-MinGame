@@ -143,7 +143,8 @@ class GroupDA(object):
                 'group_leader_last_name': 'member.last_name',
                 'group_leader_email': 'member.email',
                 'total_member': 'total_member',
-                'total_files': 'total_files'
+                'total_files': 'total_files',
+                'total_videos': 'total_videos'
             }
             sort_columns_string = cls.formatSortingParams(
                 sort_params, group_dict) or sort_columns_string
@@ -197,7 +198,19 @@ class GroupDA(object):
                     )
                 ) AS members,
                 count(DISTINCT file_tree_item.id) AS total_files,
-                group_type
+                group_type,
+                (
+                    CASE
+                        WHEN count(file_tree_item.id) = 0 THEN 0
+                        ELSE 
+                            sum(
+                                CASE
+                                    WHEN left(group_files.mime_type, 5) = 'video' THEN 1
+                                    ELSE 0
+                                END
+                            ) * count(DISTINCT file_tree_item.id) / count(file_tree_item.id)
+                    END
+                ) AS total_videos
             FROM member_group
             INNER JOIN member_group_membership ON member_group.id = member_group_membership.group_id
             LEFT JOIN member ON member.id = member_group_membership.member_id
@@ -208,6 +221,8 @@ class GroupDA(object):
             LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
             LEFT OUTER JOIN file_tree ON (file_tree.id = member_group.main_file_tree)
             LEFT OUTER JOIN file_tree_item ON file_tree_item.member_file_id IS NOT NULL AND file_tree_item.file_tree_id = file_tree.id
+            LEFT JOIN member_file ON member_file.id = file_tree_item.member_file_id
+            LEFT JOIN file_storage_engine as group_files ON group_files.id = member_file.file_id
             WHERE member_group_membership.member_id = %s AND member_group_membership.group_role = 'owner' AND group_type = %s
             {search_query if search_key else ""}
             GROUP BY member_group.id,
@@ -251,6 +266,8 @@ class GroupDA(object):
                     "group_leader_email": row[11],
                     "total_member": row[12],
                     "total_files": row[14],
+                    "group_type": row[15],
+                    "total_videos": row[16],
                     "members": row[13],
                     "group_leader_name": f'{row[9]} {row[10]}'
                 }
@@ -276,7 +293,8 @@ class GroupDA(object):
                 'group_leader_last_name': 'gl.group_leader_last_name',
                 'group_leader_email': 'gl.group_leader_email',
                 'total_member': 'total_member',
-                'total_files': 'total_files'
+                'total_files': 'total_files',
+                'total_videos': 'total_videos'
             }
             sort_columns_string = cls.formatSortingParams(
                 sort_params, entity_dict) or sort_columns_string
@@ -297,7 +315,19 @@ class GroupDA(object):
                 gl.group_leader_email,
                 COUNT(DISTINCT(members.id)) AS total_member,
                 (SELECT json_agg(members)) as members,
-                count(DISTINCT file_tree_item.id) AS total_files
+                count(DISTINCT file_tree_item.id) AS total_files,
+                (
+                    CASE
+                        WHEN count(file_tree_item.id) = 0 THEN 0
+                        ELSE 
+                            sum(
+                                CASE
+                                    WHEN left(file_tree_item.mime_type, 5) = 'video' THEN 1
+                                    ELSE 0
+                                END
+                            ) * count(DISTINCT file_tree_item.id) / count(file_tree_item.id)
+                    END
+                )  AS total_videos
             FROM member_group
             INNER JOIN member_group_membership ON member_group.id = member_group_membership.group_id
             LEFT JOIN member ON member.id = member_group_membership.member_id
@@ -331,9 +361,11 @@ class GroupDA(object):
             ) AS members ON members.group_id = member_group.id
             LEFT JOIN file_tree ON (file_tree.id = member_group.main_file_tree)
             LEFT JOIN (
-                        SELECT id, file_tree_id
+                        SELECT file_tree_item.id, file_tree_item.file_tree_id, file_storage_engine.mime_type
                         FROM file_tree_item
-                        WHERE file_tree_item.member_file_id IS NOT NULL
+                        LEFT JOIN member_file ON member_file.id = file_tree_item.member_file_id
+                        LEFT JOIN file_storage_engine ON file_storage_engine.id = member_file.file_id
+                        WHERE file_tree_item.member_file_id IS NOT NULL Group By file_tree_item.id, file_storage_engine.mime_type
                     ) as file_tree_item ON file_tree_item.file_tree_id = file_tree.id
             WHERE member_group_membership.member_id = %s AND group_type = %s {"AND group_role != 'owner'" if member_only else ""}
                 AND member_group.status = 'active'
@@ -395,6 +427,7 @@ class GroupDA(object):
                     "group_leader_email": row[11],
                     "total_member": row[12],
                     "total_files": row[14],
+                    "total_videos": row[15],
                     "members": row[13],
                     "group_leader_name": f'{row[9]} {row[10]}'
                 }

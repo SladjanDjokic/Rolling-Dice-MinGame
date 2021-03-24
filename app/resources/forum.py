@@ -19,6 +19,11 @@ class ForumResource(object):
                 "title", "content", "cover_image", "attachments", req=req)
             # del(req.env['wsgi.file_wrapper'])
 
+            cover_image = cover_image if cover_image != 'undefined' else None
+            logger.debug(f"title: {title}")
+            logger.debug(f"content: {content}")
+            logger.debug(f"cover_image: {cover_image}")
+            logger.debug(f"attachments: {attachments}")
             cover_image_file_id = None
             if cover_image is not None:
                 cover_image_file_id = FileStorageDA().put_file_to_storage(cover_image)
@@ -47,16 +52,18 @@ class ForumResource(object):
             logger.exception(err)
             raise err
     
-    @check_session
     def on_get(self, req, resp, group_id=None):
-        member_id = req.context.auth['session']['member_id']
+
         try:
 
             search_key = req.get_param('search_key') or ''
+            sort_params = req.get_param('sort')
             page_size = req.get_param_as_int('page_size')
             page_number = req.get_param_as_int('page_number')
-            
-            result = ForumDA.get_topics(group_id, search_key, page_size, page_number)
+            members = req.get_param_as_list('members', transform=int, default=[])
+            logger.debug(f"members: {members}")
+
+            result = ForumDA.get_topics(group_id, search_key, members, sort_params, page_size, page_number)
             resp.body = json.dumps({
                 "topics": result['topics'],
                 "count": result['count'],
