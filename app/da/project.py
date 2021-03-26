@@ -56,6 +56,7 @@ class ProjectDA(object):
                                 description,
                                 contract_id,
                                 project_member_contract.project_member_id,
+                                project_element.rate_type,
                                 est_hours,
                                 -- status_history
                                 (
@@ -328,6 +329,7 @@ class ProjectDA(object):
                                 description,
                                 contract_id,
                                 project_member_contract.project_member_id,
+                                project_element.rate_type,
                                 est_hours,
                                 -- status_history
                                 (
@@ -831,13 +833,16 @@ class ProjectDA(object):
         if cls.source.has_results():
             return cls.source.cursor.fetchone()[0]
         return None
-    # Element methods
+
+    '''
+        Element methods
+    '''
 
     @classmethod
     def insert_element(cls, params):
         query = (f"""
-            INSERT INTO project_element (project_id, parent_id, element_type, title, description, contract_id, est_hours, create_by, update_by)
-            VALUES (%(project_id)s, %(parent_id)s, %(element_type)s, %(title)s, %(description)s, %(contract_id)s, {"INTERVAL '%(est_hours)s'" if params["est_hours"] else "%(est_hours)s" }, %(author_id)s, %(author_id)s)
+            INSERT INTO project_element (project_id, parent_id, element_type, title, description, contract_id, est_hours, rate_type, create_by, update_by)
+            VALUES (%(project_id)s, %(parent_id)s, %(element_type)s, %(title)s, %(description)s, %(contract_id)s, {"INTERVAL '%(est_hours)s'" if params["est_hours"] else "%(est_hours)s" }, %(rate_type)s, %(author_id)s, %(author_id)s)
             RETURNING id
         """)
         cls.source.execute(query, params)
@@ -963,7 +968,9 @@ class ProjectDA(object):
         else:
             return None
 
-    # Notes
+    '''
+        Notes
+    '''
 
     @classmethod
     def add_note(cls, params):
@@ -1009,7 +1016,9 @@ class ProjectDA(object):
         else:
             return None
 
-    # Time records
+    '''
+       Time records
+    '''
 
     @classmethod
     def add_time(cls, params):
@@ -1065,7 +1074,10 @@ class ProjectDA(object):
             return cls.source.cursor.fetchone()[0]
         return None
 
-    # Contract
+    '''
+        Contract
+    '''
+
     @classmethod
     def create_contract(cls, params):
         query = ("""
@@ -1156,6 +1168,181 @@ class ProjectDA(object):
             )
         """)
         cls.source.execute(query, (project_id,))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        else:
+            return None
+
+    '''
+        Contract invite 
+    '''
+
+    @classmethod
+    def create_invite(cls, contract_id):
+        query = ("""
+            INSERT INTO project_contract_invite (contract_id)
+            VALUES (%s)
+            RETURNING id
+        """)
+        cls.source.execute(query, (contract_id,))
+        cls.source.commit()
+        id = cls.source.get_last_row_id()
+        logger.debug(
+            f"[create_invite] TRANSACTION IDENTIFIER: {id}")
+        return id
+
+    @classmethod
+    def create_invite_status(cls, invite_id, create_by, invite_status='Tentative'):
+        query = ("""
+            INSERT INTO project_contract_invite_status (project_contract_invite_id, create_by, invite_status)
+            VALUES (%s, %s, %s)
+            RETURNING id
+        """)
+        params = (invite_id, create_by, invite_status)
+        cls.source.execute(query, params)
+        cls.source.commit()
+        id = cls.source.get_last_row_id()
+        logger.debug(
+            f"[create_invite_status] TRANSACTION IDENTIFIER: {id}")
+        return id
+
+    # Gets all invites to projects
+    @classmethod
+    def get_member_contract_invites(cls, member_id):
+        query = ("""
+            SELECT json_agg(rows) AS invites
+            FROM (
+                SELECT
+                    'contract' AS type,
+                    project.id AS project_id,
+                    company.name AS company_name,
+                    project.project_title,
+                    project.project_description,
+                    project.start_date AS project_start_date,
+                    (SELECT EXTRACT(epoch FROM project.estimated_days)/86400)::int AS project_estimated_days,
+                    project_member.id AS invitee_project_member_id,
+                    project_member_contract.id AS contract_id,
+                    project_member_contract.rate_type AS contract_rate_type,
+                    -- roles
+                    (
+                        SELECT ARRAY (
+                            SELECT project_role_id
+                            FROM project_role_xref
+                            WHERE project_role_xref.project_member_id = project_member.id
+                        ) AS proposed_roles
+                    ),
+                    -- project owner
+                    (
+                        SELECT row_to_json(row) AS project_owner
+                        FROM (
+                            SELECT 
+                                project_member.id AS owner_project_member_id,
+                                member_id AS owner_member_id,
+                                first_name,
+                                last_name
+                            FROM project_owner_xref
+                            LEFT JOIN project_member ON project_member.id = project_owner_xref.owner_id
+                            LEFT JOIN member ON member.id = project_member.member_id
+                            WHERE project_owner_xref.project_id = project.id
+                            ORDER BY project_owner_xref.update_date DESC
+                            LIMIT 1
+                        ) row
+                    ),
+                    -- for fixed tasks - info on the scoped element
+                    CASE 
+                        WHEN project_member_contract.rate_type = 'fixed'::project_contract_rate_type
+                            THEN (
+                                SELECT row_to_json(row)
+                                FROM (
+                                    SELECT 
+                                        project_element.id,
+                                        project_element.title AS element_title,
+                                        project_element.description AS element_description,
+                                        project_element.element_type
+                                    FROM project_element
+                                    WHERE contract_id = project_member_contract.id
+                                ) AS row
+                            )
+                        WHEN project_member_contract.rate_type = 'hourly'::project_contract_rate_type 
+                            THEN NULL
+                    END AS scoped_element,
+                    project_member_contract.currency_code_id,
+                    currency_code.currency_code,
+                    currency_code.currency_name,
+                    project_member_contract.pay_rate,
+                    cs.contract_status,
+                    project_contract_invite.id AS invite_id,
+                    cis.invite_status,
+                    cis.invite_date,
+                    -- inviter member id props
+                    cis.inviter_id,
+                    cis.first_name,
+                    cis.middle_name,
+                    cis.last_name,
+                    cis.title,
+                    cis.department,
+                    cis.amera_avatar_url
+                FROM member
+                INNER JOIN project_member ON project_member.member_id = member.id
+                INNER JOIN project ON project.id = project_member.project_id
+                INNER JOIN company ON project.company_id = company.id
+                INNER JOIN project_member_contract ON project_member_contract.project_member_id = project_member.id
+                INNER JOIN (
+                    -- current status for each contract
+                    SELECT DISTINCT ON (contract_id)
+                        contract_id,
+                        contract_status,
+                        update_date
+                    FROM project_contract_status
+                    ORDER BY contract_id, update_date DESC
+                ) AS cs ON cs.contract_id = project_member_contract.id
+                INNER JOIN project_contract_invite ON project_contract_invite.contract_id = project_member_contract.id
+                INNER JOIN (
+                    -- current status for invite
+                    SELECT DISTINCT ON (project_contract_invite_id)
+                        project_contract_invite_id AS invite_id,
+                        invite_status,
+                        member.id AS inviter_id,
+                        member.first_name,
+                        member.middle_name,
+                        member.last_name,
+                        job_title.name as title,
+                        department.name as department,
+                        file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url,
+                        project_contract_invite_status.create_date AS invite_date
+                    FROM project_contract_invite_status
+                    LEFT JOIN project_member ON project_member.id = project_contract_invite_status.create_by
+                    LEFT JOIN member ON project_member.member_id = member.id
+                    LEFT JOIN job_title ON job_title_id = job_title.id
+                    LEFT JOIN department ON department_id = department.id
+                    LEFT JOIN member_profile ON member.id = member_profile.member_id
+                    LEFT JOIN file_storage_engine ON file_storage_engine.id = member_profile.profile_picture_storage_id
+                    ORDER BY project_contract_invite_id, project_contract_invite_status.create_date DESC
+                ) AS cis ON cis.invite_id = project_contract_invite.id
+                INNER JOIN currency_code ON currency_code.id = project_member_contract.currency_code_id
+                WHERE 
+                    member.id = %s AND 
+                    project_member.is_active = TRUE AND
+                    -- Member can receive a better offer while having this contract in active stage
+                    cs.contract_status != ALL('{"final", "cancel"}'::project_member_contract_status[]) AND
+                    cis.invite_status = 'Tentative'::confirm_status
+            ) AS rows
+        """)
+        cls.source.execute(query, (member_id,))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        else:
+            return None
+
+    @classmethod
+    def get_project_member_id_by_invite_id(cls, invite_id):
+        query = ("""
+            SELECT project_member_id
+            FROM project_contract_invite
+            INNER JOIN project_member_contract ON project_member_contract.id = project_contract_invite.contract_id
+            WHERE project_contract_invite.id = %s
+        """)
+        cls.source.execute(query, (invite_id,))
         if cls.source.has_results():
             return cls.source.cursor.fetchone()[0]
         else:

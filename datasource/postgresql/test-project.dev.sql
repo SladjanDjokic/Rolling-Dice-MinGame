@@ -15,7 +15,7 @@ INSERT INTO project_member (project_id, member_id, privileges)
            (1,2, '{create, view}'),
            (1,10, '{view}'),
            (2,1, '{approve, create, view, edit}'),
-           (2,5, '{create, view}'),
+           (2,2, '{create, view}'),
            (2,20,'{view}');
 
 UPDATE project
@@ -62,7 +62,7 @@ INSERT INTO project_element (project_id, title, parent_id, element_type, descrip
 INSERT INTO project_member_contract (project_member_id, pay_rate, rate_type, currency_code_id, create_by, update_by) VALUES 
     (1, 40, 'hourly', 132,  1, 1),
     (2, 30, 'hourly', 132,  1, 1),
-    (3, 500, 'fixed', 132,  1, 1),
+    (2, 500, 'fixed', 132,  1, 1),
     (4, 30, 'hourly', 132,  1, 1),
     (5, 25, 'hourly', 132,  1, 1),
     (6, 30, 'hourly', 132,  1, 1);
@@ -110,3 +110,14 @@ INSERT INTO project_element_note (project_element_id, element_note, create_by, u
     (11, 'Hey Test, I seem to need more than the expected time, it that ok?', 4,4),
     (11, 'Sure, take your time, but we are not going to pay you more', 4,4);
 
+INSERT INTO project_contract_invite (contract_id)
+VALUES (2), 
+       (5),
+       (5),
+       (3);
+
+INSERT INTO project_contract_invite_status (project_contract_invite_id, invite_status, create_by, create_date)
+VALUES (1, 'Tentative', 1, CURRENT_TIMESTAMP - interval '1 day'),
+       (2, 'Revoked', 4, CURRENT_TIMESTAMP - interval '1 day'),
+       (3, 'Tentative', 4, CURRENT_TIMESTAMP - interval '1 hour'),
+       (4, 'Tentative', 1, CURRENT_TIMESTAMP);

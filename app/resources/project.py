@@ -5,7 +5,7 @@ import app.util.request as request
 from app.da.project import ProjectDA
 from app.da.group import GroupDA, GroupMembershipDA, GroupRole, GroupMemberStatus, GroupExchangeOptions
 from operator import itemgetter
-from app.exceptions.project import ProjectMemberNotFound, NotEnoughPriviliges, ContractDoesNotBelongProject
+from app.exceptions.project import ProjectMemberNotFound, NotEnoughPriviliges, ContractDoesNotBelongProject, MemberDoesNotBelongToContract
 
 logger = logging.getLogger(__name__)
 
@@ -531,8 +531,8 @@ class ProjectResource(object):
     def on_post_element(self, req, resp):
         try:
             member_id = req.context.auth["session"]["member_id"]
-            (project_id, parent_id, element_type, title, description, est_hours, contract_id) = request.get_json_or_form(
-                "project_id", "parent_id", "element_type", "title", "description", "est_hours", "contract_id", req=req)
+            (project_id, parent_id, element_type, title, description, est_hours, contract_id, rate_type) = request.get_json_or_form(
+                "project_id", "parent_id", "element_type", "title", "description", "est_hours", "contract_id", "rate_type", req=req)
             author_id = ProjectDA.get_project_member_id(
                 project_id, member_id)
 
@@ -548,7 +548,7 @@ class ProjectResource(object):
                     raise ContractDoesNotBelongProject
 
             inserted = ProjectDA.insert_element({"project_id": project_id, "parent_id": json.convert_null(parent_id), "element_type": element_type,
-                                                 "title": title, "description": description, "contract_id": json.convert_null(contract_id), "est_hours": json.convert_null(est_hours), "author_id": author_id})
+                                                 "title": title, "description": description, "contract_id": json.convert_null(contract_id), "est_hours": json.convert_null(est_hours),  "rate_type": rate_type, "author_id": author_id})
             if inserted:
                 resp.body = json.dumps({
                     "success": True,
@@ -963,6 +963,40 @@ class ProjectResource(object):
                     "description": "Something went wrong when deleting time record"
                 })
 
+        except Exception as err:
+            logger.exception(err)
+            raise err
+
+    # Invite
+    @check_session
+    def on_post_invite_reaction(self, req, resp, invite_id):
+        try:
+            member_id = req.context.auth["session"]["member_id"]
+            (is_accept, project_id, contract_id) = request.get_json_or_form(
+                "isAccept", "project_id", "contract_id", req=req)
+            author_id = ProjectDA.get_project_member_id(
+                project_id, member_id)
+
+            if not author_id:
+                raise ProjectMemberNotFound
+
+            if author_id != ProjectDA.get_project_member_id_by_invite_id(invite_id):
+                raise MemberDoesNotBelongToContract
+
+            invite_handled = ProjectDA.create_invite_status(
+                invite_id=invite_id, create_by=author_id, invite_status='Accepted' if is_accept else 'Declined')
+            contract_updated = ProjectDA.create_contract_status_entry(
+                contract_id=contract_id, contract_status='active' if is_accept else 'cancel', author_id=author_id)
+            if contract_updated:
+                resp.body = json.dumps({
+                    "success": True,
+                    "description": f"Contract has been {'accepted' if is_accept else 'declined'}"
+                })
+            else:
+                resp.body = json.dumps({
+                    "success": False,
+                    "description": f"Something went wrong when {'accepting' if is_accept else 'declining'} contract"
+                })
         except Exception as err:
             logger.exception(err)
             raise err

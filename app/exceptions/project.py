@@ -20,3 +20,10 @@ class ContractDoesNotBelongProject(falcon.HTTPBadRequest):
         title = "Specified contract does not belong to this project"
         description = "There was a problem validating the reference of the specified contract to this project"
         super().__init__(title=title, description=description)
+
+
+class MemberDoesNotBelongToContract(falcon.HTTPBadRequest):
+    def __init__(self):
+        title = "This contract invite is intended for another member"
+        description = "There was a problem validating the reference of the specified contract to yourself"
+        super().__init__(title=title, description=description)

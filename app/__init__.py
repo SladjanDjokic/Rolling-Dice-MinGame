@@ -403,9 +403,11 @@ def _setup_routes(app):
     forum_resource = ForumResource()
 
     app.add_route("/groups/{group_id:int}/forum/topics", forum_resource)
-    app.add_route("/forum/topics/post/{post_id}/like", forum_resource, suffix="like")    
+    app.add_route(
+        "/forum/topics/post/{post_id}/like", forum_resource, suffix="like")
     app.add_route("/forum/topics/post", forum_resource, suffix="post")
-    app.add_route("/forum/topics/{topic_id:int}", forum_resource, suffix="detail")
+    app.add_route("/forum/topics/{topic_id:int}",
+                  forum_resource, suffix="detail")
 
     # Routes for contact newsfeeds
 
@@ -413,6 +415,7 @@ def _setup_routes(app):
 
     app.add_route("/newsfeeds", newsfeeds_resource)
     app.add_route("/newsfeeds/{topic_id:int}", newsfeeds_resource, suffix="post")
+    
     # Routes for Chat App
     app.add_route("/chat", ChatView())
 
@@ -453,6 +456,8 @@ def _setup_routes(app):
                   project_resource, suffix="time")
     app.add_route("/project/element/time/{time_id:int}",
                   project_resource, suffix="time")
+    app.add_route(
+        "/project/invite_reaction/{invite_id:int}", project_resource, suffix="invite_reaction")
     # app.add_route("/project/contract", project_resource, suffix="contract")
     # app.add_route(
     #     "/project/contract/{contract_id:int}", project_resource, suffix="contract")

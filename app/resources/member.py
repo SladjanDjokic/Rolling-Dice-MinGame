@@ -422,18 +422,22 @@ class ContactMembersOtherInvitationsResource(object):
 
             # contact invitation
             contact_invitations = MemberContactDA.get_all_contact_invitations_by_member_id(
-                session["member_id"])
+                member_id)
             # new text message
-            new_messages = MailServiceDA.get_all_text_mails(
-                session["member_id"])
+            new_messages = MailServiceDA.get_all_text_mails(member_id)
             # new media message
             new_media_messages = MemberVideoMailDA.get_all_media_mails(
-                session["member_id"])
+                member_id)
             # group invite
             group_invitations = GroupDA.get_all_group_invitations_by_member_id(
-                session["member_id"])
+                member_id)            # project contract invite
+            contract_invitations = ProjectDA.get_member_contract_invites(
+                member_id)
+            if not contract_invitations:
+                contract_invitations = []
+
             result = contact_invitations + new_messages + \
-                new_media_messages + group_invitations
+                new_media_messages + group_invitations + contract_invitations
 
             resp.body = json.dumps({
                 "data": result,
