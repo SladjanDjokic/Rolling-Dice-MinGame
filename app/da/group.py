@@ -167,6 +167,18 @@ class GroupDA(object):
         )
         """)
         query = (f"""
+            WITH online_sessions AS (
+                SELECT
+                    member_session.member_id,
+                    CASE WHEN bool_or(member_session.status = 'online' AND member_session.status is not null) = true THEN 'online' ELSE 'offline' END as online_status
+                FROM  member_session 
+                WHERE
+                    member_session.status IN ('online', 'disconnected') AND
+                    member_session.expiration_date >= current_timestamp
+                GROUP BY
+                    member_session.member_id
+            )
+
             SELECT
                 member_group.id AS group_id,
                 member_group_membership.member_id AS group_leader_id,
@@ -184,16 +196,16 @@ class GroupDA(object):
                 COALESCE(
                     json_agg(
                         json_build_object(
-                            'id', member_group_membership.member_id,
-                            'first_name', member.first_name,
-                            'last_name', member.last_name,
-                            'email', member.email,
-                            'company', member.company_name,
+                            'id', membership_members.id,
+                            'first_name', membership_members.first_name,
+                            'last_name', membership_members.last_name,
+                            'email', membership_members.email,
+                            'company', membership_members.company_name,
                             'title', job_title.name,
                             'amera_avatar_url', file_path(file_storage_engine.storage_engine_id, '/member/file'),
                             'create_date', member_group_membership.create_date,
-                            'group_id', member_group_membership.group_id 
-                            
+                            'group_id', member_group_membership.group_id,
+                            'online_status', CASE WHEN online_sessions.online_status IS NOT NULL THEN online_sessions.online_status ELSE 'offline' END
                         )
                     )
                 ) AS members,
@@ -202,7 +214,7 @@ class GroupDA(object):
                 (
                     CASE
                         WHEN count(file_tree_item.id) = 0 THEN 0
-                        ELSE 
+                        ELSE
                             sum(
                                 CASE
                                     WHEN left(group_files.mime_type, 5) = 'video' THEN 1
@@ -216,6 +228,7 @@ class GroupDA(object):
             LEFT JOIN member ON member.id = member_group_membership.member_id
             LEFT OUTER JOIN member_group_membership AS members ON members.group_id = member_group.id
             LEFT OUTER JOIN member AS membership_members ON members.member_id = membership_members.id
+            LEFT OUTER JOIN online_sessions ON membership_members.id = online_sessions.member_id
             LEFT OUTER JOIN job_title ON membership_members.job_title_id = job_title.id
             LEFT OUTER JOIN member_profile ON membership_members.id = member_profile.member_id
             LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
@@ -298,11 +311,40 @@ class GroupDA(object):
             }
             sort_columns_string = cls.formatSortingParams(
                 sort_params, entity_dict) or sort_columns_string
+        search_query = ("""
+        AND (
+            member_group.group_name ILIKE %s
+            OR concat_ws(' ', member.first_name, member.last_name) ILIKE %s
+            OR member.email ILIKE %s
+            OR concat('create year ', EXTRACT(YEAR FROM member_group.create_date)) LIKE %s
+            OR concat('create month ', EXTRACT(MONTH FROM member_group.create_date)) LIKE %s
+            OR concat('create month ', to_char(member_group.create_date, 'month')) LIKE %s
+            OR concat('create day ', EXTRACT(DAY FROM member_group.create_date)) LIKE %s
+            OR concat('create day ', to_char(member_group.create_date, 'day')) LIKE %s
+            OR concat('update year ', EXTRACT(YEAR FROM member_group.update_date)) LIKE %s
+            OR concat('update month ', EXTRACT(MONTH FROM member_group.update_date)) LIKE %s
+            OR concat('update month ', to_char(member_group.update_date, 'month')) LIKE %s
+            OR concat('update day ', EXTRACT(DAY FROM member_group.update_date)) LIKE %s
+            OR concat('update day ', to_char(member_group.update_date, 'day')) LIKE %s
+        )
+        """)
 
         query = (f"""
-          SELECT
+            WITH online_sessions AS (
+                SELECT
+                    member_session.member_id,
+                    CASE WHEN bool_or(member_session.status = 'online' AND member_session.status is not null) = true THEN 'online' ELSE 'offline' END as online_status
+                FROM  member_session 
+                WHERE
+                    member_session.status IN ('online', 'disconnected') AND
+                    member_session.expiration_date >= current_timestamp
+                GROUP BY
+                    member_session.member_id
+            )
+
+            SELECT
                 member_group.id as group_id,
-                gl.group_leader_id,
+                gl.id AS group_leader_id,
                 group_name,
                 exchange_option as group_exchange_option,
                 member_group.status as group_status,
@@ -310,83 +352,64 @@ class GroupDA(object):
                 member_group.create_date as group_create_date,
                 member_group.update_date as group_create_date,
                 member_group_membership.create_date as group_join_date,
-                gl.group_leader_first_name,
-                gl.group_leader_last_name,
-                gl.group_leader_email,
-                COUNT(DISTINCT(members.id)) AS total_member,
-                (SELECT json_agg(members)) as members,
+                gl.first_name AS group_leader_first_name,
+                gl.last_name AS group_leader_last_name,
+                gl.email AS group_leader_email,
+                COUNT(DISTINCT(member_group_membership.member_id)) AS total_member,
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'id', membership_members.id,
+                            'first_name', membership_members.first_name,
+                            'last_name', membership_members.last_name,
+                            'email', membership_members.email,
+                            'company', membership_members.company_name,
+                            'title', job_title.name,
+                            'amera_avatar_url', file_path(file_storage_engine.storage_engine_id, '/member/file'),
+                            'create_date', member_group_membership.create_date,
+                            'group_id', member_group_membership.group_id,
+                            'online_status', CASE WHEN online_sessions.online_status IS NOT NULL THEN online_sessions.online_status ELSE 'offline' END
+                        )
+                    )
+                ) AS members,
+                -- (SELECT json_agg(members)) as members,
                 count(DISTINCT file_tree_item.id) AS total_files,
                 (
                     CASE
                         WHEN count(file_tree_item.id) = 0 THEN 0
-                        ELSE 
+                        ELSE
                             sum(
-                                CASE
-                                    WHEN left(file_tree_item.mime_type, 5) = 'video' THEN 1
-                                    ELSE 0
-                                END
-                            ) * count(DISTINCT file_tree_item.id) / count(file_tree_item.id)
-                    END
-                )  AS total_videos
+                            CASE
+                                WHEN left(group_files.mime_type, 5) = 'video' THEN 1
+                                ELSE 0
+                            END
+                        ) * count(DISTINCT file_tree_item.id) / count(file_tree_item.id)
+                END
+            )  AS total_videos
             FROM member_group
+            INNER JOIN member_group_membership AS gl_membership ON member_group.id = gl_membership.group_id
+            INNER JOIN member AS gl ON gl.id = gl_membership.member_id AND gl_membership.group_role = 'owner'
             INNER JOIN member_group_membership ON member_group.id = member_group_membership.group_id
-            LEFT JOIN member ON member.id = member_group_membership.member_id
-            LEFT JOIN (
-                SELECT
-                    group_id,
-                    member_id AS group_leader_id,
-                    member.first_name AS group_leader_first_name,
-                    member.last_name AS group_leader_last_name,
-                    member.email AS group_leader_email
-                FROM member_group_membership
-                LEFT JOIN member ON member.id = member_group_membership.member_id
-                WHERE group_role = 'owner'
-            ) AS gl ON gl.group_id = member_group.id
-            LEFT JOIN (
-                SELECT
-                    member_group_membership.member_id as id,
-                    member.first_name as first_name,
-                    member.last_name as last_name,
-                    member.email as email,
-                    member.company_name as company,
-                    job_title.name as title,
-                    file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url,
-                    member_group_membership.create_date as create_date,
-                    member_group_membership.group_id as group_id
-                FROM member_group_membership
-                LEFT JOIN member ON member_group_membership.member_id = member.id
-                LEFT JOIN job_title ON member.job_title_id = job_title.id
-                LEFT JOIN member_profile ON member.id = member_profile.member_id
-                LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
-            ) AS members ON members.group_id = member_group.id
-            LEFT JOIN file_tree ON (file_tree.id = member_group.main_file_tree)
-            LEFT JOIN (
-                        SELECT file_tree_item.id, file_tree_item.file_tree_id, file_storage_engine.mime_type
-                        FROM file_tree_item
-                        LEFT JOIN member_file ON member_file.id = file_tree_item.member_file_id
-                        LEFT JOIN file_storage_engine ON file_storage_engine.id = member_file.file_id
-                        WHERE file_tree_item.member_file_id IS NOT NULL Group By file_tree_item.id, file_storage_engine.mime_type
-                    ) as file_tree_item ON file_tree_item.file_tree_id = file_tree.id
-            WHERE member_group_membership.member_id = %s AND group_type = %s {"AND group_role != 'owner'" if member_only else ""}
+            INNER JOIN member_group_membership AS group_memberships ON member_group.id = group_memberships.group_id
+            INNER JOIN member AS membership_members ON membership_members.id = group_memberships.member_id
+            LEFT OUTER JOIN online_sessions ON membership_members.id = online_sessions.member_id
+            LEFT OUTER JOIN job_title ON membership_members.job_title_id = job_title.id
+            LEFT OUTER JOIN member_profile ON membership_members.id = member_profile.member_id
+            LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+            LEFT OUTER JOIN file_tree ON (file_tree.id = member_group.main_file_tree)
+            LEFT OUTER JOIN file_tree_item ON file_tree_item.member_file_id IS NOT NULL
+            AND file_tree_item.file_tree_id = file_tree.id
+            LEFT JOIN member_file ON member_file.id = file_tree_item.member_file_id
+            LEFT JOIN file_storage_engine as group_files ON group_files.id = member_file.file_id
+            WHERE 
+                member_group_membership.member_id = %s 
+                AND group_type = %s
+                {"AND member_group_membership.group_role != 'owner'" if member_only else ""}
                 AND member_group.status = 'active'
-                AND
-                (
-                    member_group.group_name ILIKE %s
-                    OR concat_ws(' ', member.first_name, member.last_name) ILIKE %s
-                    OR member.email ILIKE %s
-                    OR concat('create year ', EXTRACT(YEAR FROM member_group.create_date)) LIKE %s
-                    OR concat('create month ', EXTRACT(MONTH FROM member_group.create_date)) LIKE %s
-                    OR concat('create month ', to_char(member_group.create_date, 'month')) LIKE %s
-                    OR concat('create day ', EXTRACT(DAY FROM member_group.create_date)) LIKE %s
-                    OR concat('create day ', to_char(member_group.create_date, 'day')) LIKE %s
-                    OR concat('update year ', EXTRACT(YEAR FROM member_group.update_date)) LIKE %s
-                    OR concat('update month ', EXTRACT(MONTH FROM member_group.update_date)) LIKE %s
-                    OR concat('update month ', to_char(member_group.update_date, 'month')) LIKE %s
-                    OR concat('update day ', EXTRACT(DAY FROM member_group.update_date)) LIKE %s
-                    OR concat('update day ', to_char(member_group.update_date, 'day')) LIKE %s
-                )
+                {search_query if search_key else ""}
+
             GROUP BY member_group.id,
-                    gl.group_leader_id,
+                    gl.id,
                     group_name,
                     exchange_option,
                     member_group.status,
@@ -394,9 +417,9 @@ class GroupDA(object):
                     member_group.create_date,
                     member_group.update_date,
                     member_group_membership.create_date,
-                    gl.group_leader_first_name,
-                    gl.group_leader_last_name,
-                    gl.group_leader_email
+                    gl.first_name,
+                    gl.last_name,
+                    gl.email
             ORDER BY {sort_columns_string}
         """)
 
@@ -405,7 +428,12 @@ class GroupDA(object):
             search_key = ""
 
         like_search_key = f"%{search_key}%"
-        params = (member_id, group_type) + tuple(13 * [like_search_key])
+        params = (member_id, group_type)
+
+        if search_key:
+            like_search_key = f"%{search_key}%"
+            params = params + \
+                tuple(13 * [like_search_key])
 
         cls.source.execute(query, params)
 
@@ -656,7 +684,7 @@ class GroupDA(object):
                 INNER JOIN member ON member_group.group_leader_id = member.id
                 LEFT JOIN member_profile ON member.id = member_profile.member_id
                 LEFT JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
-                WHERE 
+                WHERE
                     member_group_membership.member_id = %s
                     {invited}
                 ORDER BY member_group_membership.create_date DESC
@@ -883,7 +911,7 @@ class GroupMembershipDA(object):
     @classmethod
     def get_members_without_role(cls):
         query = """
-            SELECT * 
+            SELECT *
             FROM member_group_membership
             WHERE group_role IS NULL
         """

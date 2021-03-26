@@ -910,10 +910,7 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN member_profile ON contact.contact_member_id = member_profile.member_id
                 LEFT OUTER JOIN member_achievement ON member_achievement.member_id = member.id
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
-                LEFT OUTER JOIN member_session ON
-                    contact.contact_member_id = member_session.member_id AND
-                    member_session.status IN ('online', 'disconnected') AND
-                    member_session.expiration_date >= current_timestamp
+                LEFT OUTER JOIN online_sessions ON contact.contact_member_id  = online_sessions.member_id
                 LEFT OUTER JOIN company_role_xref ON company_role_xref.member_id = member.id
                 LEFT OUTER JOIN company ON company_role_xref.company_id = company.id
                 LEFT JOIN member_rate ON member_rate.member_id = member.id
@@ -947,7 +944,8 @@ class MemberContactDA(object):
                 contact.create_date,
                 contact.update_date,
                 file_storage_engine.storage_engine_id,
-                contact.status
+                contact.status,
+                online_sessions.online_status
             """)
 
         if search_key != '':
@@ -956,6 +954,17 @@ class MemberContactDA(object):
                 tuple(11 * [like_search_key])
 
         get_contacts_query = (f"""
+            WITH online_sessions AS (
+                SELECT
+                    member_session.member_id,
+                    CASE WHEN bool_or(member_session.status = 'online' AND member_session.status is not null) = true THEN 'online' ELSE 'offline' END as online_status
+                FROM  member_session 
+                WHERE
+                    member_session.status IN ('online', 'disconnected') AND
+                    member_session.expiration_date >= current_timestamp
+                GROUP BY
+                    member_session.member_id
+            )
             SELECT 
                 contact.id as id,
                 contact.contact_member_id as contact_member_id,
@@ -989,8 +998,7 @@ class MemberContactDA(object):
                 file_storage_engine.storage_engine_id as s3_avatar_url,
                 contact.security_exchange_option,
                 contact.status,
-                json_agg(member_session.status)->-1 as online_status,
-                json_agg(member_session.status) as all_statuses,
+                CASE WHEN online_sessions.online_status IS NOT NULL THEN online_sessions.online_status ELSE 'offline' END as online_status,
                 COALESCE(json_agg(DISTINCT company.*) FILTER (WHERE company.id IS NOT NULL), '[]')->0->'id' as company_id,
                 COALESCE(json_agg(DISTINCT company.*) FILTER (WHERE company.id IS NOT NULL), '[]')->0->'name' as member_company_name,
                 COALESCE(json_agg(DISTINCT company.*) FILTER (WHERE company.id IS NOT NULL), '[]') AS companies
@@ -999,6 +1007,18 @@ class MemberContactDA(object):
         """)
 
         get_contacts_count_query = (f"""
+            WITH online_sessions AS (
+                SELECT
+                    member_session.member_id,
+                    CASE WHEN bool_or(member_session.status = 'online' AND member_session.status is not null) = true THEN 'online' ELSE 'offline' END as online_status
+                FROM  member_session 
+                WHERE
+                    member_session.status IN ('online', 'disconnected') AND
+                    member_session.expiration_date >= current_timestamp
+                GROUP BY
+                    member_session.member_id
+            )
+
             SELECT COUNT(*)
                 FROM (SELECT COUNT(DISTINCT contact.contact_member_id)
                 {get_contacts_base_query}) as sq
@@ -1057,7 +1077,7 @@ class MemberContactDA(object):
                         security_exchange_option,
                         status,
                         online_status,
-                        all_statuses,
+                        # all_statuses,
                         company_id,
                         member_company_name,
                         companies
@@ -1098,7 +1118,7 @@ class MemberContactDA(object):
                                 security_exchange_option, 0),
                         "status": status,
                         "online_status": online_status,
-                        "all_statuses": all_statuses,
+                        # "all_statuses": all_statuses,
                         "company_id": company_id,
                         "member_company_name": member_company_name,
                         "companies": companies

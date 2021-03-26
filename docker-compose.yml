@@ -64,6 +64,7 @@ services:
           - amera-web-notifications
           - amera-signaling
           - amera-eventserver
+          - host.docker.internal
     volumes:
       - ../web:/app/main:ro
       - ../web-share:/app/share:ro
@@ -455,46 +456,46 @@ services:
       timeout: 5s
       retries: 15
 
-  # amera-web-notifications:
-  #   container_name: amera-web-notifications
-  #   image: amera-web-notifications:latest
-  #   restart: always
-  #   user: node
-  #   build:
-  #     context: ../web-notifications
-  #     dockerfile: Dockerfile.dev
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 96M
-  #       reservations:
-  #         memory: 48M
-  #   networks:
-  #     amera-net:
-  #       aliases:
-  #         - amera-eventserver
-  #   ports:
-  #     - 5070:5070
-  #   expose:
-  #     - 5070
-  #   environment:
-  #     NODE_ENV: development
-  #     PORT: 5070
-  #     SSE_KEEPALIVE_RATE_SECS: 2
-  #     SSE_PING_RATE_SECS: 2
-  #     PG_USER: amera
-  #     PG_HOST: amera-web-db
-  #     PG_DATABASE: ameraiot
-  #     PG_PASSWORD: amera
-  #     PG_PORT: 5432
-  #     DEBUG: express:*
-  #   volumes:
-  #     - ../web-notifications:/home/node/app
-  #   stdin_open: true
-  #   command: ['yarn', 'start']
-  #   depends_on:
-  #     amera-web-db:
-  #       condition: service_healthy
+  amera-web-notifications:
+    container_name: amera-web-notifications
+    image: amera-web-notifications:latest
+    restart: always
+    user: node
+    build:
+      context: ../web-notifications
+      dockerfile: Dockerfile.dev
+    deploy:
+      resources:
+        limits:
+          memory: 96M
+        reservations:
+          memory: 48M
+    networks:
+      amera-net:
+        aliases:
+          - amera-eventserver
+    ports:
+      - 5070:5070
+    expose:
+      - 5070
+    environment:
+      NODE_ENV: development
+      PORT: 5070
+      SSE_KEEPALIVE_RATE_SECS: 2
+      SSE_PING_RATE_SECS: 2
+      PG_USER: amera
+      PG_HOST: amera-web-db
+      PG_DATABASE: ameraiot
+      PG_PASSWORD: amera
+      PG_PORT: 5432
+      DEBUG: express:*
+    volumes:
+      - ../web-notifications:/home/node/app
+    stdin_open: true
+    command: ['yarn', 'start']
+    depends_on:
+      amera-web-api:
+        condition: service_healthy
 
   amera-call-consumer:
     container_name: amera-call-consumer
