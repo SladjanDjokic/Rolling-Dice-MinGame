@@ -60,6 +60,8 @@ from app.resources.activity_new import SystemActivitySessionResource, SystemActi
 from app.resources.notifications_setting import MemberNotificationsSetting
 # from app.resources.memberfile import
 
+from app.resources.newsfeeds import NewsFeedsResource
+
 from app.resources.bug_report import BugReportResource, BugReportUsersResource
 
 from app.resources.admin import AdminMemberResource
@@ -404,7 +406,13 @@ def _setup_routes(app):
     app.add_route("/forum/topics/post/{post_id}/like", forum_resource, suffix="like")    
     app.add_route("/forum/topics/post", forum_resource, suffix="post")
     app.add_route("/forum/topics/{topic_id:int}", forum_resource, suffix="detail")
-    
+
+    # Routes for contact newsfeeds
+
+    newsfeeds_resource = NewsFeedsResource()
+
+    app.add_route("/newsfeeds", newsfeeds_resource)
+    app.add_route("/newsfeeds/{topic_id:int}", newsfeeds_resource, suffix="post")
     # Routes for Chat App
     app.add_route("/chat", ChatView())
 

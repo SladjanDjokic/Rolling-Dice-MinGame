@@ -525,6 +525,8 @@ class KafkaProducerMiddleware(object):
                 method_map = uri_map[req.uri_template]
             except KeyError:
                 method_map = uri_map[req.path]
+        except TypeError:
+            pass
         except KeyError:
             pass
 
