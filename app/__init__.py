@@ -56,6 +56,7 @@ from app.resources.forum import ForumResource
 from app.resources.billing import BillingResource
 from app.resources.activity_new import SystemActivitySessionResource, SystemActivitySecurityResource, SystemActivityMessageResource, \
     SystemActivityGroupResource, SystemActivityInvitationsResource
+from app.resources.page_settings import PageSettingsResource
 
 from app.resources.notifications_setting import MemberNotificationsSetting
 # from app.resources.memberfile import
@@ -281,6 +282,7 @@ def _setup_routes(app):
 
     app.add_route("/member/register/country", CountryCodeResource())
     app.add_route("/member/role", RolesResource())
+    app.add_route("/member/page/settings", PageSettingsResource())
 
     # Avatars
     member_avatar_resource = MemberAvatarResource()
@@ -311,9 +313,8 @@ def _setup_routes(app):
 
     # Inbox
     mail_inbox_resource = MailInboxResource()
+    app.add_route("/mail/threads", mail_inbox_resource, suffix="thread_mails")
     app.add_route("/mail/inbox", mail_inbox_resource, suffix="list")
-    app.add_route("/mail/inbox/threads",
-                  mail_inbox_resource, suffix="thread_mails")
     app.add_route("/mail/inbox/members", mail_inbox_resource, suffix="members")
 
     app.add_route("/mail/{mail_id}", mail_inbox_resource, suffix="detail")
@@ -323,37 +324,26 @@ def _setup_routes(app):
     mail_star_resource = MailStaredResource()
     app.add_route("/mail/star", mail_star_resource)  # POST
     app.add_route("/mail/star/list", mail_star_resource, suffix="list")  # GET
-    app.add_route("/mail/star/threads", mail_inbox_resource,
-                  suffix="thread_mails")
     app.add_route("/mail/star/{mail_id}", mail_star_resource, suffix="detail")
     app.add_route("/mail/star/members", mail_star_resource, suffix="members")
 
     # Trash
     mail_trash_resource = MailTrashResource()
     app.add_route("/mail/trash", mail_trash_resource)  # POST - Add to trash
-    app.add_route("/mail/trash/list", mail_trash_resource,
-                  suffix="list")  # GET - Trash list
-    # GET - Trash mail detail
-    app.add_route("/mail/trash/{mail_id}",
-                  mail_trash_resource, suffix="detail")
+    app.add_route("/mail/trash/list", mail_trash_resource, suffix="list")  # GET - Trash list
+    app.add_route("/mail/trash/{mail_id}", mail_trash_resource, suffix="detail")  # GET - Trash mail detail
+    app.add_route("/mail/trash/{mail_id}/{mail_xref}", mail_trash_resource, suffix="detail_rm")
     # DELETE - delete email for ever
-    app.add_route("/mail/trash/mv/origin", mail_trash_resource,
-                  suffix="remove")  # POST - move mail to origin
-    app.add_route("/mail/trash/mv/archive", mail_trash_resource,
-                  suffix="archive")  # POST - Add to archive
+    app.add_route("/mail/trash/mv/origin", mail_trash_resource, suffix="remove")  # POST - move mail to origin
+    app.add_route("/mail/trash/mv/archive", mail_trash_resource, suffix="archive")  # POST - Add to archive
     app.add_route("/mail/trash/members", mail_trash_resource, suffix="members")
 
     # Archive
     mail_archive_resource = MailArchiveResource()
-    # POST - Add to trash
-    app.add_route("/mail/archive", mail_archive_resource)
-    app.add_route("/mail/archive/list", mail_archive_resource,
-                  suffix="list")  # GET - Trash list
-    app.add_route("/mail/archive/threads",
-                  mail_inbox_resource, suffix="thread_mails")
-    # GET - Trash mail detail
-    app.add_route("/mail/archive/{mail_id}",
-                  mail_archive_resource, suffix="detail")
+    app.add_route("/mail/archive", mail_archive_resource)  # POST - Add to trash
+    app.add_route("/mail/archive/list", mail_archive_resource, suffix="list")  # GET - Trash list
+    app.add_route("/mail/archive/{mail_id}", mail_archive_resource, suffix="detail")  # GET - Trash mail detail
+    app.add_route("/mail/archive/{mail_id}/{mail_xref}", mail_archive_resource, suffix="detail_rm")
     # DELETE - delete email for ever
     app.add_route("/mail/archive/mv/origin", mail_archive_resource,
                   suffix="remove")  # POST - move mail to origin
@@ -365,8 +355,6 @@ def _setup_routes(app):
     # Sent
     mail_sent_resource = MailSentResource()
     app.add_route("/mail/sent/list", mail_sent_resource, suffix="list")  # GET
-    app.add_route("/mail/sent/threads", mail_inbox_resource,
-                  suffix="thread_mails")
     app.add_route("/mail/sent/{mail_id}", mail_sent_resource, suffix="detail")
     app.add_route("/mail/sent/members", mail_sent_resource, suffix="members")
 

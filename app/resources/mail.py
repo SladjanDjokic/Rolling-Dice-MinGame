@@ -135,14 +135,17 @@ class MailBaseResource(object):
             start = int(start)
         except ValueError:
             raise HTTPBadRequest("Start is not valid")
-        thread_id = req.params.get('start', -1)
+        thread_id = req.params.get('thread', None)
+        if not thread_id:
+            raise HTTPBadRequest("Thread is required")
         try:
             thread_id = int(thread_id)
         except ValueError:
             raise HTTPBadRequest("Thread is not valid")
-        return_data = self.main_da_class.get_reply_chain(
-            member_id, thread_id, start)
-        response.body = json.dumps(return_data, default_parser=json.parser)
+        return_data = self.main_da_class.get_reply_chain(member_id, thread_id, start)
+        response.body = json.dumps({
+            "data": return_data,
+        }, default_parser=json.parser)
 
     @check_session
     def on_get_detail(self, req, response, mail_id):
@@ -330,10 +333,9 @@ class MailStaredResource(MailBaseResource):
     @check_session
     def on_post(self, req, res):
 
-        (mail_id, rm) = request.get_json_or_form(
-            "mail_id", "rm", req=req)
+        (mail_id, mail_xref, rm) = request.get_json_or_form(
+            "mail_id", "xref_id", "rm", req=req)
         member_id = req.context.auth["session"]["member_id"]
-
         if not mail_id:
             raise HTTPBadRequest("Email is not specified")
         if not type(mail_id) == list:
@@ -343,6 +345,15 @@ class MailStaredResource(MailBaseResource):
                 int(each)
             except ValueError:
                 raise HTTPBadRequest("Email id is invalid")
+        if not type(mail_xref) == list:
+            mail_xref = [mail_xref]
+        for each in mail_xref:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Xref id is invalid")
+        if len(mail_xref) != len(mail_id):
+            raise HTTPBadRequest("Xref and header didn't matched")
         if not rm:
             rm = False
         else:
@@ -350,9 +361,8 @@ class MailStaredResource(MailBaseResource):
                 rm = bool(rm)
             except ValueError:
                 raise HTTPBadRequest("Only boolean is allowed for 'rm'")
-        for each in mail_id:
-            self.main_da_class.add_remove_mail_to_star(
-                int(each), member_id, not rm)
+        for index, each in enumerate(mail_id):
+            self.main_da_class.add_remove_mail_to_star(int(each), int(mail_xref[index]), member_id, not rm)
 
 
 class MailTrashResource(MailBaseResource):
@@ -382,8 +392,8 @@ class MailTrashResource(MailBaseResource):
     @check_session
     def on_post(self, req, res):
 
-        (mail_id,) = request.get_json_or_form(
-            "mail_id", req=req)
+        (mail_id, mail_xref) = request.get_json_or_form(
+            "mail_id", "xref_id", req=req)
         member_id = req.context.auth["session"]["member_id"]
 
         if not mail_id:
@@ -397,11 +407,21 @@ class MailTrashResource(MailBaseResource):
             except ValueError:
                 raise HTTPBadRequest("Email id is invalid")
 
-        for each in mail_id:
-            self.main_da_class.add_to_trash(int(each), member_id)
+        if not type(mail_xref) == list:
+            mail_xref = [mail_xref]
+        for each in mail_xref:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Xref id is invalid")
+        if len(mail_xref) != len(mail_id):
+            raise HTTPBadRequest("Xref and header didn't matched")
+
+        for index, each in enumerate(mail_id):
+            self.main_da_class.add_to_trash(int(each), int(mail_xref[index]), member_id)
 
     @check_session
-    def on_delete_detail(self, req, response, mail_id):
+    def on_delete_detail_rm(self, req, response, mail_id, mail_xref):
         member_id = req.context.auth["session"]["member_id"]
         if not mail_id:
             raise HTTPBadRequest("Email is not specified")
@@ -411,14 +431,23 @@ class MailTrashResource(MailBaseResource):
                 int(each)
             except ValueError:
                 raise HTTPBadRequest("Email id is invalid")
-        for each in mail_id:
-            self.main_da_class.delete_mail(each, member_id)
+
+        mail_xref = str(mail_xref).split(",")
+        for each in mail_xref:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Xref id is invalid")
+        if len(mail_xref) != len(mail_id):
+            raise HTTPBadRequest("Xref and header didn't matched")
+
+        for index, each in enumerate(mail_id):
+            self.main_da_class.delete_mail(each, int(mail_xref[index]), member_id)
 
     @check_session
     def on_post_remove(self, req, response):
-        (mail_id,) = request.get_json_or_form(
-            "mail_id", req=req)
-        member_id = req.context.auth["session"]["member_id"]
+        (mail_id, mail_xref) = request.get_json_or_form(
+            "mail_id", "xref_id", req=req)
         if not mail_id:
             raise HTTPBadRequest("Email is not specified")
 
@@ -430,15 +459,24 @@ class MailTrashResource(MailBaseResource):
             except ValueError:
                 raise HTTPBadRequest("Email id is invalid")
 
-        for each in mail_id:
-            self.main_da_class.remove_from_trash(
-                int(each), member_id)
+        if not type(mail_xref) == list:
+            mail_xref = [mail_xref]
+        for each in mail_xref:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Xref id is invalid")
+        if len(mail_xref) != len(mail_id):
+            raise HTTPBadRequest("Xref and header didn't matched")
+
+        for index, each in enumerate(mail_id):
+            self.main_da_class.remove_from_trash(int(each), int(mail_xref[index]), member_id)
 
     @check_session
     def on_post_archive(self, req, response):
-        (mail_id,) = request.get_json_or_form(
-            "mail_id", req=req)
         member_id = req.context.auth["session"]["member_id"]
+        (mail_id, mail_xref) = request.get_json_or_form(
+            "mail_id", "xref_id", req=req)
         if not mail_id:
             raise HTTPBadRequest("Email is not specified")
 
@@ -450,8 +488,18 @@ class MailTrashResource(MailBaseResource):
             except ValueError:
                 raise HTTPBadRequest("Email id is invalid")
 
-        for each in mail_id:
-            self.main_da_class.add_to_archive(int(each), member_id)
+        if not type(mail_xref) == list:
+            mail_xref = [mail_xref]
+        for each in mail_xref:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Xref id is invalid")
+        if len(mail_xref) != len(mail_id):
+            raise HTTPBadRequest("Xref and header didn't matched")
+
+        for index, each in enumerate(mail_id):
+            self.main_da_class.add_to_archive(int(each), int(mail_xref[index]), member_id)
 
 
 class MailArchiveResource(MailBaseResource):
@@ -478,8 +526,8 @@ class MailArchiveResource(MailBaseResource):
     @check_session
     def on_post(self, req, res):
 
-        (mail_id,) = request.get_json_or_form(
-            "mail_id", req=req)
+        (mail_id, mail_xref) = request.get_json_or_form(
+            "mail_id", "xref_id", req=req)
         member_id = req.context.auth["session"]["member_id"]
 
         if not mail_id:
@@ -493,11 +541,21 @@ class MailArchiveResource(MailBaseResource):
             except ValueError:
                 raise HTTPBadRequest("Email id is invalid")
 
-        for each in mail_id:
-            self.main_da_class.add_to_archive(int(each), member_id)
+        if not type(mail_xref) == list:
+            mail_xref = [mail_xref]
+        for each in mail_xref:
+            try:
+                int(each)
+            except (ValueError, TypeError):
+                raise HTTPBadRequest("Xref id is invalid")
+        if len(mail_xref) != len(mail_id):
+            raise HTTPBadRequest("Xref and header didn't matched")
+
+        for index, each in enumerate(mail_id):
+            self.main_da_class.add_to_archive(int(each), int(mail_xref[index]), member_id)
 
     @check_session
-    def on_delete_detail(self, req, response, mail_id):
+    def on_delete_detail_rm(self, req, response, mail_id, mail_xref):
         if not mail_id:
             raise HTTPBadRequest("Email is not specified")
         member_id = req.context.auth["session"]["member_id"]
@@ -507,14 +565,24 @@ class MailArchiveResource(MailBaseResource):
                 int(each)
             except ValueError:
                 raise HTTPBadRequest("Email id is invalid")
-        for each in mail_id:
-            self.main_da_class.delete_mail(int(each), member_id)
+
+        mail_xref = str(mail_xref).split(",")
+        for each in mail_xref:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Xref id is invalid")
+        if len(mail_xref) != len(mail_id):
+            raise HTTPBadRequest("Xref and header didn't matched")
+
+        for index, each in enumerate(mail_id):
+            self.main_da_class.delete_mail(int(each), int(mail_xref[index]), member_id)
 
     @check_session
     def on_post_remove(self, req, response):
-        (mail_id,) = request.get_json_or_form(
-            "mail_id", req=req)
         member_id = req.context.auth["session"]["member_id"]
+        (mail_id, mail_xref) = request.get_json_or_form(
+            "mail_id", "xref_id", req=req)
         if not mail_id:
             raise HTTPBadRequest("Email is not specified")
 
@@ -526,14 +594,23 @@ class MailArchiveResource(MailBaseResource):
             except ValueError:
                 raise HTTPBadRequest("Email id is invalid")
 
-        for each in mail_id:
-            self.main_da_class.remove_from_archive(
-                int(each), member_id)
+        if not type(mail_xref) == list:
+            mail_xref = [mail_xref]
+        for each in mail_xref:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Xref id is invalid")
+        if len(mail_xref) != len(mail_id):
+            raise HTTPBadRequest("Xref and header didn't matched")
+
+        for index, each in enumerate(mail_id):
+            self.main_da_class.remove_from_archive(int(each), int(mail_xref[index]), member_id)
 
     @check_session
     def on_post_trash(self, req, response):
-        (mail_id,) = request.get_json_or_form(
-            "mail_id", req=req)
+        (mail_id, mail_xref) = request.get_json_or_form(
+            "mail_id", "xref_id", req=req)
         member_id = req.context.auth["session"]["member_id"]
         if not mail_id:
             raise HTTPBadRequest("Email is not specified")
@@ -546,8 +623,18 @@ class MailArchiveResource(MailBaseResource):
             except ValueError:
                 raise HTTPBadRequest("Email id is invalid")
 
-        for each in mail_id:
-            self.main_da_class.add_to_trash(int(each), member_id)
+        if not type(mail_xref) == list:
+            mail_xref = [mail_xref]
+        for each in mail_xref:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Xref id is invalid")
+        if len(mail_xref) != len(mail_id):
+            raise HTTPBadRequest("Xref and header didn't matched")
+
+        for index, each in enumerate(mail_id):
+            self.main_da_class.add_to_trash(int(each), int(mail_xref[index]), member_id)
 
 
 class MailSentResource(MailBaseResource):
@@ -565,15 +652,14 @@ class MailSettingsResource(object):
                         "/mail/sign": {
                             "event_type": settings.get('kafka.event_types.post.create_signature'),
                             "topic": settings.get('kafka.topics.mail')
-                },
-                },
+                        },
+                        },
             }}
 
     @check_session
     def on_get(self, req, response):
         member_id = req.context.auth["session"]["member_id"]
-        response.body = json.dumps(MailSettingsDA.settings_get(
-            member_id), default_parser=json.parser)
+        response.body = json.dumps(MailSettingsDA.settings_get(member_id), default_parser=json.parser)
 
     @check_session
     def on_post(self, req, response):
@@ -664,8 +750,8 @@ class MailMemberFolderResource(object):
     @check_session
     def on_post_move(self, req, response):
         member_id = req.context.auth["session"]["member_id"]
-        (folder_id, mail_id,) = request.get_json_or_form(
-            "folder_id", "mail_id", req=req)
+        (folder_id, mail_id, mail_xref) = request.get_json_or_form(
+            "folder_id", "mail_id", "xref_id", req=req)
         if not folder_id or not mail_id:
             raise HTTPBadRequest("Data missing!")
         if folder_id is not None:
@@ -683,8 +769,19 @@ class MailMemberFolderResource(object):
                 int(each)
             except ValueError:
                 raise HTTPBadRequest("Email id is invalid")
+
+        if not type(mail_xref) == list:
+            mail_xref = [mail_xref]
+        for each in mail_xref:
+            try:
+                int(each)
+            except ValueError:
+                raise HTTPBadRequest("Xref id is invalid")
+        if len(mail_xref) != len(mail_id):
+            raise HTTPBadRequest("Xref and header didn't matched")
+
         result = None
-        for each in mail_id:
+        for index, each in enumerate(mail_id):
             result = MailMemberFolder.move_to_folder(
-                member_id, int(each), folder_id)
+                member_id, int(each), int(mail_xref[index]), folder_id)
         response.body = json.dumps({"id": result}, default_parser=json.parser)

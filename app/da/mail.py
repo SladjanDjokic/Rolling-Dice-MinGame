@@ -1,3 +1,4 @@
+import copy
 import datetime
 import json
 import logging
@@ -97,6 +98,7 @@ class BaseMailDA(BaseDA):
                 m.email,
                 m.first_name,
                 m.last_name,
+                xref.id,
                 xref.read,
                 xref.new_mail,
                 prof_image_engine.storage_engine_id,
@@ -144,6 +146,7 @@ class BaseMailDA(BaseDA):
                 prof_image_engine.storage_engine_id,
                 folder.name,
                 folder.id,
+                xref.id,
                 xref.read,
                 xref.replied_id,
                 xref.replied_ts,
@@ -161,7 +164,8 @@ class BaseMailDA(BaseDA):
                 head.message_to,
                 head.message_cc,
                 head.message_bcc,
-                xref.recent_mail_folder_id
+                xref.recent_mail_folder_id,
+                head.mail_thread_id
             FROM mail_header as head
             INNER JOIN mail_xref xref on head.id = xref.mail_header_id
             INNER JOIN mail_body body on head.id = body.mail_header_id
@@ -198,7 +202,7 @@ class BaseMailDA(BaseDA):
     def get_reply_chain(cls, member_id, thread_id, start):
         folder_query, folder_join = cls.folder_query(member_id)
         header_query = f"""
-            SELECT
+            SELECT DISTINCT ON (head.id)
                 head.id,
                 head.subject,
                 body.message,
@@ -238,6 +242,7 @@ class BaseMailDA(BaseDA):
                                                             prof_image_engine.id = profile.profile_picture_storage_id
             INNER JOIN mail_folder_xref mfx on xref.id = mfx.mail_xref_id
             INNER JOIN mail_folder folder on mfx.mail_folder_id = folder.id
+            INNER JOIN mail_thread_item mti on head.id = mti.mail_header_id
             INNER JOIN mail_header reply on (
                 CASE
                     WHEN xref.replied_id IS NOT NULL THEN
@@ -253,12 +258,11 @@ class BaseMailDA(BaseDA):
                 END
             )
             WHERE (
-                xref.mail_thread_id = %s
-                AND xref.id > %s
+                mti.mail_thread_id = %s
+                AND head.id < %s
                 AND head.message_locked = %s
-                {folder_query}
-            )
-            LIMIT 20;
+            );
+--             LIMIT 20;
         """
         attach_query = """
             SELECT
@@ -366,6 +370,7 @@ class BaseMailDA(BaseDA):
                     pass
                 cls.source.commit()
                 return_data.append(data)
+        return_data = sorted(return_data, key=lambda x: x["time"], reverse=True)
         return return_data
 
     @classmethod
@@ -473,6 +478,7 @@ class BaseMailDA(BaseDA):
                     sender_mail,
                     first_name,
                     last_name,
+                    xref_id,
                     read,
                     new_mail,
                     prof_id,
@@ -512,6 +518,7 @@ class BaseMailDA(BaseDA):
                     "subject": subject,
                     "body": body,
                     "time": time,
+                    "xref_id": xref_id,
                     "attachments_count": attachments_count,
                     "sender_mail": sender_mail,
                     "first_name": first_name,
@@ -579,6 +586,7 @@ class BaseMailDA(BaseDA):
                 prof_id,
                 folder_name,
                 folder_id,
+                xref_id,
                 read,
                 reply_id,
                 reply_time,
@@ -588,7 +596,8 @@ class BaseMailDA(BaseDA):
                 receivers,
                 cc,
                 bcc,
-                folder_id
+                folder_id,
+                thread_id
             ) = cls.source.cursor.fetchone()
             if receivers and not type(receivers) == dict:
                 try:
@@ -618,6 +627,7 @@ class BaseMailDA(BaseDA):
                 "subject": subject,
                 "body": body,
                 "time": time,
+                "xref_id": xref_id,
                 "attachments_count": attachments_count,
                 "sender_member_id": sender_member_id,
                 "sender_mail": sender_mail,
@@ -636,7 +646,8 @@ class BaseMailDA(BaseDA):
                 "attachments": [],
                 "is_stared": is_starred,
                 "member_details": member_infos,
-                "folder_id": folder_id
+                "folder_id": folder_id,
+                "thread_id": thread_id,
             }
 
             cls.source.execute(attach_query, (mail_id,))
@@ -660,6 +671,259 @@ class BaseMailDA(BaseDA):
             cls.source.commit()
             return data
         return {}
+
+    @classmethod
+    def get_selectable_contacts(cls, member_id, sort_params, filter_params, search_key='', page_size=None,
+                                page_number=None):
+        sort_columns_string = 'first_name ASC'
+        contact_dict = {
+            'id': 'contact.id',
+            'contact_member_id': 'contact.contact_member_id',
+            'first_name': 'contact.first_name',
+            'middle_name': 'member.middle_name',
+            'last_name': 'contact.last_name',
+            'biography': 'member_profile.biography',
+            'cell_phone': 'contact.cell_phone',
+            'office_phone': 'contact.office_phone',
+            'home_phone': 'contact.home_phone',
+            'email': 'contact.email',
+            'personal_email': 'contact.personal_email',
+            'company': 'member.company_name',
+            'title': 'job_title.name',
+            'country_code_id': 'member_location.country_code_id',
+            'company_name': 'member.company_name',
+            'company_phone': 'contact.company_phone',
+            'company_web_site': 'contact.company_web_site',
+            'company_email': 'contact.company_email',
+            'company_bio': 'contact.company_bio',
+            'role': 'role.name',
+            'role_id': 'role.id',
+            'create_date': 'contact.create_date',
+            'update_date': 'contact.update_date',
+            'status': 'contact.status',
+            'online_status': 'member_session.status'
+        }
+
+        if sort_params:
+            sort_columns_string = MemberContactDA.formatSortingParams(
+                sort_params, contact_dict) or sort_columns_string
+
+        (filter_conditions_query, filter_conditions_params) = MemberContactDA.formatFilterConditions(
+            filter_params, contact_dict)
+        get_contacts_params = (member_id, ) + filter_conditions_params
+        contacts = list()
+        get_contacts_query = (f"""
+            SELECT contact.id as id,
+                contact.contact_member_id as contact_member_id,
+                contact.first_name as first_name,
+                member.middle_name as middle_name,
+                contact.last_name as last_name,
+                member_profile.biography as biography,
+                contact.cell_phone as cell_phone,
+                contact.office_phone as office_phone,
+                contact.home_phone as home_phone,
+                contact.email as email,
+                contact.personal_email as personal_email,
+                member.company_name as company,
+                job_title.name as title,
+                contact.company_name as company_name,
+                contact.company_phone as company_phone,
+                contact.company_web_site as company_web_site,
+                contact.company_email as company_email,
+                contact.company_bio as company_bio,
+                role.name as role,
+                role.id as role_id,
+                contact.create_date as create_date,
+                contact.update_date as update_date,
+                COALESCE(json_agg(DISTINCT member_location.*) FILTER (WHERE member_location.id IS NOT NULL), '[]') AS location_information,
+                COALESCE(json_agg(DISTINCT member_contact_2.*) FILTER (WHERE member_contact_2.id IS NOT NULL), '[]') AS contact_information,
+                COALESCE(json_agg(DISTINCT country_code.*) FILTER (WHERE country_code.id IS NOT NULL), '[]') AS country_code,
+                COALESCE(json_agg(DISTINCT member_achievement.*) FILTER (WHERE member_achievement.id IS NOT NULL), '[]') AS achievement_information,
+                file_storage_engine.storage_engine_id as s3_avatar_url,
+                contact.security_exchange_option,
+                contact.status,
+                CASE
+                    WHEN member_session.status IS NOT NULL
+                    THEN member_session.status
+                    ELSE 'inactive'
+                END as online_status
+            FROM contact
+                LEFT JOIN member ON member.id = contact.contact_member_id
+                LEFT OUTER JOIN role ON contact.role_id = role.id
+                LEFT OUTER JOIN member_location ON member_location.member_id = contact.contact_member_id
+                LEFT OUTER JOIN member_contact ON member_contact.member_id = contact.contact_member_id
+                LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = contact.contact_member_id
+                LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
+                LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
+                LEFT OUTER JOIN member_profile ON contact.contact_member_id = member_profile.member_id
+                LEFT OUTER JOIN member_achievement ON member_achievement.member_id = member.id
+                LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+                LEFT OUTER JOIN member_session ON
+                    contact.contact_member_id = member_session.member_id AND
+                    member_session.status IN ('online', 'disconnected') AND
+                    member_session.expiration_date >= current_timestamp
+                INNER JOIN mail_xref mx on mx.member_id = contact.member_id
+                INNER JOIN mail_header mh on
+                            mx.mail_header_id = mh.id AND (
+                                mh.message_to->'amera' @> to_char(contact.contact_member_id, '999')::jsonb
+                                OR mh.message_cc->'amera' @> to_char(contact.contact_member_id, '999')::jsonb
+                                OR mh.member_id = contact.contact_member_id
+                            )
+                INNER JOIN mail_folder_xref on mx.id = mail_folder_xref.mail_xref_id
+                INNER JOIN mail_folder mf on (
+                        mail_folder_xref.mail_folder_id = mf.id
+                        AND mf.name = '{str(cls.folder_name).upper()}'
+                    )
+            WHERE
+                contact.member_id = %s {filter_conditions_query}
+                AND
+                (
+                    concat(contact.first_name, member.middle_name, contact.last_name) ILIKE %s
+                    OR contact.email ILIKE %s
+                    OR member_profile.biography LIKE %s
+                    OR contact.cell_phone LIKE %s
+                    OR contact.office_phone LIKE %s
+                    OR contact.home_phone LIKE %s
+                    OR contact.personal_email LIKE %s
+                    OR member.company_name LIKE %s
+                    OR job_title.name LIKE %s
+                    OR cast(member_location.country_code_id as varchar) LIKE %s
+                    OR member.company_name LIKE %s
+                    OR contact.company_phone LIKE %s
+                    OR contact.company_web_site LIKE %s
+                    OR contact.company_email LIKE %s
+                    OR contact.company_bio LIKE %s
+                    OR role.name LIKE %s
+                )
+            GROUP BY
+                contact.id,
+                contact.contact_member_id,
+                contact.first_name,
+                member.middle_name,
+                contact.last_name,
+                member_profile.biography,
+                contact.cell_phone,
+                contact.office_phone,
+                contact.home_phone,
+                contact.email,
+                contact.personal_email,
+                member.company_name,
+                job_title.name,
+                contact.company_name,
+                contact.company_phone,
+                contact.company_web_site,
+                contact.company_email,
+                contact.company_bio,
+                role.name,
+                role.id,
+                contact.create_date,
+                contact.update_date,
+                file_storage_engine.storage_engine_id,
+                contact.status,
+                member_session.status
+            ORDER BY {sort_columns_string}
+            """)
+
+        like_search_key = """%{}%""".format(search_key)
+        get_contacts_params = get_contacts_params + tuple(16 * [like_search_key])
+
+        countQuery = (f"""
+            SELECT COUNT(*)
+                FROM
+                    (
+                        {get_contacts_query}
+                    ) src;
+            """)
+
+        count = 0
+        cls.source.execute(countQuery, get_contacts_params)
+        if cls.source.has_results():
+            (count,) = cls.source.cursor.fetchone()
+
+        if page_size and page_number >= 0:
+            get_contacts_query += """LIMIT %s OFFSET %s"""
+            offset = 0
+            if page_number > 0:
+                offset = page_number * page_size
+            get_contacts_params = get_contacts_params + (page_size, offset)
+
+        cls.source.execute(get_contacts_query, get_contacts_params)
+        if cls.source.has_results():
+            for (
+                    id,
+                    contact_member_id,
+                    first_name,
+                    middle_name,
+                    last_name,
+                    biography,
+                    cell_phone,
+                    office_phone,
+                    home_phone,
+                    email,
+                    personal_email,
+                    company,
+                    title,
+                    company_name,
+                    company_phone,
+                    company_web_site,
+                    company_email,
+                    company_bio,
+                    role,
+                    role_id,
+                    create_date,
+                    update_date,
+                    location_information,
+                    contact_information,
+                    country_code,
+                    achievement_information,
+                    s3_avatar_url,
+                    security_exchange_option,
+                    status,
+                    online_status
+            ) in cls.source.cursor:
+                contact = {
+                    "id": id,
+                    "contact_member_id": contact_member_id,
+                    "first_name": first_name,
+                    "middle_name": middle_name,
+                    "last_name": last_name,
+                    "member_name": f'{first_name} {last_name}',
+                    "biography": biography,
+                    "cell_phone": cell_phone,
+                    "office_phone": office_phone,
+                    "home_phone": home_phone,
+                    "email": email,
+                    "personal_email": personal_email,
+                    "company": company,
+                    "title": title,
+                    "company_name": company_name,
+                    "company_phone": company_phone,
+                    "company_web_site": company_web_site,
+                    "company_email": company_email,
+                    "company_bio": company_bio,
+                    "role": role,
+                    "role_id": role_id,
+                    "create_date": create_date,
+                    "update_date": update_date,
+                    "location_information": location_information,
+                    "contact_information": contact_information,
+                    "country_code": country_code,
+                    "achievement_information": achievement_information,
+                    "amera_avatar_url": amerize_url(s3_avatar_url),
+                    "security_exchange_option":
+                        SECURITY_EXCHANGE_OPTIONS.get(security_exchange_option, 0),
+                    "status": status,
+                    "online_status": online_status
+                    # "city": city,
+                    # "state": state,
+                    # "province": province,
+                    # "country": country
+                }
+                contacts.append(contact)
+        return {
+            "contacts": contacts,
+            "count": count
+        }
 
 
     @classmethod
@@ -1094,6 +1358,202 @@ class DraftMailDA(BaseMailDA):
         return True
 
     @classmethod
+    def start_new_thread(cls, mail_header_id):
+        # First, creates new thread
+        thread_create_query = """
+            INSERT INTO mail_thread (id)
+            VALUES (DEFAULT)
+            RETURNING id;
+        """
+        current_thread_create = """
+            INSERT INTO mail_thread_item (mail_thread_id, mail_header_id)
+            VALUES (%s, %s);
+        """
+        cls.source.execute(thread_create_query, ())
+        if cls.source.has_results():
+            thread_id = cls.source.cursor.fetchone()[0]
+            cls.source.execute(current_thread_create, (thread_id, mail_header_id))
+            if cls.source.has_results():
+                # Update related parent to have same thread
+                thread_update_loop = """
+                    DO $$
+                    DECLARE
+                       next_reply_id BIGINT = %(start_header_id)s;
+                       tmp_middle_var BIGINT = NULL;
+                       res mail_xref;
+                    BEGIN
+                        WHILE next_reply_id IS NOT NULL LOOP
+                            tmp_middle_var = next_reply_id;
+                            next_reply_id = NULL;
+                            FOR res IN
+                                SELECT 
+                                    *
+                                FROM mail_xref
+                                WHERE
+                                    mail_header_id = tmp_middle_var
+                                    AND replied_id IS NOT NULL
+                                ORDER BY id
+                                ASC
+                                LIMIT 1
+                            LOOP
+                                IF res.replied_id IS NOT NULL THEN
+                                    next_reply_id = res.replied_id;
+                                    INSERT INTO mail_thread_item (mail_thread_id, mail_header_id)
+                                    VALUES (%(thread_id)s, res.replied_id);
+                                END IF;
+                            END LOOP;
+                        END LOOP;
+                    END$$;
+                """
+                cls.source.execute(thread_update_loop, {
+                    "start_header_id": mail_header_id,
+                    "thread_id": thread_id
+                })
+                logger.debug(f"\n\n{cls.source.has_results()}\n\n")
+                return thread_id
+        raise HTTPInternalServerError("Failed to start thread for email")
+
+    @classmethod
+    def check_reply(cls, sender_member_id, owner_member_id, receivers=None, owner_receivers=None):
+        """
+            Checks replied email
+            @param sender_member_id: member_id of sender of new email
+            @param owner_member_id: member_id of owner of original email
+            @param receivers: receivers of reply in format {
+                "to": {
+                    "amera": [],
+                    "external": []
+                },
+                "cc": {
+                    "amera": [],
+                    "external": []
+                },
+                "bcc": {
+                    "amera": [],
+                    "external": []
+                },
+            }
+            @param owner_receivers: receivers of original email in format {
+                "to": {
+                    "amera": [],
+                    "external": []
+                },
+                "cc": {
+                    "amera": [],
+                    "external": []
+                },
+                "bcc": {
+                    "amera": [],
+                    "external": []
+                },
+            }
+            @return: returns True if reply is in a new thread, else False
+            @raise HTTPBadRequest: raises an exception when receivers are invalid
+        """
+        if receivers is None:
+            receivers = {
+                "to": {
+                    "amera": [],
+                    "external": []
+                },
+                "cc": {
+                    "amera": [],
+                    "external": []
+                },
+                "bcc": {
+                    "amera": [],
+                    "external": []
+                },
+            }
+        if receivers is None:
+            owner_receivers = {
+                "to": {
+                    "amera": [],
+                    "external": []
+                },
+                "cc": {
+                    "amera": [],
+                    "external": []
+                },
+                "bcc": {
+                    "amera": [],
+                    "external": []
+                },
+            }
+        # for eachTarget in ["to", "cc", "bcc"]:
+        #     try:
+        #         owner_receivers[eachTarget]["amera"].remove(sender_member_id)
+        #     except ValueError:
+        #         pass
+        #     try:
+        #         receivers[eachTarget]["amera"].remove(sender_member_id)
+        #     except ValueError:
+        #         pass
+        if (
+                len(receivers["to"]) if "to" in receivers else 0 + len(receivers["cc"]) if "cc" in receivers else 0
+        ) < 1:
+            raise HTTPBadRequest("Receivers cannot be empty")
+
+        includes_owner = False
+        logger.debug("OWNER RECEIVERS")
+        logger.debug(owner_receivers)
+
+        for eachTarget in ["to", "cc"]:
+            try:
+                owner_receivers[eachTarget]["amera"].remove(sender_member_id)
+            except (ValueError, TypeError):
+                pass
+            try:
+                receivers[eachTarget]["amera"].remove(sender_member_id)
+                if owner_member_id == sender_member_id and eachTarget == "to":
+                    includes_owner = True
+            except (ValueError, TypeError):
+                pass
+
+        for eachTarget in ["to", "cc"]:
+            try:
+                owner_receivers[eachTarget]["amera"].remove(owner_member_id)
+            except (ValueError, TypeError):
+                pass
+            try:
+                receivers[eachTarget]["amera"].remove(owner_member_id)
+                if eachTarget == "to":
+                    includes_owner = True
+            except (ValueError, TypeError):
+                pass
+        if (not receivers["to"] == owner_receivers["to"]) \
+                and not (len(receivers["to"]["amera"]) + len(receivers["to"]["external"]) < 1 and includes_owner):
+            raise HTTPBadRequest("Receivers list is invalid")
+        if (not receivers["cc"] == owner_receivers["cc"]) \
+                and not (len(receivers["to"]["amera"]) + len(receivers["to"]["external"]) < 1 and includes_owner):
+            raise HTTPBadRequest("CC receivers list is invalid")
+        if len(receivers["to"]) + len(receivers["cc"]) < 1 and not includes_owner:
+            raise HTTPBadRequest("Cannot deselect original email receivers from reply email")
+
+        return len(receivers["to"]["amera"]) + len(receivers["cc"]["amera"]) < 1
+        #         len(receivers["to"]) if "to" in receivers else 0
+        #         + len(receivers["cc"]) if "cc" in receivers else 0
+        #         + len(receivers["bcc"]) if "bcc" in receivers else 0
+        # ) < 1:
+        #     raise HTTPBadRequest("Receivers cannot be empty")
+        # if (not receivers["to"] == owner_receivers["to"]) and owner_member_id not in receivers["to"]["amera"]:
+        #     raise HTTPBadRequest("Receivers list is invalid")
+        # if (not receivers["cc"] == owner_receivers["cc"]) and owner_member_id not in receivers["cc"]["amera"]:
+        #     raise HTTPBadRequest("CC receivers list is invalid")
+        # if (not receivers["bcc"] == owner_receivers["bcc"]) and owner_member_id not in receivers["bcc"]["amera"]:
+        #     raise HTTPBadRequest("BCC receivers list is invalid")
+        # # for eachTarget in ["to", "cc", "bcc"]:
+        # #     try:
+        # #         owner_receivers[eachTarget]["amera"].remove(owner_member_id)
+        # #     except ValueError:
+        # #         pass
+        # #     try:
+        # #         receivers[eachTarget]["amera"].remove(owner_member_id)
+        # #     except ValueError:
+        # #         pass
+        # return not receivers == owner_receivers
+
+    @classmethod
     def can_forward_mail(cls, member_id, mail_id):
         # TODO: check query for forward
         return True
@@ -1358,7 +1818,6 @@ class DraftMailDA(BaseMailDA):
 
     @classmethod
     def process_send_mail(cls, mail_id, member_id):
-
         header_query = """
             SELECT
                 mail_header.subject,
@@ -1377,6 +1836,13 @@ class DraftMailDA(BaseMailDA):
             WHERE (
                 mail_header_id = %s
             ) RETURNING mail_header_id;
+        """
+        update_header = """
+            UPDATE mail_header
+            SET mail_thread_id = %s
+            WHERE (
+                id = %s
+            ) RETURNING id;
         """
         insert_xref = """
             INSERT INTO mail_xref (member_id, owner_member_id, mail_header_id, recipient_type, message_type,
@@ -1422,15 +1888,84 @@ class DraftMailDA(BaseMailDA):
                 AND mail_xref.deleted = FALSE
             )
         """
+        xref_parent_get = """
+            SELECT
+                replied_id,
+                mh.message_to,
+                mh.message_cc,
+                mh.message_bcc,
+                mh.member_id,
+                mh.mail_thread_id
+            FROM mail_xref
+            INNER JOIN mail_folder_xref mfx on mail_xref.id = mfx.mail_xref_id
+            INNER JOIN mail_header mh on mh.id = mail_xref.mail_header_id
+            WHERE (
+                mail_xref.member_id = %s
+                AND mail_xref.mail_header_id = %s
+            )
+        """
+        thread_create_query = """
+            INSERT INTO mail_thread (id)
+            VALUES (DEFAULT)
+            RETURNING id;
+        """
+        current_thread_create = """
+            INSERT INTO mail_thread_item (mail_thread_id, mail_header_id)
+            VALUES (%s, %s);
+        """
+
         draft_folder_id = MailFolderDA.get_folder_id_for_member("DRAFT", member_id)
 
         # Get mail header
         cls.source.execute(xref_get, (member_id, member_id, mail_id, draft_folder_id))
         if cls.source.has_results():
-            (reply_id,) = cls.source.cursor.fetchone()
+            (reply_id, ) = cls.source.cursor.fetchone()
             cls.source.execute(header_query, (mail_id, member_id))
             if cls.source.has_results():
                 (subject, receivers, cc, bcc, body) = cls.source.cursor.fetchone()
+                # Check for reply
+                thread_id = None
+                if reply_id:
+                    cls.source.execute(xref_parent_get, (member_id, reply_id,))
+                    if cls.source.has_results():
+                        (
+                            reply_id,
+                            orig_receivers,
+                            orig_cc,
+                            orig_bcc,
+                            owner_member_id,
+                            base_thread_id
+                        ) = cls.source.cursor.fetchone()
+                        if cls.check_reply(member_id, owner_member_id, {
+                            "to": copy.deepcopy(receivers),
+                            "cc": copy.deepcopy(cc),
+                            "bcc": copy.deepcopy(bcc),
+                        }, {
+                            "to": copy.deepcopy(orig_receivers),
+                            "cc": copy.deepcopy(orig_cc),
+                            "bcc": copy.deepcopy(orig_bcc),
+                        }):
+                            thread_id = cls.start_new_thread(mail_id)
+                        else:
+                            if base_thread_id:
+                                thread_id = base_thread_id
+                    else:
+                        raise HTTPInternalServerError("Failed to get or check reply")
+                else:
+                    cls.source.execute(thread_create_query, ())
+                    if cls.source.has_results():
+                        thread_id = cls.source.cursor.fetchone()[0]
+                    else:
+                        raise HTTPInternalServerError("Failed to create thread")
+                if thread_id:
+                    cls.source.execute(current_thread_create, (thread_id, mail_id))
+                    if cls.source.has_results():
+                        cls.source.execute(update_header, (thread_id, mail_id))
+                        if not cls.source.has_results():
+                            raise HTTPInternalServerError("Failed to update thread in header")
+                    else:
+                        raise HTTPInternalServerError("Failed to add thread item")
+                # - END -
                 if not reply_id:
                     extra_text = MailSettingsDA.get_compose_signature(member_id)
                 else:
@@ -1442,11 +1977,9 @@ class DraftMailDA(BaseMailDA):
                         receiver_data = json.loads(str(receivers))
                     except json.decoder.JSONDecodeError:
                         receiver_data = receivers
-
-                    receiver_data = receiver_dict_validator(receiver_data)
+                    receiver_data = receiver_dict_validator(receiver_data, False)
                     bcc = receiver_dict_validator(bcc, False)
                     bcc = receiver_dict_validator(bcc, False)
-
                     item_key = {
                         "BCC": bcc,
                         "CC": cc,
@@ -1506,7 +2039,7 @@ class StarMailDa(BaseMailDA):
                 """INNER JOIN mail_folder_xref mfx on xref.id = mfx.mail_xref_id""")
 
     @classmethod
-    def add_remove_mail_to_star(cls, mail_id, member_id, add=True):
+    def add_remove_mail_to_star(cls, mail_id, xref_id, member_id, add=True):
         xref_query = f"""
             SELECT
                 id
@@ -1514,6 +2047,7 @@ class StarMailDa(BaseMailDA):
             WHERE (
                 mail_xref.member_id = %s
                 AND mail_xref.mail_header_id = %s
+                AND mail_xref.id = %s
                 AND mail_xref.deleted = FALSE
                 AND mail_xref.archived = FALSE
                 AND mail_xref.starred = {'FALSE' if add else 'TRUE'}
@@ -1535,7 +2069,7 @@ class StarMailDa(BaseMailDA):
             ) RETURNING id;
         """
 
-        cls.source.execute(xref_query, (member_id, mail_id))
+        cls.source.execute(xref_query, (member_id, mail_id, xref_id))
         if cls.source.has_results():
             xref_id = cls.source.cursor.fetchone()[0]
             if add:
@@ -1565,13 +2099,14 @@ class TrashMailDa(BaseMailDA):
                 """INNER JOIN mail_folder_xref mfx on xref.id = mfx.mail_xref_id""")
 
     @classmethod
-    def add_to_trash(cls, mail_id, member_id):
+    def add_to_trash(cls, mail_id, xref_id, member_id):
         xref_query = """
             SELECT
                 id
             FROM mail_xref
             WHERE (
                 mail_xref.member_id = %s
+                AND mail_xref.id = %s
                 AND mail_xref.mail_header_id = %s
                 AND mail_xref.deleted = FALSE
             )
@@ -1590,7 +2125,7 @@ class TrashMailDa(BaseMailDA):
             ) RETURNING id;
         """
 
-        cls.source.execute(xref_query, (member_id, mail_id))
+        cls.source.execute(xref_query, (member_id, xref_id, mail_id))
         if cls.source.has_results():
             xref_id = cls.source.cursor.fetchone()[0]
             MailFolderDA.remove_all_non_origin_folders_from_mail(xref_id, member_id, False, ["SENT"])
@@ -1602,7 +2137,7 @@ class TrashMailDa(BaseMailDA):
         raise HTTPBadRequest("Email not exists!")
 
     @classmethod
-    def add_to_archive(cls, mail_id, member_id):
+    def add_to_archive(cls, mail_id, xref_id, member_id):
         xref_query = f"""
             SELECT
                 mail_xref.id
@@ -1611,6 +2146,7 @@ class TrashMailDa(BaseMailDA):
             INNER JOIN mail_folder mf on mf.id = mfx.mail_folder_id
             WHERE (
                 mail_xref.member_id = %s
+                AND mail_xref.id = %s
                 AND mail_xref.mail_header_id = %s
                 AND mf.name = '{cls.folder_name.upper()}'
             )
@@ -1629,7 +2165,7 @@ class TrashMailDa(BaseMailDA):
             ) RETURNING id;
         """
 
-        cls.source.execute(xref_query, (member_id, mail_id))
+        cls.source.execute(xref_query, (member_id, xref_id, mail_id))
         if cls.source.has_results():
             xref_id = cls.source.cursor.fetchone()[0]
             MailFolderDA.remove_folder_from_mail(cls.folder_name.upper(), xref_id, member_id, False)  # Remove from trash
@@ -1641,13 +2177,14 @@ class TrashMailDa(BaseMailDA):
         raise HTTPBadRequest("Email not exists")
 
     @classmethod
-    def remove_from_trash(cls, mail_id, member_id):
+    def remove_from_trash(cls, mail_id, xref_id, member_id):
         xref_query = """
             SELECT
                 id
             FROM mail_xref
             WHERE (
                 mail_xref.member_id = %s
+                AND mail_xref.id = %s
                 AND mail_xref.mail_header_id = %s
                 AND mail_xref.deleted = TRUE
             )
@@ -1662,7 +2199,7 @@ class TrashMailDa(BaseMailDA):
             ) RETURNING id;
         """
 
-        cls.source.execute(xref_query, (member_id, mail_id))
+        cls.source.execute(xref_query, (member_id, xref_id, mail_id))
         if cls.source.has_results():
             xref_id = cls.source.cursor.fetchone()[0]
             MailFolderDA.remove_folder_from_mail(cls.folder_name.upper(), xref_id, member_id, False)
@@ -1673,17 +2210,18 @@ class TrashMailDa(BaseMailDA):
         raise HTTPBadRequest("Email not exists")
 
     @classmethod
-    def delete_mail(cls, mail_id, member_id):
+    def delete_mail(cls, mail_id, xref_id, member_id):
         xref_query = """
             DELETE FROM mail_xref
             WHERE (
                 mail_xref.member_id = %s
+                AND mail_xref.id = %s
                 AND mail_xref.mail_header_id = %s
                 AND mail_xref.deleted = TRUE
             )
             RETURNING id;
         """
-        cls.source.execute(xref_query, (member_id, mail_id))
+        cls.source.execute(xref_query, (member_id, xref_id, mail_id))
         if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
             cls.source.commit()
             return
@@ -1705,13 +2243,14 @@ class ArchiveMailDa(BaseMailDA):
                 """INNER JOIN mail_folder_xref mfx on xref.id = mfx.mail_xref_id""")
 
     @classmethod
-    def add_to_archive(cls, mail_id, member_id):
+    def add_to_archive(cls, mail_id, xref_id, member_id):
         xref_query = """
             SELECT
                 id
             FROM mail_xref
             WHERE (
                 member_id = %s
+                AND id = %s
                 AND mail_header_id = %s
             )
         """
@@ -1729,7 +2268,7 @@ class ArchiveMailDa(BaseMailDA):
             ) RETURNING id;
         """
 
-        cls.source.execute(xref_query, (member_id, mail_id))
+        cls.source.execute(xref_query, (member_id, xref_id, mail_id))
         if cls.source.has_results():
             xref_id = cls.source.cursor.fetchone()[0]
             MailFolderDA.remove_all_non_origin_folders_from_mail(xref_id, member_id, False, ["SENT"])
@@ -1741,7 +2280,7 @@ class ArchiveMailDa(BaseMailDA):
         raise HTTPBadRequest("Email not exists")
 
     @classmethod
-    def add_to_trash(cls, mail_id, member_id):
+    def add_to_trash(cls, mail_id, xref_id, member_id):
         xref_query = f"""
             SELECT
                 mail_xref.id
@@ -1750,6 +2289,7 @@ class ArchiveMailDa(BaseMailDA):
             INNER JOIN mail_folder mf on mf.id = mfx.mail_folder_id
             WHERE (
                 mail_xref.member_id = %s
+                AND mail_xref.id = %s
                 AND mail_xref.mail_header_id = %s
                 AND mf.name = '{cls.folder_name.upper()}'
                 AND mail_xref.deleted = FALSE
@@ -1769,7 +2309,7 @@ class ArchiveMailDa(BaseMailDA):
             ) RETURNING id;
         """
 
-        cls.source.execute(xref_query, (member_id, mail_id))
+        cls.source.execute(xref_query, (member_id, xref_id, mail_id))
         if cls.source.has_results():
             xref_id = cls.source.cursor.fetchone()[0]
             MailFolderDA.remove_folder_from_mail(cls.folder_name.upper(), xref_id, member_id, False)  # Remove from trash
@@ -1781,13 +2321,14 @@ class ArchiveMailDa(BaseMailDA):
         raise HTTPBadRequest("Email not exists")
 
     @classmethod
-    def remove_from_archive(cls, mail_id, member_id):
+    def remove_from_archive(cls, mail_id, xref_id, member_id):
         xref_query = """
             SELECT
                 id
             FROM mail_xref
             WHERE (
                 mail_xref.member_id = %s
+                AND mail_xref.id = %s
                 AND mail_xref.mail_header_id = %s
                 AND mail_xref.deleted = FALSE
                 AND mail_xref.archived = TRUE
@@ -1803,7 +2344,7 @@ class ArchiveMailDa(BaseMailDA):
             ) RETURNING id;
         """
 
-        cls.source.execute(xref_query, (member_id, mail_id))
+        cls.source.execute(xref_query, (member_id, xref_id, mail_id))
         if cls.source.has_results():
             xref_id = cls.source.cursor.fetchone()[0]
             MailFolderDA.remove_folder_from_mail(cls.folder_name.upper(), xref_id, member_id, False)
@@ -1814,18 +2355,19 @@ class ArchiveMailDa(BaseMailDA):
         raise HTTPBadRequest("Email not exists")
 
     @classmethod
-    def delete_mail(cls, mail_id, member_id):
+    def delete_mail(cls, mail_id, xref_id, member_id):
         xref_query = """
             DELETE FROM mail_xref
             WHERE (
                 mail_xref.member_id = %s
+                AND mail_xref.id = %s
                 AND mail_xref.mail_header_id = %s
                 AND mail_xref.deleted = FALSE
                 AND mail_xref.archived = TRUE
             )
             RETURNING id;
         """
-        cls.source.execute(xref_query, (member_id, mail_id))
+        cls.source.execute(xref_query, (member_id, xref_id, mail_id))
         if cls.source.has_results() and cls.source.cursor.fetchone()[0]:
             cls.source.commit()
             return
@@ -1937,6 +2479,10 @@ class MailSettingsDA(BaseDA):
             RETURNING member_id;
         """
 
+
+
+
+
         cls.source.execute(query, {
             "member_id": member_id,
             "style": default_style,
@@ -2045,9 +2591,11 @@ class MailServiceDA(BaseDA):
 
         try:
             unread= ""
+            param_mails = (member_id,)
 
             if not is_history:
-                unread = " AND xref.read = false"
+                unread = """ AND xref.read = false AND xref.deleted = false AND xref.owner_member_id <> %s"""
+                param_mails = (member_id, member_id)
 
             query_mails = f"""
                 SELECT
@@ -2061,6 +2609,8 @@ class MailServiceDA(BaseDA):
                     xref.id as xref_id,
                     xref.read,
                     xref.new_mail,
+                    xref.deleted,
+                    member.id as sender_id,
                     member.email as email,
                     member.first_name as first_name,
                     member.last_name as last_name,
@@ -2072,22 +2622,11 @@ class MailServiceDA(BaseDA):
                 LEFT OUTER JOIN member_profile profile on member.id = profile.member_id
                 LEFT OUTER JOIN file_storage_engine on file_storage_engine.id = profile.profile_picture_storage_id
                 WHERE
-                    (
-                        head.message_to->'amera' @> to_char(%s, '999')::jsonb
-                        OR
-                        head.message_cc->'amera' @> to_char(%s, '999')::jsonb
-                        OR
-                        head.message_bcc->'amera' @> to_char(%s, '999')::jsonb
-                    )
-                    AND
-                    xref.member_id = %s  AND xref.deleted = false
+                    xref.member_id = %s
                     {unread}
                 ORDER BY head.message_ts DESC
                 LIMIT 10
             """
-
-            param_mails = (member_id, member_id, member_id, member_id)
-
 
             cls.source.execute(query_mails, param_mails)
             if cls.source.has_results():
@@ -2102,6 +2641,8 @@ class MailServiceDA(BaseDA):
                         xref_id,
                         read,
                         new_mail,
+                        deleted,
+                        sender_id,
                         email,
                         first_name,
                         last_name,
@@ -2117,6 +2658,8 @@ class MailServiceDA(BaseDA):
                         "message_bcc": message_bcc,
                         "xref_id": xref_id,
                         "new_mail": new_mail,
+                        "deleted": deleted,
+                        "sender_id": sender_id,
                         "email": email,
                         "first_name": first_name,
                         "last_name": last_name,

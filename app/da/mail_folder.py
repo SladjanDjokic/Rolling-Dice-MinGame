@@ -236,7 +236,7 @@ class MailMemberFolder(object):
         raise HTTPNotFound("Folder not found")
 
     @classmethod
-    def move_to_folder(cls, member_id, mail_id, folder_id):
+    def move_to_folder(cls, member_id, mail_id, mail_xref, folder_id):
         update_query = f"""
             UPDATE mail_xref
             SET recent_mail_folder_id = %(folder_id)s
@@ -245,6 +245,7 @@ class MailMemberFolder(object):
                 head.id = mail_xref.mail_header_id
                 AND head.message_locked = TRUE
                 AND head.id = %(mail_id)s
+                AND mail_xref.id = %(mail_xref)s
                 AND mail_xref.member_id = %(member_id)s
                 AND mail_xref.archived = FALSE
                 AND mail_xref.deleted = FALSE
@@ -261,7 +262,8 @@ class MailMemberFolder(object):
         cls.source.execute(update_query, ({
             "member_id": member_id,
             "mail_id": mail_id,
-            "folder_id": folder_id
+            "folder_id": folder_id,
+            "mail_xref": mail_xref
         }))
         if cls.source.has_results():
             cls.source.commit()

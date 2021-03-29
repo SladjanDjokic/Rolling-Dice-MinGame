@@ -399,6 +399,12 @@ class MemberDA(object):
         VALUES (%s, %s)
         """)
 
+        query_member_page_settings = ("""
+            INSERT INTO member_page_settings 
+                (member_id, page_type, view_type, sort_order)
+            VALUES (%s, %s, %s, %s)
+        """)
+
         # AES_ENCRYPT(%s, UNHEX(SHA2(%s)))
         # settings.get('MEMBER_KEY')
         # store member personal info
@@ -443,6 +449,12 @@ class MemberDA(object):
         # When registering a new member, the uploaded photo is set as both profile and security picture. Profile picture can be changed later on.
         params_member_profile = (id, avatar_storage_id)
         cls.source.execute(query_member_profile, params_member_profile)
+
+        cls.source.execute(query_member_page_settings, (id, 'Contacts', 'table', list(['first_name'])))
+        cls.source.execute(query_member_page_settings, (id, 'Groups', 'tile', list(['group_name'])))
+        cls.source.execute(query_member_page_settings, (id, 'Calendar', 'week', list([''])))
+        cls.source.execute(query_member_page_settings, (id, 'Drive', 'tile', list(['file_name'])))
+        cls.source.execute(query_member_page_settings, (id, 'Mail', 'table', list([''])))
 
         if commit:
             cls.source.commit()
@@ -2612,7 +2624,7 @@ class MemberVideoMailDA(object):
                 LEFT OUTER JOIN file_storage_engine on file_storage_engine.id = profile.profile_picture_storage_id
                 LEFT OUTER JOIN member_group on member_group.id = head.group_id
                 WHERE
-                    xref.member_id = %s AND xref.status != 'deleted'
+                    xref.member_id = %s
                     {unread}
                     {mail_type}
                 ORDER BY xref.create_date DESC

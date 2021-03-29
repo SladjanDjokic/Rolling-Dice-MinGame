@@ -428,6 +428,7 @@ services:
       - ../web-api/datasource/postgresql/member_external_account.sql:/docker-entrypoint-initdb.d/q-member_external_account.sql
       - ../web-api/datasource/postgresql/forum.sql:/docker-entrypoint-initdb.d/q-forum.sql
       - ../web-api/datasource/postgresql/news.sql:/docker-entrypoint-initdb.d/q-news.sql
+      - ../web-api/datasource/postgresql/page_settings.sql:/docker-entrypoint-initdb.d/q-page_settings.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-03-23_project_element_rate_type.sql:/docker-entrypoint-initdb.d/q-project-update.sql
       # Test data
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
@@ -442,7 +443,7 @@ services:
       - ../web-api/datasource/postgresql/test-company-role_xref.dev.sql:/docker-entrypoint-initdb.d/z-9-1-test-company-roles.dev.sql
       - ../web-api/datasource/postgresql/test-project.dev.sql:/docker-entrypoint-initdb.d/z-9-2-test-project-dev.sql
       - ../web-api/datasource/postgresql/test-member-contact-2.sql:/docker-entrypoint-initdb.d/z-9-3-test-member-contact-2.sql
-
+      - ../web-api/datasource/postgresql/test-page-settings.sql:/docker-entrypoint-initdb.d/z-9-4-test-page-settings.sql.sql
     environment:
       POSTGRES_DB: ameraiot
       POSTGRES_USER: amera
