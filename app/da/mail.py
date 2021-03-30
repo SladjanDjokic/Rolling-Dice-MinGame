@@ -2625,7 +2625,7 @@ class MailServiceDA(BaseDA):
                     xref.member_id = %s
                     {unread}
                 ORDER BY head.message_ts DESC
-                LIMIT 10
+                LIMIT 25
             """
 
             cls.source.execute(query_mails, param_mails)

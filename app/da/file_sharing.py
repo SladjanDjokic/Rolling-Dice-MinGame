@@ -1916,7 +1916,7 @@ class ShareFileDA(object):
                 WHERE 
                     member.id = %s
                 ORDER BY file_share.create_date DESC
-                LIMIT 10
+                LIMIT 25
             """
 
             params = (member_id,)

@@ -695,10 +695,12 @@ class MemberSettingResource(object):
     @check_session
     def on_get(self, req, resp):
         member_id = req.context.auth["session"]["member_id"]
+        # TODO: Convert to try/except with custom exception if no settings are found
         member_info = MemberSettingDA().get_member_setting(member_id)
 
+        # TODO: The UI expects an obect right now, fix the UI in case there are errors
         resp.body = json.dumps({
-            "data": member_info,
+            "data": member_info or {},
             "success": True
         }, default_parser=json.parser)
 

@@ -1702,7 +1702,7 @@ class MemberContactDA(object):
                     receiver_contact.member_id = %s
                     {pending}
                 ORDER BY receiver_contact.update_date DESC
-                LIMIT 10
+                LIMIT 25
             """
 
             params = (member_id,)
@@ -2051,6 +2051,7 @@ class MemberInfoDA(object):
 class MemberSettingDA(object):
     source = source
 
+    @classmethod
     def get_member_setting(cls, member_id):
         get_member_setting_query = ("""
             SELECT
@@ -2628,7 +2629,7 @@ class MemberVideoMailDA(object):
                     {unread}
                     {mail_type}
                 ORDER BY xref.create_date DESC
-                LIMIT 10
+                LIMIT 25
             """
 
             param_mails = (member_id,)

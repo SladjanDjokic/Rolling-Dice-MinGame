@@ -1159,13 +1159,18 @@ class ProjectDA(object):
     @classmethod
     def update_member_default_rate(cls, member_id, pay_rate, currency_code_id):
         query = ("""
-            UPDATE member_rate
+            INSERT INTO member_rate (
+                member_id,
+                pay_rate,
+                currency_code_id
+            )
+            VALUES (%s, %s, %s)
+            ON conflict(member_id) DO UPDATE
             SET pay_rate = %s,
                 currency_code_id = %s
-            WHERE member_id =%s
             RETURNING member_id
         """)
-        params = (pay_rate, currency_code_id, member_id)
+        params = (member_id, pay_rate, currency_code_id, pay_rate, currency_code_id)
         cls.source.execute(query, params)
         cls.source.commit()
         id = cls.source.get_last_row_id()

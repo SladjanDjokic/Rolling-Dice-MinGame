@@ -1148,7 +1148,7 @@ class MemberEventDA(object):
                 WHERE
                     event_invite_2.invite_member_id = %s AND event_2.event_status='Active'
                 ORDER BY event_invite_2.create_date DESC
-                LIMIT 10
+                LIMIT 25
             """
 
             params = (member_id,)
@@ -1254,7 +1254,7 @@ class MemberEventDA(object):
                     member.email,
                     file_storage_engine.storage_engine_id
                 ORDER BY event_sequence.create_date DESC
-                LIMIT 10
+                LIMIT 25
             """
 
             params = (member_id,)

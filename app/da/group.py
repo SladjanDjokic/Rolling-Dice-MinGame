@@ -688,7 +688,7 @@ class GroupDA(object):
                     member_group_membership.member_id = %s
                     {invited}
                 ORDER BY member_group_membership.create_date DESC
-                LIMIT 10
+                LIMIT 25
             """
 
             params = (member_id,)
