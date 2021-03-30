@@ -968,6 +968,22 @@ class ProjectDA(object):
         else:
             return None
 
+    @classmethod
+    def get_assigned_project_member_id(cls, project_element_id):
+        query = ("""
+            SELECT 
+                project_member_contract.project_member_id
+            FROM project_element
+            LEFT JOIN project_member_contract ON project_member_contract.id = project_element.contract_id
+            WHERE project_element.id = %s
+        """)
+        params = (project_element_id,)
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        else:
+            return None
+
     '''
         Notes
     '''
@@ -1172,6 +1188,37 @@ class ProjectDA(object):
             return cls.source.cursor.fetchone()[0]
         else:
             return None
+
+    @classmethod
+    def get_contract_id_by_element(cls, element_id):
+        query = ("""
+            SELECT 
+            	project_member_contract.id
+            FROM project_element
+            LEFT JOIN project_member_contract ON project_member_contract.id = project_element.contract_id
+            WHERE project_element.id = %s
+        """)
+        cls.source.execute(query, (element_id,))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        else:
+            return None
+
+    @classmethod
+    def get_current_contract_status(cls, contract_id):
+        query =("""
+            SELECT contract_status
+            FROM project_contract_status
+            WHERE contract_id = %s
+            ORDER BY update_date DESC
+            LIMIT 1
+        """)
+        cls.source.execute(query, (contract_id,))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        else:
+            return None
+
 
     '''
         Contract invite 

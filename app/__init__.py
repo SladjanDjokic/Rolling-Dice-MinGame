@@ -402,8 +402,9 @@ def _setup_routes(app):
     newsfeeds_resource = NewsFeedsResource()
 
     app.add_route("/newsfeeds", newsfeeds_resource)
-    app.add_route("/newsfeeds/{topic_id:int}", newsfeeds_resource, suffix="post")
-    
+    app.add_route("/newsfeeds/{topic_id:int}",
+                  newsfeeds_resource, suffix="post")
+
     # Routes for Chat App
     app.add_route("/chat", ChatView())
 
@@ -444,6 +445,9 @@ def _setup_routes(app):
                   project_resource, suffix="time")
     app.add_route("/project/element/time/{time_id:int}",
                   project_resource, suffix="time")
+    app.add_route("/project/milestone", project_resource, suffix="milestone")
+    app.add_route(
+        "/project/milestone/{milestone_id:int}", project_resource, suffix="milestone")
     app.add_route(
         "/project/invite_reaction/{invite_id:int}", project_resource, suffix="invite_reaction")
     # app.add_route("/project/contract", project_resource, suffix="contract")

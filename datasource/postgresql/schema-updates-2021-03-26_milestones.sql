@@ -1,0 +1,1 @@
+ALTER TYPE project_element_type ADD VALUE 'milestone';

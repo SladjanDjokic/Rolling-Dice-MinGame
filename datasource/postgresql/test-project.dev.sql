@@ -82,10 +82,10 @@ INSERT INTO project_contract_status (contract_id, contract_status, update_by, up
     (6, 'active', 1,  CURRENT_TIMESTAMP - INTERVAL '1 weeks');
 
 -- Task
-INSERT INTO project_element (project_id, title, parent_id, element_type, description, create_by, update_by, est_hours, contract_id, currency_code_id) VALUES
-    (1,'Task 1',8,'task','lorem ipsum', 1,1, INTERVAL '6 hours', 1, 132),
-    (1,'Task 2',8,'task','lorem ipsum', 1,1, INTERVAL '3 hours', 2 ,132),
-    (1,'Task 3',7,'task','lorem ipsum', 1,1, NULL,3, 132);
+INSERT INTO project_element (project_id, title, parent_id, element_type, description, create_by, update_by, est_hours, contract_id, currency_code_id, rate_type) VALUES
+    (1,'Task 1',8,'task','lorem ipsum', 1,1, INTERVAL '6 hours', 1, 132, 'hourly'),
+    (1,'Task 2',8,'task','lorem ipsum', 1,1, INTERVAL '3 hours', 2 ,132, 'hourly'),
+    (1,'Task 3',7,'task','lorem ipsum', 1,1, NULL,3, 132, 'fixed');
 
 -- Status history
 INSERT INTO project_element_status (project_element_id, element_status, update_date, update_by) VALUES 
