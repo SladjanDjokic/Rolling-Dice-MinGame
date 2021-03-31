@@ -306,7 +306,7 @@ class ContactMembersResource(object):
     @check_session
     def on_post(self, req, resp):
         member_id = req.context.auth["session"]["member_id"]
-        contacts = list()
+        # contacts = list()
         contact_member_id_list = req.get_param('member_id_list').split(',')
         req.headers['kafka_contact_id_list'] = json.dumps(
             contact_member_id_list)
@@ -338,7 +338,7 @@ class ContactMembersResource(object):
             contact = {}
             if contact_id:
                 contact = MemberContactDA().get_member_contact(contact_id)
-            contacts.append(contact)
+            # contacts.append(contact)
 
             contact_member = MemberDA().get_contact_member(member_id)
 
@@ -365,6 +365,10 @@ class ContactMembersResource(object):
 
             contact_id = MemberContactDA().create_member_contact(**contact_member_params)
             logger.debug("New created contact_id: {}".format(contact_id))
+
+        contacts = MemberContactDA().get_member_contacts(
+            member_id=member_id, sort_params=None, filter_params=None)
+
         resp.body = json.dumps({
             "contacts": contacts,
             "success": True

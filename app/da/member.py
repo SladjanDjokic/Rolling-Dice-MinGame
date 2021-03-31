@@ -919,6 +919,7 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = contact.contact_member_id
                 LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
                 LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
+                LEFT JOIN department ON member.department_id = department.id
                 LEFT OUTER JOIN member_profile ON contact.contact_member_id = member_profile.member_id
                 LEFT OUTER JOIN member_achievement ON member_achievement.member_id = member.id
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
@@ -946,11 +947,13 @@ class MemberContactDA(object):
                 -- contact.personal_email,
                 member.company_name,
                 job_title.name,
+                department.name,
                 -- contact.company_name,
                 -- contact.company_phone,
                 -- contact.company_web_site,
                 -- contact.company_email,
                 -- contact.company_bio,
+                -- group_memberships,
                 role.name,
                 role.id,
                 contact.create_date,
@@ -994,11 +997,26 @@ class MemberContactDA(object):
                 -- contact.personal_email as personal_email,
                 member.company_name as company,
                 job_title.name as title,
+                department.name as department,
                 -- contact.company_name as company_name,
                 -- contact.company_phone as company_phone,
                 -- contact.company_web_site as company_web_site,
                 -- contact.company_email as company_email,
                 -- contact.company_bio as company_bio,
+                (
+                    SELECT json_agg(rows) AS group_memberships
+                    FROM (
+                        SELECT 
+                            member_group.id AS group_id,
+                            group_name,
+                            group_role
+                        FROM member_group_membership
+                        LEFT JOIN member_group ON member_group.id = member_group_membership.group_id
+                        WHERE member_group_membership.status = 'active' 
+                        AND member_group_membership.member_id = contact.contact_member_id 
+                        AND member_group.group_type = 'contact'
+                    ) AS rows
+                ),
                 role.name as role,
                 role.id as role_id,
                 contact.create_date as create_date,
@@ -1072,11 +1090,13 @@ class MemberContactDA(object):
                         # personal_email,
                         company,
                         title,
+                        department,
                         # company_name,
                         # company_phone,
                         # company_web_site,
                         # company_email,
                         # company_bio,
+                        group_memberships,
                         role,
                         role_id,
                         create_date,
@@ -1111,11 +1131,13 @@ class MemberContactDA(object):
                         # "personal_email": personal_email,
                         "company": company,
                         "title": title,
+                        "department": department,
                         # "company_name": company_name,
                         # "company_phone": company_phone,
                         # "company_web_site": company_web_site,
                         # "company_email": company_email,
                         # "company_bio": company_bio,
+                        "group_memberships": group_memberships,
                         "role": role,
                         "role_id": role_id,
                         "create_date": create_date,
