@@ -365,6 +365,8 @@ class MemberDA(object):
                  country, postal, cell_confrimation_ts, email_confrimation_ts, department_id, main_file_tree_id, bin_file_tree_id,
                  commit=True):
 
+        page_settings = settings.get('page_settings')
+
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query_member = ("""
         INSERT INTO member
@@ -450,11 +452,13 @@ class MemberDA(object):
         params_member_profile = (id, avatar_storage_id)
         cls.source.execute(query_member_profile, params_member_profile)
 
-        cls.source.execute(query_member_page_settings, (id, 'Contacts', 'table', list(['first_name'])))
-        cls.source.execute(query_member_page_settings, (id, 'Groups', 'tile', list(['group_name'])))
-        cls.source.execute(query_member_page_settings, (id, 'Calendar', 'week', list([''])))
-        cls.source.execute(query_member_page_settings, (id, 'Drive', 'tile', list(['file_name'])))
-        cls.source.execute(query_member_page_settings, (id, 'Mail', 'table', list([''])))
+        for key in page_settings:
+            page_setting = page_settings[key]
+            page_type = page_setting['page_type']
+            view_type = page_setting['view_type']
+            sort_order = page_setting['sort_order']
+            
+            cls.source.execute(query_member_page_settings, (id, page_type, view_type, sort_order))
 
         if commit:
             cls.source.commit()

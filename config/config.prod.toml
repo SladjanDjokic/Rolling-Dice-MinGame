@@ -199,3 +199,29 @@ default_folders = [
 
 [facial_recognition]
 distance_max = "2.5"
+
+[page_settings]
+    [page_settings.contact]
+    page_type = "Contacts"
+    view_type = "table"
+    sort_order = ["first_name", "last_name"]
+
+    [page_settings.group]
+    page_type = "Groups"
+    view_type = "tile"
+    sort_order = ["group_name"]
+
+    [page_settings.calendar]
+    page_type = "Calendar"
+    view_type = "week"
+    sort_order = [""]
+
+    [page_settings.drive]
+    page_type = "Drive"
+    view_type = "tile"
+    sort_order = ["file_name"]
+
+    [page_settings.mail]
+    page_type = "Mail"
+    view_type = "table"
+    sort_order = [""]

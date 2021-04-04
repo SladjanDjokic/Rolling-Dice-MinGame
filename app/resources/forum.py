@@ -103,10 +103,18 @@ class ForumResource(object):
     def on_post_post(self, req, resp):
         member_id = req.context.auth['session']['member_id']
         try:
-            (topic_id, post_id, content, ) = request.get_json_or_form(
-                "topic_id", "post_id", "content", req=req) 
+            (topic_id, post_id, content, attachments) = request.get_json_or_form(
+                "topic_id", "post_id", "content", "attachments", req=req) 
 
             post_id = ForumDA.create_post(topic_id, post_id, member_id, content)
+            
+            attachments = int(attachments)
+
+            for x in range(attachments):
+                file = req.get_param(f"file_{x}")
+                media_file_id = FileStorageDA().put_file_to_storage(file)
+                ForumDA.add_post_attachment(topic_id, post_id, media_file_id)
+
             post = ForumDA.get_post(post_id)
 
             resp.body = json.dumps({

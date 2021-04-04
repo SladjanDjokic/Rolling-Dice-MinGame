@@ -938,6 +938,7 @@ class MemberEventDA(object):
             FROM
             (SELECT event_invite_2.id as id,
                     event_2.id AS event_id,
+                    row_to_json(member_location) as event_location,
                     sequence_id,
                     (
                         SELECT row_to_json(group_data) as group_info
@@ -1023,6 +1024,7 @@ class MemberEventDA(object):
                      ) AS invitees)
             FROM event_2
             INNER JOIN event_invite_2 ON event_invite_2.event_id = event_2.id
+            LEFT JOIN member_location ON event_2.location_id = member_location.id
             LEFT JOIN member ON member.id = event_2.host_member_id
             LEFT JOIN member_profile ON member.id = member_profile.member_id
             LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
