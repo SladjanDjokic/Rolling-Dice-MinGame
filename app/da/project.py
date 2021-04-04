@@ -30,6 +30,7 @@ class ProjectDA(object):
                     project_description,
                     group_id,
                     group_name,
+                    project.is_active,
                     exchange_option AS group_exchange_option,
                     -- current owner
                     (
@@ -58,6 +59,9 @@ class ProjectDA(object):
                                 project_member_contract.project_member_id,
                                 project_element.rate_type,
                                 est_hours,
+                                est_rate,
+                                project_element.due_date,
+                                project_element.currency_code_id,
                                 -- status_history
                                 (
                                     SELECT json_agg(rows) as status_history
@@ -126,6 +130,8 @@ class ProjectDA(object):
                                 middle_name,
                                 last_name,
                                 company_name,
+                                member_rate.pay_rate as default_hourly_rate,
+								member_rate.currency_code_id as default_rate_currency_id,
                                 job_title.name as title,
                                 department.name as department,
                                 file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url,
@@ -144,6 +150,7 @@ class ProjectDA(object):
                             LEFT JOIN department ON department_id = department.id
                             LEFT JOIN member_profile ON member.id = member_profile.member_id
                             LEFT JOIN file_storage_engine ON file_storage_engine.id = member_profile.profile_picture_storage_id
+                            LEFT JOIN member_rate ON member_rate.member_id = member.id
                             WHERE project_member.project_id = project.id AND project_member.is_active = TRUE
                         ) AS ROWS
                     ),
@@ -193,7 +200,7 @@ class ProjectDA(object):
                             SELECT DISTINCT ON (project_element.id) project_element.id, title, project_element_status.element_status, project_element_status.update_date
                             FROM project_element
                             LEFT JOIN project_element_status ON project_element_status.project_element_id = project_element.id
-                            WHERE element_type = 'task' AND project_id = project.id
+                            WHERE element_type = ANY ('{task, milestone}'::project_element_type[]) AND project_id = project.id
                             ORDER BY project_element.id, project_element_status.update_date DESC
                         ) AS temp
                         WHERE temp.element_status = 'define'
@@ -205,7 +212,7 @@ class ProjectDA(object):
                             SELECT DISTINCT ON (project_element.id) project_element.id, title, project_element_status.element_status, project_element_status.update_date
                             FROM project_element
                             LEFT JOIN project_element_status ON project_element_status.project_element_id = project_element.id
-                            WHERE element_type = 'task' AND project_id = project.id
+                            WHERE element_type = ANY ('{task, milestone}'::project_element_type[]) AND project_id = project.id
                             ORDER BY project_element.id, project_element_status.update_date DESC
                         ) AS temp
                         WHERE temp.element_status = 'in progress'
@@ -217,7 +224,7 @@ class ProjectDA(object):
                             SELECT DISTINCT ON (project_element.id) project_element.id, title, project_element_status.element_status, project_element_status.update_date
                             FROM project_element
                             LEFT JOIN project_element_status ON project_element_status.project_element_id = project_element.id
-                            WHERE element_type = 'task' AND project_id = project.id
+                            WHERE element_type = ANY ('{task, milestone}'::project_element_type[]) AND project_id = project.id
                             ORDER BY project_element.id, project_element_status.update_date DESC
                         ) AS temp
                         WHERE temp.element_status = 'complete'
@@ -229,7 +236,7 @@ class ProjectDA(object):
                             SELECT DISTINCT ON (project_element.id) project_element.id, title, project_element_status.element_status, project_element_status.update_date
                             FROM project_element
                             LEFT JOIN project_element_status ON project_element_status.project_element_id = project_element.id
-                            WHERE element_type = 'task' AND project_id = project.id
+                            WHERE element_type = ANY ('{task, milestone}'::project_element_type[]) AND project_id = project.id
                             ORDER BY project_element.id, project_element_status.update_date DESC
                         ) AS temp
                         WHERE temp.element_status = 'cancel'
@@ -241,7 +248,7 @@ class ProjectDA(object):
                             SELECT DISTINCT ON (project_element.id) project_element.id, title, project_element_status.element_status, project_element_status.update_date
                             FROM project_element
                             LEFT JOIN project_element_status ON project_element_status.project_element_id = project_element.id
-                            WHERE element_type = 'task' AND project_id = project.id
+                            WHERE element_type = ANY ('{task, milestone}'::project_element_type[]) AND project_id = project.id
                             ORDER BY project_element.id, project_element_status.update_date DESC
                         ) AS temp
                         WHERE temp.element_status = 'suspend'
@@ -253,7 +260,7 @@ class ProjectDA(object):
                             SELECT DISTINCT ON (project_element.id) project_element.id, title, project_element_status.element_status, project_element_status.update_date
                             FROM project_element
                             LEFT JOIN project_element_status ON project_element_status.project_element_id = project_element.id
-                            WHERE element_type = 'task' AND project_id = project.id
+                            WHERE element_type = ANY ('{task, milestone}'::project_element_type[]) AND project_id = project.id
                             ORDER BY project_element.id, project_element_status.update_date DESC
                         ) AS temp
                         WHERE temp.element_status = 'delete'
@@ -265,7 +272,7 @@ class ProjectDA(object):
                             SELECT DISTINCT ON (project_element.id) project_element.id, title, project_element_status.element_status, project_element_status.update_date
                             FROM project_element
                             LEFT JOIN project_element_status ON project_element_status.project_element_id = project_element.id
-                            WHERE element_type = 'task' AND project_id = project.id
+                            WHERE element_type = ANY ('{task, milestone}'::project_element_type[]) AND project_id = project.id
                             ORDER BY project_element.id, project_element_status.update_date DESC
                         ) AS temp
                         WHERE temp.element_status != 'cancel' OR temp.element_status != 'delete' OR temp.element_status != 'suspend' 
@@ -303,6 +310,7 @@ class ProjectDA(object):
                     project_description,
                     group_id,
                     group_name,
+                    project.is_active,
                     exchange_option AS group_exchange_option,
                     -- current owner
                     (
@@ -331,6 +339,9 @@ class ProjectDA(object):
                                 project_member_contract.project_member_id,
                                 project_element.rate_type,
                                 est_hours,
+                                est_rate,
+                                project_element.due_date,
+                                project_element.currency_code_id,
                                 -- status_history
                                 (
                                     SELECT json_agg(rows) as status_history
@@ -399,6 +410,8 @@ class ProjectDA(object):
                                 middle_name,
                                 last_name,
                                 company_name,
+                                member_rate.pay_rate as default_hourly_rate,
+								member_rate.currency_code_id as default_rate_currency_id,
                                 job_title.name as title,
                                 department.name as department,
                                 file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url,
@@ -417,6 +430,7 @@ class ProjectDA(object):
                             LEFT JOIN department ON department_id = department.id
                             LEFT JOIN member_profile ON member.id = member_profile.member_id
                             LEFT JOIN file_storage_engine ON file_storage_engine.id = member_profile.profile_picture_storage_id
+                            LEFT JOIN member_rate ON member_rate.member_id = member.id
                             WHERE project_member.project_id = project.id
                         ) AS ROWS
                     ),
@@ -466,7 +480,7 @@ class ProjectDA(object):
                             SELECT DISTINCT ON (project_element.id) project_element.id, title, project_element_status.element_status, project_element_status.update_date
                             FROM project_element
                             LEFT JOIN project_element_status ON project_element_status.project_element_id = project_element.id
-                            WHERE element_type = 'task' AND project_id = project.id
+                            WHERE element_type = ANY ('{task, milestone}'::project_element_type[]) AND project_id = project.id
                             ORDER BY project_element.id, project_element_status.update_date DESC
                         ) AS temp
                         WHERE temp.element_status = 'define'
@@ -478,7 +492,7 @@ class ProjectDA(object):
                             SELECT DISTINCT ON (project_element.id) project_element.id, title, project_element_status.element_status, project_element_status.update_date
                             FROM project_element
                             LEFT JOIN project_element_status ON project_element_status.project_element_id = project_element.id
-                            WHERE element_type = 'task' AND project_id = project.id
+                            WHERE element_type = ANY ('{task, milestone}'::project_element_type[]) AND project_id = project.id
                             ORDER BY project_element.id, project_element_status.update_date DESC
                         ) AS temp
                         WHERE temp.element_status = 'in progress'
@@ -490,7 +504,7 @@ class ProjectDA(object):
                             SELECT DISTINCT ON (project_element.id) project_element.id, title, project_element_status.element_status, project_element_status.update_date
                             FROM project_element
                             LEFT JOIN project_element_status ON project_element_status.project_element_id = project_element.id
-                            WHERE element_type = 'task' AND project_id = project.id
+                            WHERE element_type = ANY ('{task, milestone}'::project_element_type[]) AND project_id = project.id
                             ORDER BY project_element.id, project_element_status.update_date DESC
                         ) AS temp
                         WHERE temp.element_status = 'complete'
@@ -502,7 +516,7 @@ class ProjectDA(object):
                             SELECT DISTINCT ON (project_element.id) project_element.id, title, project_element_status.element_status, project_element_status.update_date
                             FROM project_element
                             LEFT JOIN project_element_status ON project_element_status.project_element_id = project_element.id
-                            WHERE element_type = 'task' AND project_id = project.id
+                            WHERE element_type = ANY ('{task, milestone}'::project_element_type[]) AND project_id = project.id
                             ORDER BY project_element.id, project_element_status.update_date DESC
                         ) AS temp
                         WHERE temp.element_status = 'cancel'
@@ -514,7 +528,7 @@ class ProjectDA(object):
                             SELECT DISTINCT ON (project_element.id) project_element.id, title, project_element_status.element_status, project_element_status.update_date
                             FROM project_element
                             LEFT JOIN project_element_status ON project_element_status.project_element_id = project_element.id
-                            WHERE element_type = 'task' AND project_id = project.id
+                            WHERE element_type = ANY ('{task, milestone}'::project_element_type[]) AND project_id = project.id
                             ORDER BY project_element.id, project_element_status.update_date DESC
                         ) AS temp
                         WHERE temp.element_status = 'suspend'
@@ -526,7 +540,7 @@ class ProjectDA(object):
                             SELECT DISTINCT ON (project_element.id) project_element.id, title, project_element_status.element_status, project_element_status.update_date
                             FROM project_element
                             LEFT JOIN project_element_status ON project_element_status.project_element_id = project_element.id
-                            WHERE element_type = 'task' AND project_id = project.id
+                            WHERE element_type = ANY ('{task, milestone}'::project_element_type[]) AND project_id = project.id
                             ORDER BY project_element.id, project_element_status.update_date DESC
                         ) AS temp
                         WHERE temp.element_status = 'delete'
@@ -538,7 +552,7 @@ class ProjectDA(object):
                             SELECT DISTINCT ON (project_element.id) project_element.id, title, project_element_status.element_status, project_element_status.update_date
                             FROM project_element
                             LEFT JOIN project_element_status ON project_element_status.project_element_id = project_element.id
-                            WHERE element_type = 'task' AND project_id = project.id
+                            WHERE element_type = ANY ('{task, milestone}'::project_element_type[]) AND project_id = project.id
                             ORDER BY project_element.id, project_element_status.update_date DESC
                         ) AS temp
                         WHERE temp.element_status != 'cancel' OR temp.element_status != 'delete' OR temp.element_status != 'suspend' 
@@ -841,8 +855,8 @@ class ProjectDA(object):
     @classmethod
     def insert_element(cls, params):
         query = (f"""
-            INSERT INTO project_element (project_id, parent_id, element_type, title, description, contract_id, est_hours, rate_type, create_by, update_by)
-            VALUES (%(project_id)s, %(parent_id)s, %(element_type)s, %(title)s, %(description)s, %(contract_id)s, {"INTERVAL '%(est_hours)s'" if params["est_hours"] else "%(est_hours)s" }, %(rate_type)s, %(author_id)s, %(author_id)s)
+            INSERT INTO project_element (project_id, parent_id, element_type, title, description, contract_id, est_hours, rate_type, create_by, update_by, est_rate, currency_code_id, due_date)
+            VALUES (%(project_id)s, %(parent_id)s, %(element_type)s, %(title)s, %(description)s, %(contract_id)s, {"INTERVAL '%(est_hours)s'" if params["est_hours"] else "%(est_hours)s" }, %(rate_type)s, %(author_id)s, %(author_id)s, %(est_rate)s, %(currency_code_id)s, %(due_date)s)
             RETURNING id
         """)
         cls.source.execute(query, params)
@@ -863,7 +877,10 @@ class ProjectDA(object):
                 description = %(description)s,
                 contract_id = %(contract_id)s,
                 {"est_hours = INTERVAL '%(est_hours)s hours'," if params["est_hours"] else "est_hours = %(est_hours)s,"}
-                update_by = %(author_id)s
+                update_by = %(author_id)s,
+                est_rate = %(est_rate)s,
+                currency_code_id = %(currency_code_id)s,
+                due_date = %(due_date)s
             WHERE id = %(element_id)s
             RETURNING id
         """)
@@ -1170,7 +1187,8 @@ class ProjectDA(object):
                 currency_code_id = %s
             RETURNING member_id
         """)
-        params = (member_id, pay_rate, currency_code_id, pay_rate, currency_code_id)
+        params = (member_id, pay_rate, currency_code_id,
+                  pay_rate, currency_code_id)
         cls.source.execute(query, params)
         cls.source.commit()
         id = cls.source.get_last_row_id()
@@ -1179,13 +1197,16 @@ class ProjectDA(object):
         return id
 
     @classmethod
-    def get_contract_ids_by_project(cls, project_id):
+    def get_active_hourly_contracts_by_project(cls, project_id):
         query = ("""
             SELECT ARRAY (
-                SELECT project_member_contract.id as contract_id
+                SELECT DISTINCT ON (contract_id)
+                    project_member_contract.id as contract_id
                 FROM project_member
                 LEFT JOIN project_member_contract ON project_member_contract.project_member_id = project_member.id
-                WHERE project_id = %s
+                LEFT JOIN project_contract_status ON project_contract_status.contract_id = project_member_contract.id
+                WHERE project_id = %s AND rate_type = 'hourly' AND project_contract_status.contract_status = ANY('{active, pending, suspend}'::project_member_contract_status[])
+                ORDER BY contract_id, project_contract_status.update_date DESC
             )
         """)
         cls.source.execute(query, (project_id,))
@@ -1211,7 +1232,7 @@ class ProjectDA(object):
 
     @classmethod
     def get_current_contract_status(cls, contract_id):
-        query =("""
+        query = ("""
             SELECT contract_status
             FROM project_contract_status
             WHERE contract_id = %s
@@ -1224,6 +1245,21 @@ class ProjectDA(object):
         else:
             return None
 
+    @classmethod
+    def update_contract_rate(cls, params):
+        query = ("""
+            UPDATE project_member_contract
+            SET pay_rate = %(pay_rate)s,
+                currency_code_id = %(currency_code_id)s
+            WHERE id = %(contract_id)s
+            RETURNING ID
+        """)
+        cls.source.execute(query, params)
+        cls.source.commit()
+        id = cls.source.get_last_row_id()
+        logger.debug(
+            f"[update_contract_rate] TRANSACTION IDENTIFIER: {id}")
+        return id
 
     '''
         Contract invite 
@@ -1399,3 +1435,18 @@ class ProjectDA(object):
             return cls.source.cursor.fetchone()[0]
         else:
             return None
+
+    # Deactivate project
+    @classmethod
+    def deactivate_project(cls, project_id):
+        query = ("""
+            UPDATE project
+            SET is_active = FALSE
+            RETURNING id
+        """)
+        cls.source.execute(query, (project_id,))
+        cls.source.commit()
+        id = cls.source.get_last_row_id()
+        logger.debug(
+            f"[deactivate_project] TRANSACTION IDENTIFIER: {id}")
+        return id

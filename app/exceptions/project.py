@@ -15,6 +15,13 @@ class NotEnoughPriviliges(falcon.HTTPBadRequest):
         super().__init__(title=title, description=description)
 
 
+class NotProjectOwner(falcon.HTTPBadRequest):
+    def __init__(self):
+        title = "You are not the project owner"
+        description = "There was a problem validating your project ownership in order to make this action"
+        super().__init__(title=title, description=description)
+
+
 class ContractDoesNotBelongProject(falcon.HTTPBadRequest):
     def __init__(self):
         title = "Specified contract does not belong to this project"

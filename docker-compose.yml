@@ -430,8 +430,9 @@ services:
       - ../web-api/datasource/postgresql/news.sql:/docker-entrypoint-initdb.d/q-news.sql
       - ../web-api/datasource/postgresql/page_settings.sql:/docker-entrypoint-initdb.d/q-page_settings.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-03-23_project_element_rate_type.sql:/docker-entrypoint-initdb.d/q-project-update.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-03-26_milestones.sql:/docker-entrypoint-initdb.d/q-1-project_update.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-04-03_page-settings-and-event-types.sql:/docker-entrypoint-initdb.d/q-2-page-settings-event-types.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-03-26_milestones.sql:/docker-entrypoint-initdb.d/r-1-project_update.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-04-03_page-settings-and-event-types.sql:/docker-entrypoint-initdb.d/r-2-page-settings-event-types.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-03-31_due_date.sql:/docker-entrypoint-initdb.d/r-3-project_update.sql
       # Test data
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
@@ -713,3 +714,4 @@ volumes:
 networks:
   amera-net:
     name: amera-net
+    

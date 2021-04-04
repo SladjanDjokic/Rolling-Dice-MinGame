@@ -5,7 +5,7 @@ import app.util.request as request
 from app.da.project import ProjectDA
 from app.da.group import GroupDA, GroupMembershipDA, GroupRole, GroupMemberStatus, GroupExchangeOptions
 from operator import itemgetter
-from app.exceptions.project import ProjectMemberNotFound, NotEnoughPriviliges, ContractDoesNotBelongProject, MemberDoesNotBelongToContract
+from app.exceptions.project import ProjectMemberNotFound, NotEnoughPriviliges, ContractDoesNotBelongProject, MemberDoesNotBelongToContract, NotProjectOwner
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -490,6 +490,15 @@ class ProjectResource(object):
             if 'edit' not in author_privileges:
                 raise NotEnoughPriviliges
 
+            # We trigger sending contract invites at this stage as it is the last step of project creation
+            contract_ids = ProjectDA.get_active_hourly_contracts_by_project(
+                project_id)
+            if contract_ids and len(contract_ids) > 0:
+                for c_id in contract_ids:
+                    invite_id = ProjectDA.create_invite(c_id)
+                    if invite_id:
+                        ProjectDA.create_invite_status(invite_id, author_id)
+
             if len(privileges_data) > 0:
                 for item in privileges_data:
                     (project_member_id, privileges) = itemgetter(
@@ -545,12 +554,18 @@ class ProjectResource(object):
                 raise NotEnoughPriviliges
 
             if json.convert_null(contract_id):
-                if contract_id not in ProjectDA.get_contract_ids_by_project(project_id):
+                if contract_id not in ProjectDA.get_active_hourly_contracts_by_project(project_id):
                     raise ContractDoesNotBelongProject
 
-            inserted = ProjectDA.insert_element({"project_id": project_id, "parent_id": json.convert_null(parent_id), "element_type": element_type,
-                                                 "title": title, "description": description, "contract_id": json.convert_null(contract_id), "est_hours": json.convert_null(est_hours),  "rate_type": rate_type, "author_id": author_id})
-            if inserted:
+            element_id = ProjectDA.insert_element({"project_id": project_id, "parent_id": json.convert_null(parent_id), "element_type": element_type,
+                                                   "title": title, "description": description, "contract_id": json.convert_null(contract_id), "est_hours": json.convert_null(est_hours),  "rate_type": rate_type, "author_id": author_id,
+                                                   "est_rate": None, "currency_code_id": None, "due_date": None})
+
+            # Create define status
+            ProjectDA.add_element_status_record(
+                element_id=element_id, author_id=author_id, status='define')
+
+            if element_id:
                 resp.body = json.dumps({
                     "success": True,
                     "description": f"{element_type.capitalize()} created successfully"
@@ -587,7 +602,8 @@ class ProjectResource(object):
                     raise NotEnoughPriviliges
 
             updated = ProjectDA.update_element({"element_id": element_id, "project_id": project_id, "parent_id": json.convert_null(
-                parent_id), "element_type": element_type, "title": title, "description": description, "contract_id": json.convert_null(contract_id), "est_hours": json.convert_null(est_hours), "author_id": author_id})
+                parent_id), "element_type": element_type, "title": title, "description": description, "contract_id": json.convert_null(contract_id), "est_hours": json.convert_null(est_hours), "author_id": author_id,
+                "est_rate": None, "currency_code_id": None, "due_date": None})
 
             if json.convert_null(element_status):
                 last_status = ProjectDA.get_last_status(element_id=element_id)
@@ -1033,14 +1049,21 @@ class ProjectResource(object):
                 contract_status_updated = ProjectDA.create_contract_status_entry(
                     contract_id=contract_id, contract_status="pending", author_id=author_id)
 
-            date = datetime.fromisoformat(due_date)
-            now = datetime.now()
-            est_hours = (date - now).total_seconds() // 3600
+            milestone_id = ProjectDA.insert_element({"project_id": project_id, "parent_id": parent_id, "element_type": 'milestone', "title": title,
+                                                     "description": description, "contract_id": contract_id, "est_hours": None, "rate_type": "fixed", "author_id": author_id,
+                                                     "est_rate": pay_rate, "currency_code_id": currency_code_id, "due_date": due_date})
 
-            milestone_created = ProjectDA.insert_element({"project_id": project_id, "parent_id": parent_id, "element_type": 'milestone', "title": title,
-                                                          "description": description, "contract_id": contract_id, "est_hours": est_hours, "rate_type": "fixed", "author_id": author_id})
+            # Create define status
+            ProjectDA.add_element_status_record(
+                element_id=milestone_id, author_id=author_id, status='define')
 
-            if milestone_created:
+            # Trigger an invite if contract
+            if contract_id:
+                invite_id = ProjectDA.create_invite(contract_id)
+                if invite_id:
+                    ProjectDA.create_invite_status(invite_id, author_id)
+
+            if milestone_id:
                 resp.body = json.dumps({
                     "success": True,
                     "description": "Milestone created successfully"
@@ -1107,10 +1130,6 @@ class ProjectResource(object):
                     contract_status_updated = ProjectDA.create_contract_status_entry(
                         contract_id=contract_id, contract_status=new_contract_status, author_id=author_id)
 
-            date = datetime.fromisoformat(due_date)
-            now = datetime.now()
-            est_hours = (date - now).total_seconds() // 3600
-
             milestone_updated = ProjectDA.update_element({
                 "project_id": project_id,
                 "parent_id": parent_id,
@@ -1118,10 +1137,20 @@ class ProjectResource(object):
                 "title": title,
                 "description": description,
                 "contract_id": contract_id,
-                "est_hours": est_hours,
+                "est_hours": None,
                 "author_id": author_id,
-                "element_id": milestone_id
+                "element_id": milestone_id,
+                "est_rate": pay_rate,
+                "currency_code_id": currency_code_id,
+                "due_date": due_date
             })
+
+            if json.convert_null(status):
+                last_status = ProjectDA.get_last_status(
+                    element_id=milestone_id)
+                if not last_status or last_status != status:
+                    ProjectDA.add_element_status_record(
+                        element_id=milestone_id, author_id=author_id, status=status)
 
             if milestone_updated:
                 resp.body = json.dumps({
@@ -1134,6 +1163,73 @@ class ProjectResource(object):
                     "description": "Something went wrong when updating milestone"
                 })
 
+        except Exception as err:
+            logger.exception(err)
+            raise err
+
+    # Deactivate
+    @check_session
+    def on_post_deactivate(self, req, resp, project_id):
+        try:
+            member_id = req.context.auth["session"]["member_id"]
+            author_id = ProjectDA.get_project_member_id(
+                project_id, member_id)
+
+            if not author_id:
+                raise ProjectMemberNotFound
+
+            current_owner = ProjectDA.get_current_owner(project_id=project_id)
+
+            if current_owner != author_id:
+                raise NotProjectOwner
+
+            deactivated = ProjectDA.deactivate_project(project_id=project_id)
+
+            if deactivated:
+                resp.body = json.dumps({
+                    "success": True,
+                    "description": "Project deactivated"
+                })
+            else:
+                resp.body = json.dumps({
+                    "success": False,
+                    "description": "Something went wrong when deactivating project"
+                })
+        except Exception as err:
+            logger.exception(err)
+            raise err
+
+    # Update contract
+    @check_session
+    def on_put_contract_rate(self, req, resp, contract_id):
+        try:
+            member_id = req.context.auth["session"]["member_id"]
+            (pay_rate, project_id, currency_code_id) = request.get_json_or_form(
+                "pay_rate", "project_id", "currency_code_id", req=req)
+            author_id = ProjectDA.get_project_member_id(
+                project_id, member_id)
+
+            if not author_id:
+                raise ProjectMemberNotFound
+            author_privileges = ProjectDA.get_project_member_privileges(
+                author_id)
+
+            if 'approve' not in author_privileges:
+                raise NotEnoughPriviliges
+
+            updated = ProjectDA.update_contract_rate(
+                {"pay_rate": pay_rate, "currency_code_id": currency_code_id, "contract_id": contract_id})
+
+            if updated:
+                resp.body = json.dumps({
+                    "success": True,
+                    "description": "Contract updated"
+                })
+            else:
+                resp.body = json.dumps({
+                    "success": False,
+                    "description": "Something went wrong when updating contract"
+                })
         except Exception as err:
             logger.exception(err)
             raise err
