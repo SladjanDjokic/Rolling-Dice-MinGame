@@ -15,6 +15,8 @@ from app.util.db import source
 from app.util.filestorage import amerize_url
 from app.config import settings
 from app.util.filestorage import safe_open, s3fy_filekey
+from app.da.password import PasswordDA
+import app.util.password as password
 from app.exceptions.file_sharing import FileStorageUploadError
 
 logger = logging.getLogger(__name__)
@@ -95,6 +97,61 @@ class FileStorageDA(object):
         except NoCredentialsError:
             print("Credentials not available")
             return False
+
+    @classmethod
+    def put_favicon(cls, site_url=''):
+        response = password.get_largest_favicon(site_url)
+        logger.debug(f"response_here:{response.url}")
+        logger.debug(f"response_headers: {response.headers}")
+        if response is None:
+            return None
+        uniquestr = str(uuid.uuid4())[:8]
+        true_filename = os.path.split(response.url)[1]
+        logger.debug(f"True Filename: {true_filename}")
+        s3_key = f"favicon_{uniquestr}_{true_filename}"
+        logger.debug(f"S3 Key: {s3_key}")
+
+        s3 = cls.aws_s3_client()
+        bucket = settings.get("storage.s3.bucket")
+
+        s3_response = s3.upload_fileobj(response.raw, bucket, s3_key)
+        s3_location = settings.get("storage.s3.file_location_host")
+        storage_url = urljoin(s3_location, s3_key)
+
+        logger.debug(s3_response)
+
+        mime_type = mimetypes.MimeTypes().guess_type(true_filename)[0]
+        file_size_bytes = len(response.content)
+
+        file_id = cls.create_file_storage_entry(
+            storage_url, 's3', "available", file_size_bytes, mime_type)
+        return file_id
+
+    @classmethod
+    def favicon_stream_s3_file(cls, password):
+        logger.debug(f'Password Favicon: {password}')
+
+        try:
+            file_path = urlparse(password["storage_engine_id"]).path
+            file_path = file_path[1:]
+            s3_resp = cls.stream_s3_file(file_path)
+            return s3_resp
+        except Exception as e:
+            pass
+        try:
+            icon = cls.put_favicon(password["website"])
+            cls.delete_file(password["icon"])
+            PasswordDA.update_password_favicon(password["id"], icon)
+
+            password = PasswordDA.get_password(password["id"])
+
+            file_path = urlparse(password["storage_engine_id"]).path
+            file_path = file_path[1:]
+            s3_resp = cls.stream_s3_file(file_path)
+
+            return s3_resp
+        except Exception as e2:
+            raise e2
 
     @classmethod
     def upload_to_aws(cls, local_file, bucket, s3_file):
@@ -1913,7 +1970,7 @@ class ShareFileDA(object):
                 LEFT JOIN member_profile ON create_user.id = member_profile.member_id
                 LEFT JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
                 LEFT JOIN file_storage_engine file on file.id = member_file.file_id
-                WHERE 
+                WHERE
                     member.id = %s
                 ORDER BY file_share.create_date DESC
                 LIMIT 25

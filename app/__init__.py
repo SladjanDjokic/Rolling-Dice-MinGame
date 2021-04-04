@@ -62,6 +62,7 @@ from app.resources.notifications_setting import MemberNotificationsSetting
 # from app.resources.memberfile import
 
 from app.resources.newsfeeds import NewsFeedsResource
+from app.resources.password import PasswordResource
 
 from app.resources.bug_report import BugReportResource, BugReportUsersResource
 
@@ -415,6 +416,14 @@ def _setup_routes(app):
     app.add_route("/newsfeeds", newsfeeds_resource)
     app.add_route("/newsfeeds/{topic_id:int}",
                   newsfeeds_resource, suffix="post")
+
+    # Routes for password manager
+    
+    password_resource = PasswordResource()
+
+    app.add_route("/password/favicon/{password_id:int}", password_resource, suffix="favicon")
+    app.add_route("/password/{password_id:int}", password_resource, suffix="detail")
+    app.add_route("/password", password_resource)
 
     # Routes for Chat App
     app.add_route("/chat", ChatView())

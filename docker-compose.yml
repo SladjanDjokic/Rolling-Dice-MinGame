@@ -430,9 +430,12 @@ services:
       - ../web-api/datasource/postgresql/news.sql:/docker-entrypoint-initdb.d/q-news.sql
       - ../web-api/datasource/postgresql/page_settings.sql:/docker-entrypoint-initdb.d/q-page_settings.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-03-23_project_element_rate_type.sql:/docker-entrypoint-initdb.d/q-project-update.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-03-26_milestones.sql:/docker-entrypoint-initdb.d/r-1-project_update.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-03-26_milestones.sql:/docker-entrypoint-initdb.d/p-1-project_update.sql
+      - ../web-api/datasource/postgresql/member_pm_account.sql:/docker-entrypoint-initdb.d/q-member_pm_account.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-04-03_page-settings-and-event-types.sql:/docker-entrypoint-initdb.d/r-2-page-settings-event-types.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-03-31_due_date.sql:/docker-entrypoint-initdb.d/r-3-project_update.sql
+      - ../web-api/datasource/postgresql/profile_jobs.sql:/docker-entrypoint-initdb.d/r-profile-jobs.sql
+      - ../web-api/datasource/postgresql/profile_mbr_tables.sql:/docker-entrypoint-initdb.d/r-profile-member-tables.sql
       # Test data
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
@@ -446,7 +449,8 @@ services:
       - ../web-api/datasource/postgresql/test-company-role_xref.dev.sql:/docker-entrypoint-initdb.d/z-9-1-test-company-roles.dev.sql
       - ../web-api/datasource/postgresql/test-project.dev.sql:/docker-entrypoint-initdb.d/z-9-2-test-project-dev.sql
       - ../web-api/datasource/postgresql/test-member-contact-2.sql:/docker-entrypoint-initdb.d/z-9-3-test-member-contact-2.sql
-      - ../web-api/datasource/postgresql/test-page-settings.sql:/docker-entrypoint-initdb.d/z-9-4-test-page-settings.sql.sql
+      - ../web-api/datasource/postgresql/test-page-settings.sql:/docker-entrypoint-initdb.d/z-9-4-test-page-settings.sql
+      - ../web-api/datasource/postgresql/test-profile-data.sql:/docker-entrypoint-initdb.d/z-9-5-test-profile-data.sql
     environment:
       POSTGRES_DB: ameraiot
       POSTGRES_USER: amera
@@ -714,4 +718,3 @@ volumes:
 networks:
   amera-net:
     name: amera-net
-    
