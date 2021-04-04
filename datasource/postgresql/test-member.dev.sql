@@ -131,14 +131,27 @@ INSERT INTO member_group
         (2, 'Eclipto', 1, '123456', 'MOST_SECURE'),
         (2, 'Trollery', 1, '123456', 'MOST_SECURE');
 
+-- Populate leaders to group membership
+DO $$
+    DECLARE 
+        temprow RECORD;
+    BEGIN
+        FOR temprow IN (SELECT id AS group_id,group_leader_id FROM member_group)
+            LOOP
+                INSERT INTO member_group_membership (group_id, member_id, status, group_role) VALUES
+                (temprow.group_id, temprow.group_leader_id, 'active', 'owner');
+            END LOOP;
+    END;
+$$;
+
 INSERT INTO member_group_membership
-        (group_id, member_id, status)
+        (group_id, member_id, status, group_role)
         VALUES
-        (1, 2, 'active'),
-        (1, 3, 'active'),
-        (3, 1, 'active'),
-        (4, 1, 'active'),
-        (6, 1, 'active');
+        (1, 2, 'active', 'standard'),
+        (1, 3, 'active', 'standard'),
+        (3, 1, 'active', 'standard'),
+        (4, 1, 'active', 'standard'),
+        (6, 1, 'active', 'standard');
 
 INSERT INTO invite
         (invite_key, email, expiration, first_name, last_name, inviter_member_id, group_id)

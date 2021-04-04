@@ -402,7 +402,7 @@ class MemberDA(object):
         """)
 
         query_member_page_settings = ("""
-            INSERT INTO member_page_settings
+            INSERT INTO member_page_settings 
                 (member_id, page_type, view_type, sort_order)
             VALUES (%s, %s, %s, %s)
         """)
@@ -457,7 +457,7 @@ class MemberDA(object):
             page_type = page_setting['page_type']
             view_type = page_setting['view_type']
             sort_order = page_setting['sort_order']
-
+            
             cls.source.execute(query_member_page_settings, (id, page_type, view_type, sort_order))
 
         if commit:
@@ -982,14 +982,14 @@ class MemberContactDA(object):
                 SELECT
                     member_session.member_id,
                     CASE WHEN bool_or(member_session.status = 'online' AND member_session.status is not null) = true THEN 'online' ELSE 'offline' END as online_status
-                FROM  member_session
+                FROM  member_session 
                 WHERE
                     member_session.status IN ('online', 'disconnected') AND
                     member_session.expiration_date >= current_timestamp
                 GROUP BY
                     member_session.member_id
             )
-            SELECT
+            SELECT 
                 contact.id as id,
                 contact.contact_member_id as contact_member_id,
                 CASE WHEN member_rate.pay_rate IS NOT NULL THEN member_rate.pay_rate ELSE 0 END as default_pay_rate,
@@ -1015,14 +1015,14 @@ class MemberContactDA(object):
                 (
                     SELECT json_agg(rows) AS group_memberships
                     FROM (
-                        SELECT
+                        SELECT 
                             member_group.id AS group_id,
                             group_name,
                             group_role
                         FROM member_group_membership
                         LEFT JOIN member_group ON member_group.id = member_group_membership.group_id
-                        WHERE member_group_membership.status = 'active'
-                        AND member_group_membership.member_id = contact.contact_member_id
+                        WHERE member_group_membership.status = 'active' 
+                        AND member_group_membership.member_id = contact.contact_member_id 
                         AND member_group.group_type = 'contact'
                     ) AS rows
                 ),
@@ -1035,7 +1035,7 @@ class MemberContactDA(object):
                 COALESCE(json_agg(DISTINCT country_code.*) FILTER (WHERE country_code.id IS NOT NULL), '[]') AS country_code,
                 COALESCE(json_agg(DISTINCT member_achievement.*) FILTER (WHERE member_achievement.id IS NOT NULL), '[]') AS achievement_information,
                 COALESCE(json_agg(DISTINCT profile_skill.*) FILTER (WHERE profile_skill.display_status = TRUE), '[]') AS skills_information,
-                COALESCE(json_agg(DISTINCT member_workhistory.*), '[]') AS workhistory_information,
+                COALESCE(json_agg(DISTINCT member_workhistory.*), '[]') AS workhistory_information, 
                 COALESCE(json_agg(DISTINCT member_education.*), '[]') AS education_information,
                 COALESCE(json_agg(DISTINCT member_certificate.*), '[]') AS certificate_information,
                 file_storage_engine.storage_engine_id as s3_avatar_url,
@@ -1054,7 +1054,7 @@ class MemberContactDA(object):
                 SELECT
                     member_session.member_id,
                     CASE WHEN bool_or(member_session.status = 'online' AND member_session.status is not null) = true THEN 'online' ELSE 'offline' END as online_status
-                FROM  member_session
+                FROM  member_session 
                 WHERE
                     member_session.status IN ('online', 'disconnected') AND
                     member_session.expiration_date >= current_timestamp
@@ -1735,13 +1735,13 @@ class MemberContactDA(object):
                     file_storage_engine.storage_engine_id,
                     contact.id as requester_contact_id
                 FROM contact
-                INNER JOIN contact receiver_contact ON
-                        contact.contact_member_id = receiver_contact.member_id
+                INNER JOIN contact receiver_contact ON 
+                        contact.contact_member_id = receiver_contact.member_id 
                     AND contact.member_id = receiver_contact.contact_member_id
                 INNER JOIN member ON contact.member_id = member.id
                 LEFT JOIN member_profile ON member.id = member_profile.member_id
                 LEFT JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
-                WHERE
+                WHERE 
                     receiver_contact.member_id = %s
                     {pending}
                 ORDER BY receiver_contact.update_date DESC
@@ -1814,6 +1814,7 @@ class MemberInfoDA(object):
                 member.job_title_id as job_title_id,
                 job_title.name as job_title,
                 member.department_id as department_id,
+                department.name as department_name,
                 member.create_date as create_date,
                 member.update_date as update_date,
                 COALESCE(json_agg(DISTINCT member_location.*) FILTER (WHERE member_location.id IS NOT NULL), '[]') AS location_information,
@@ -1821,14 +1822,15 @@ class MemberInfoDA(object):
                 COALESCE(json_agg(DISTINCT country_code.*) FILTER (WHERE country_code.id IS NOT NULL), '[]') AS country_code,
                 COALESCE(json_agg(DISTINCT member_achievement.*) FILTER (WHERE member_achievement.id IS NOT NULL), '[]') AS achievement_information,
                 COALESCE(json_agg(DISTINCT profile_skill.*) FILTER (WHERE profile_skill.display_status = TRUE), '[]') AS skills_information,
-                COALESCE(json_agg(DISTINCT member_workhistory.*), '[]') AS workhistory_information,
+                COALESCE(json_agg(DISTINCT member_workhistory.*), '[]') AS workhistory_information, 
                 COALESCE(json_agg(DISTINCT member_education.*), '[]') AS education_information,
                 COALESCE(json_agg(DISTINCT member_certificate.*), '[]') AS certificate_information,
                 file_storage_engine.storage_engine_id as s3_avatar_url,
                 member_profile.biography as biography,
                 member_security_preferences.facial_recognition as facial_recognition,
                 member_rate.pay_rate,
-                member_rate.currency_code_id
+                member_rate.currency_code_id,
+                currency_code.currency_code
             FROM member
                 LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
                 LEFT OUTER JOIN member_location ON member_location.member_id = member.id
@@ -1845,6 +1847,8 @@ class MemberInfoDA(object):
                 LEFT JOIN member_workhistory ON member_workhistory.member_id = member.id
                 LEFT JOIN member_education ON member_education.member_id = member.id
                 LEFT JOIN member_certificate ON member_certificate.member_id = member.id
+                LEFT JOIN department ON department.id = member.department_id
+                LEFT JOIN currency_code ON currency_code.id = member_rate.currency_code_id
             WHERE member.id = %s
             GROUP BY
                 member.id,
@@ -1855,6 +1859,7 @@ class MemberInfoDA(object):
                 member.company_name,
                 member.job_title_id,
                 job_title.name,
+                department.name,
                 member.department_id,
                 member.create_date,
                 member.update_date,
@@ -1862,7 +1867,8 @@ class MemberInfoDA(object):
                 member_profile.biography,
                 member_security_preferences.facial_recognition,
                 member_rate.pay_rate,
-                member_rate.currency_code_id
+                member_rate.currency_code_id,
+                currency_code.currency_code
             """)
         get_member_info_params = (member_id,)
         cls.source.execute(get_member_info_query, get_member_info_params)
@@ -1876,6 +1882,7 @@ class MemberInfoDA(object):
                     job_title_id,
                     job_title,
                     department_id,
+                    department_name,
                     create_date,
                     update_date,
                     location_information,
@@ -1890,7 +1897,8 @@ class MemberInfoDA(object):
                     biography,
                     facial_recognition,
                     pay_rate,
-                    currency_code_id
+                    currency_code_id,
+                    currency_code
             ) in cls.source.cursor:
                 member = {
                     "member_id": member_id,
@@ -1902,6 +1910,7 @@ class MemberInfoDA(object):
                     "job_title_id": job_title_id,
                     "job_title": job_title,
                     "department_id": department_id,
+                    "department_name": department_name,
                     "create_date": create_date,
                     "update_date": update_date,
                     "location_information": location_information,
@@ -1916,7 +1925,8 @@ class MemberInfoDA(object):
                     "biography": biography,
                     "facial_recognition": facial_recognition,
                     "pay_rate": pay_rate,
-                    "currency_code_id": currency_code_id
+                    "currency_code_id": currency_code_id,
+                    "currency_code": currency_code
                 }
 
                 return member
@@ -2185,15 +2195,15 @@ class MemberSettingDA(object):
                     start_day )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON conflict(member_id) DO UPDATE
-                SET online_status = %s,
-                    view_profile = %s,
-                    add_contact = %s,
-                    join_date = %s,
-                    login_location = %s,
-                    unit_of_measure = %s,
-                    timezone_id = %s,
-                    date_format = %s,
-                    time_format = %s,
+                SET online_status = %s, 
+                    view_profile = %s, 
+                    add_contact = %s, 
+                    join_date = %s,  
+                    login_location = %s, 
+                    unit_of_measure = %s, 
+                    timezone_id = %s, 
+                    date_format = %s, 
+                    time_format = %s, 
                     start_day = %s
             """)
 
@@ -2449,7 +2459,7 @@ class MemberVideoMailDA(object):
 
                 group_member_query = """
                     INSERT INTO video_mail_xref (member_id, video_mail_id)
-                    SELECT member_group_membership.member_id, %s as video_mail_id
+                    SELECT member_group_membership.member_id, %s as video_mail_id 
                     FROM member_group_membership
                     WHERE member_group_membership.group_id = %s AND member_group_membership.member_id <> %s
                 """
@@ -2489,7 +2499,7 @@ class MemberVideoMailDA(object):
 
             group_member_query = """
                 INSERT INTO video_mail_xref (member_id, video_mail_id)
-                SELECT member_group_membership.member_id, %s as video_mail_id
+                SELECT member_group_membership.member_id, %s as video_mail_id 
                 FROM member_group_membership
                 WHERE member_group_membership.group_id = %s AND member_group_membership.member_id <> %s
             """
@@ -2535,9 +2545,9 @@ class MemberVideoMailDA(object):
             LEFT OUTER JOIN member_group ON member_group.id = vm.group_id
             LEFT OUTER JOIN file_storage_engine ON vm.video_storage_id = file_storage_engine.id
             WHERE (
-                sender.email like %s OR
-                sender.first_name LIKE %s OR
-                sender.last_name LIKE %s OR
+                sender.email like %s OR 
+                sender.first_name LIKE %s OR 
+                sender.last_name LIKE %s OR 
                 vm.subject LIKE %s )
                 AND vmx.member_id = %s
                 AND vmx.status <> 'deleted'
