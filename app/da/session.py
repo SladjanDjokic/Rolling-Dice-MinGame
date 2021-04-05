@@ -668,7 +668,7 @@ class SessionDA(object):
 
     @classmethod
     def get_sessions(cls, search_key, page_size=None, page_number=None, sort_params='', get_all=False, member_id=None):
-        sort_columns_string = 'first_name ASC, last_name ASC'
+        sort_columns_string = 'member_session.update_date DESC, member_session.first_name ASC, member_session.last_name ASC'
         if sort_params:
             session_dict = {
                 'session_id': 'member_session.session_id',
@@ -829,7 +829,7 @@ class SessionDA(object):
 
     @classmethod
     def get_threats(cls, search_key, page_size=None, page_number=None, sort_params='', get_all=False, member_id=None):
-        sort_columns_string = 'first_name ASC, last_name ASC'
+        sort_columns_string = 'member_session.update_date DESC, member_session.first_name ASC, member_session.last_name ASC'
         if sort_params:
             session_dict = {
                 'session_id': 'member_session.session_id',

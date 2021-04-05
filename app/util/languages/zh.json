@@ -53,6 +53,7 @@
   "app.registration.upload": "Upload",
   "app.registration.read": "I have read and fully accept AMERA",
   "app.registration.termsAndCondition": "terms and conditions",
+  "app.integration.profile.title": "Integrations",
   "app.dashboard.edit": "Edit",
   "app.dashboard.scheduledMeetings": "Scheduled Meetings",
   "app.dashboard.upcoming": "Upcoming",
