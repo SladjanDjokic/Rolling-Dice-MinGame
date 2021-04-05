@@ -150,9 +150,16 @@ class GithubOAuthResource:
             email = user.get('email')
             profile_link = user.get('html_url')
             company = user.get('company')
-            name = user.get('name').split(' ')
-            first_name = name[0]
-            last_name = name[1]
+            #name = user.get('name').split(' ')
+            name = user.get('name')
+            first_name = None
+            last_name = None
+            if name:
+                name = name.split(' ')
+                first_name = name[0]
+                last_name = name[1]
+            #first_name = name[0]
+            #last_name = name[1]
             scope = r.headers.get('X-OAuth-Scopes').split(',')
 
             # look up user by username - create if they don't exist.

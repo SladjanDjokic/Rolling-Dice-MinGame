@@ -157,6 +157,3 @@ class ExternalAccountDA(object):
             }
             return external_account
         return None
-
-
-

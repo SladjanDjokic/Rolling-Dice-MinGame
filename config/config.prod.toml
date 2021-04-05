@@ -45,9 +45,29 @@ secret_access_key = "${AWS_SECRET_ACCESS_KEY}"
 totp_length = 6
 totp_lifetime_seconds=60
 [services.github]
+# Github OAuth
 callback_url = "/api/github/oauth"
 admin_repo_redirect_url = "/github_notification"
 api_url = "https://api.github.com/user"
+authorization_url = "https://github.com/login/oauth/authorize"
+token_url = "https://github.com/login/oauth/access_token"
+[services.o365]
+# O365 Graph Api and Oauth Uri
+callback_url = "/api/o365/auth"
+admin_redirect_url = "/o365_notification"
+graph_uri = "https://graph.microsoft.com/v1.0"
+login_uri = "https://login.microsoftonline.com/"
+token_path = "{}/oauth2/v2.0/token"
+authorize_path = "{}/oauth2/v2.0/authorize"
+user_scope_org = "offline_access Mail.read Calendars.ReadWrite Files.Read.All User.ReadWrite.All Notes.ReadWrite.All Directory.ReadWrite.All Files.ReadWrite.All User.ReadBasic.All User.Read User.ReadWrite Directory.Read.All Directory.AccessAsUser.All Directory.ReadWrite.All"
+user_scope = "offline_access Mail.read Calendars.ReadWrite Files.Read.All User.ReadWrite.All Notes.ReadWrite.All Directory.ReadWrite.All Files.ReadWrite.All User.ReadBasic.All User.Read"
+[services.trello]
+# Trello Api and Oauth Uri
+callback_url = "/api/trello/auth"
+admin_redirect_url = "/trello_notification"
+api_uri = "https://api.trello.com/1/"
+login_uri = "https://trello.com/1/authorize"
+scope = "read,write,account"
 
 [storage]
 [storage.s3]

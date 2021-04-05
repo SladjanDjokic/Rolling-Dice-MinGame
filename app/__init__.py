@@ -61,6 +61,14 @@ from app.resources.page_settings import PageSettingsResource
 from app.resources.notifications_setting import MemberNotificationsSetting
 # from app.resources.memberfile import
 
+from app.resources.o365Resource import O365LoginResource
+from app.resources.o365Resource import O365OAuthResource
+# O365Resource import
+
+from app.resources.trelloResource import TrelloLoginResource
+from app.resources.trelloResource import TrelloOAuthResource
+
+
 from app.resources.newsfeeds import NewsFeedsResource
 from app.resources.password import PasswordResource
 
@@ -523,3 +531,11 @@ def _setup_routes(app):
     app.add_route("/github/repo/setup", GithubRepoListResource())
     app.add_route("/github/oauth/login", GithubLoginResource())
     app.add_route("/github/oauth", GithubOAuthResource())
+
+    # o365
+    app.add_route("/o365/oauth/login", O365LoginResource())
+    app.add_route("/o365/auth", O365OAuthResource())
+
+    # trello
+    app.add_route("/trello/oauth/login", TrelloLoginResource())
+    app.add_route("/trello/auth", TrelloOAuthResource())

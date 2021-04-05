@@ -234,6 +234,9 @@ services:
       - AMERA_API_SERVICES.GITHUB.API_URL=https://api.github.com/user
       - AMERA_API_SERVICES.GITHUB.AUTHORIZATION_URL=https://github.com/login/oauth/authorize
       - AMERA_API_SERVICES.GITHUB.TOKEN_URL=https://github.com/login/oauth/access_token
+      # O365 Graph Api and Oauth Uri
+      - AMERA_API_SERVICES.O365.GRAPH_URI=https://graph.microsoft.com/v1.0
+      - AMERA_API_SERVICES.O365.TOKEN_URI=https://login.microsoftonline.com/
     volumes:
       - ../web-api:/app
       - web-api-python-packages:/root/.local/share
@@ -301,9 +304,6 @@ services:
       - AMERA_API_KAFKA.CHAT_TOPIC=chat
       - AMERA_API_KAFKA.CALENDAR_TOPIC=calendar
       - AMERA_API_KAFKA.BOOTSTRAP_SERVERS=kafka:9092
-      # Github OAuth
-      - AMERA_API_SERVICES.GITHUB.AUTHORIZATION_URL=https://github.com/login/oauth/authorize
-      - AMERA_API_SERVICES.GITHUB.TOKEN_URL=https://github.com/login/oauth/access_token
     networks:
       - amera-net
     expose:
@@ -539,9 +539,6 @@ services:
       - AMERA_API_KAFKA.CALENDAR_TOPIC=calendar
       - AMERA_API_KAFKA.BOOTSTRAP_SERVERS=kafka:9092
       - AMERA_API_KAFKA.SERVER=kafka:9092
-      # Github OAuth
-      - AMERA_API_SERVICES.GITHUB.AUTHORIZATION_URL=https://github.com/login/oauth/authorize
-      - AMERA_API_SERVICES.GITHUB.TOKEN_URL=https://github.com/login/oauth/access_token
     depends_on:
       kafka:
         condition: service_healthy
@@ -585,9 +582,6 @@ services:
       - AMERA_API_KAFKA.CALENDAR_TOPIC=calendar
       - AMERA_API_KAFKA.BOOTSTRAP_SERVERS=kafka:9092
       - AMERA_API_KAFKA.SERVER=kafka:9092
-      # Github OAuth
-      - AMERA_API_SERVICES.GITHUB.AUTHORIZATION_URL=https://github.com/login/oauth/authorize
-      - AMERA_API_SERVICES.GITHUB.TOKEN_URL=https://github.com/login/oauth/access_token
     depends_on:
       kafka:
         condition: service_started
@@ -633,9 +627,6 @@ services:
       - AMERA_API_KAFKA.CALENDAR_TOPIC=calendar
       - AMERA_API_KAFKA.BOOTSTRAP_SERVERS=kafka:9092
       - AMERA_API_KAFKA.SERVER=kafka:9092
-      # Github OAuth
-      - AMERA_API_SERVICES.GITHUB.AUTHORIZATION_URL=https://github.com/login/oauth/authorize
-      - AMERA_API_SERVICES.GITHUB.TOKEN_URL=https://github.com/login/oauth/access_token
     depends_on:
       kafka:
         condition: service_started

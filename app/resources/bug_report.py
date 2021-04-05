@@ -26,7 +26,7 @@ class BugReportResource(object):
             )
             member_id = req.context.auth["session"]["member_id"]
 
-            referer_url = req.headers.get('REFERER')
+            referer_url = req.headers.get('REFERER') 
 
             if not current_url:
                 current_url = referer_url
