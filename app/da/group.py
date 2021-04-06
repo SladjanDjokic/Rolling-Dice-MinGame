@@ -681,9 +681,10 @@ class GroupDA(object):
                     file_storage_engine.storage_engine_id
                 FROM member_group_membership
                 INNER JOIN member_group on member_group_membership.group_id = member_group.id
-                INNER JOIN member ON member_group.group_leader_id = member.id
-                LEFT JOIN member_profile ON member.id = member_profile.member_id
-                LEFT JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
+                INNER JOIN member_group_membership AS mgm_leader ON mgm_leader.group_id = member_group.id AND mgm_leader.group_role = 'owner'
+                INNER JOIN member ON mgm_leader.member_id = member.id
+                LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id
+                LEFT OUTER JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
                 WHERE
                     member_group_membership.member_id = %s
                     {invited}
