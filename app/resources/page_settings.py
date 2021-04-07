@@ -36,12 +36,12 @@ class PageSettingsResource(object):
     @check_session
     def on_post(self, req, resp):
         try:
-            (page_type, view_type, page_size, sort_order) = request.get_json_or_form(
-                "page_type", "view_type", "page_size", "sort_order", req=req)
+            (page_type, view_type, page_size, sort_order, extra_settings) = request.get_json_or_form(
+                "page_type", "view_type", "page_size", "sort_order", "extra_settings", req=req)
 
             member_id = req.context.auth['session']['member_id']
 
-            data = PageSettingsDA().create_member_page_settings(member_id, page_type, view_type, page_size, sort_order)
+            data = PageSettingsDA().create_member_page_settings(member_id, page_type, view_type, page_size, sort_order, extra_settings)
 
             if data:
                 resp.body = json.dumps({
@@ -66,12 +66,12 @@ class PageSettingsResource(object):
         member_id = req.context.auth['session']['member_id']
         try:
             (id, page_type, view_type,
-                page_size, sort_order) = request.get_json_or_form(
+                page_size, sort_order, extra_settings) = request.get_json_or_form(
                 "id", "page_type", "view_type",
-                "page_size", "sort_order", req=req)
+                "page_size", "sort_order", "extra_settings", req=req)
 
             data = PageSettingsDA().update_member_page_settings(
-                id, member_id, page_type, view_type, page_size, sort_order)
+                id, member_id, page_type, view_type, page_size, sort_order, extra_settings)
 
             if data:
                 resp.body = json.dumps({

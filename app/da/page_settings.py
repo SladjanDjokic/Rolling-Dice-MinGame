@@ -17,6 +17,7 @@ class PageSettingsDA(object):
                     view_type,
                     page_size,
                     sort_order,
+                    extra_settings,
                     create_date,
                     update_date
                 FROM member_page_settings
@@ -31,6 +32,7 @@ class PageSettingsDA(object):
                     view_type,
                     page_size,
                     sort_order,
+                    extra_settings,
                     create_date,
                     update_date
                 ) in cls.source.cursor:
@@ -40,6 +42,7 @@ class PageSettingsDA(object):
                         "view_type": view_type,
                         "page_size": page_size,
                         "sort_order": sort_order,
+                        "extra_settings": extra_settings,
                         "create_date": create_date,
                         "update_date": update_date
                     }
@@ -51,19 +54,19 @@ class PageSettingsDA(object):
             raise err
 
     @classmethod
-    def create_member_page_settings(cls, member_id, page_type, view_type, page_size, sort_order):
+    def create_member_page_settings(cls, member_id, page_type, view_type, page_size, sort_order, extra_settings):
         try:
             sort_order_list = list(sort_order.split(','))
 
             query = ("""
                     INSERT INTO member_page_settings
-                        (member_id, page_type, view_type, page_size, sort_order)
+                        (member_id, page_type, view_type, page_size, sort_order, extra_settings)
                     VALUES
-                        (%s, %s, %s, %s, %s)
+                        (%s, %s, %s, %s, %s, %s)
                     RETURNING *
                 """)
 
-            params = (member_id, page_type, view_type, page_size, sort_order_list)
+            params = (member_id, page_type, view_type, page_size, sort_order_list, extra_settings)
 
 
             cls.source.execute(query, params)
@@ -79,7 +82,8 @@ class PageSettingsDA(object):
                     "page_size": result[4],
                     "sort_order": result[5],
                     "create_date": result[6],
-                    "update_date": result[7]
+                    "update_date": result[7],
+                    "extra_settings": result[8]
                 }
                 return page_setting
 
@@ -90,15 +94,15 @@ class PageSettingsDA(object):
 
 
     @classmethod
-    def update_member_page_settings(cls, id, member_id, page_type, view_type, page_size, sort_order):
+    def update_member_page_settings(cls, id, member_id, page_type, view_type, page_size, sort_order, extra_settings):
         try:
             sort_order_list = list(sort_order.split(','))
 
             query = ("""
             INSERT INTO member_page_settings
-                (member_id, page_type, view_type, page_size, sort_order)
+                (member_id, page_type, view_type, page_size, sort_order, extra_settings)
             VALUES
-                (%s, %s, %s, %s, %s)
+                (%s, %s, %s, %s, %s, %s)
             ON CONFLICT (member_id, page_type)
             DO UPDATE
             SET
@@ -106,13 +110,14 @@ class PageSettingsDA(object):
                 view_type = %s,
                 page_size = %s,
                 sort_order = %s,
+                extra_settings = %s,
                 update_date = CURRENT_TIMESTAMP
             WHERE member_page_settings.id = %s
             RETURNING *
             """)
 
-            params = (member_id, page_type, view_type, page_size, sort_order_list,
-                      page_type, view_type, page_size, sort_order_list, id)
+            params = (member_id, page_type, view_type, page_size, sort_order_list, extra_settings,
+                      page_type, view_type, page_size, sort_order_list, extra_settings, id)
 
             cls.source.execute(query, params)
 
@@ -127,7 +132,8 @@ class PageSettingsDA(object):
                     "page_size": result[4],
                     "sort_order": result[5],
                     "create_date": result[6],
-                    "update_date": result[7]
+                    "update_date": result[7],
+                    "extra_settings": result[8]
                 }
                 return page_setting
 
