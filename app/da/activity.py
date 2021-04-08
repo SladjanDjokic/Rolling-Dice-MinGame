@@ -720,3 +720,710 @@ class ActivityDA(object):
         except Exception as e:
             logger.error(e, exc_info=True)
             return None
+    
+    @classmethod
+    def get_invitations_by_member_id(cls, member_id, is_history=False, search_key='', page_size=None, page_number=None, sort_params=''):
+        try:
+            activities = list()
+            sort_columns_string = 'update_date DESC'
+            invitation_dict = {
+                "id": 'id',
+                "first_name": 'last_name',
+                "last_name": 'last_name',
+                "status": 'status',
+                "file_name": 'file_name',
+                "requester_contact_id": 'requester_contact_id',
+                "create_date": 'create_date',
+                "update_date": 'update_date',
+            }
+
+            if sort_params:
+                sort_columns_string = cls.formatSortingParams(
+                    sort_params, invitation_dict) or sort_columns_string
+            
+            # pending = ""
+
+            # if not is_history:
+            #     pending = " AND receiver_contact.status = 'pending'"
+
+            empty_obj = '{}'
+
+            query = f"""
+                SELECT  id, first_name, last_name, email, status, file_name,
+                        requester_contact_id, create_date, update_date, invitation_type,
+                        event_name, event_type, event_description,
+                        row_number() OVER (ORDER BY {sort_columns_string}) AS row_id,
+                        storage_engine_id, create_user_id, file_url, host_member_info, invitations
+                FROM  (
+                        SELECT
+                            receiver_contact.id as id,
+                            member.first_name as first_name,
+                            member.last_name as last_name,
+                            member.email as email,
+                            receiver_contact.status::text as status,
+                            '' as file_name,
+                            contact.id as requester_contact_id,
+                            receiver_contact.create_date as create_date,
+                            receiver_contact.update_date as update_date,
+                            'contact_invitation' as invitation_type,
+                            '' as event_name,
+                            '' as event_type,
+                            '' as event_description,
+                            file_storage_engine.storage_engine_id,
+                            member.id as create_user_id,
+                            '' as file_url,
+                            '{empty_obj}'::json AS host_member_info,
+                            '{empty_obj}'::json AS invitations
+                        FROM contact
+                            INNER JOIN contact receiver_contact ON 
+                                contact.contact_member_id = receiver_contact.member_id 
+                            AND contact.member_id = receiver_contact.contact_member_id
+                            INNER JOIN member ON contact.member_id = member.id
+                            LEFT JOIN member_profile ON member.id = member_profile.member_id
+                            LEFT JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
+                        WHERE 
+                            receiver_contact.member_id = %s
+                            AND
+                            (
+                                concat_ws(' ', member.first_name, member.last_name) iLIKE %s
+                                OR concat('create year ', EXTRACT(YEAR FROM receiver_contact.update_date)) iLIKE %s
+                                OR concat('create month ', EXTRACT(MONTH FROM receiver_contact.update_date)) iLIKE %s
+                                OR concat('create month ', to_char(receiver_contact.update_date, 'month')) iLIKE %s
+                                OR concat('create day ', EXTRACT(DAY FROM receiver_contact.update_date)) iLIKE %s
+                                OR concat('create day ', to_char(receiver_contact.update_date, 'day')) iLIKE %s
+                                OR concat('update year ', EXTRACT(YEAR FROM receiver_contact.update_date)) iLIKE %s
+                                OR concat('update month ', EXTRACT(MONTH FROM receiver_contact.update_date)) iLIKE %s
+                                OR concat('update month ', to_char(receiver_contact.update_date, 'month')) iLIKE %s
+                                OR concat('update day ', EXTRACT(DAY FROM receiver_contact.update_date)) iLIKE %s
+                                OR concat('update day ', to_char(receiver_contact.update_date, 'day')) iLIKE %s
+                            )
+                    UNION ALL
+                        SELECT
+                            event_sequence.id as id,
+                            member.first_name as first_name,
+                            member.last_name as last_name,
+                            member.email as email,
+                            event_invite_2.invite_status::text as status, 
+                            '' as file_name,
+                            0 as requester_contact_id,
+                            event_sequence.create_date as create_date,
+                            event_sequence.update_date as update_date,
+                            'event_invitation' as invitation_type,
+                            event_2.event_name::text as event_name,
+                            event_2.event_type::text as event_type,
+                            event_2.event_description::text as event_description,
+                            file_storage_engine.storage_engine_id,
+                            member.id as create_user_id,
+                            '' as file_url,
+                            json_build_object(
+                                'host_member_id', member.id,
+                                'first_name', member.first_name,
+                                'middle_name', member.middle_name,
+                                'last_name', member.last_name
+                            ) AS host_member_info,
+                            json_agg(json_build_object(
+                                'invite_id', invitations.id,
+                                'invite_member_id', invitations.invite_member_id,
+                                'first_name', invited_member.first_name,
+                                'middle_name', invited_member.middle_name,
+                                'last_name', invited_member.last_name
+                            )) AS invitations
+
+                        FROM event_sequence
+                            INNER JOIN event_2 on event_2.sequence_id = event_sequence.id
+                            INNER JOIN event_invite_2 on event_invite_2.event_id = event_2.id
+                            INNER JOIN member ON event_2.host_member_id = member.id
+                            LEFT OUTER JOIN event_invite_2 AS invitations ON invitations.event_id = event_2.id
+                            LEFT OUTER JOIN member AS invited_member ON invitations.invite_member_id = invited_member.id
+                            LEFT JOIN member_profile ON member.id = member_profile.member_id
+                            LEFT JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
+                        WHERE
+                            event_invite_2.invite_member_id = %s
+                            AND
+                            event_2.event_status='Active'
+                            AND
+                            event_invite_2.invite_status != 'Recurring'
+                            AND
+                            event_2.group_id is NULL
+                            AND
+                            (
+                                concat_ws(' ', member.first_name, member.last_name) iLIKE %s
+                                OR concat('create year ', EXTRACT(YEAR FROM event_sequence.update_date)) iLIKE %s
+                                OR concat('create month ', EXTRACT(MONTH FROM event_sequence.update_date)) iLIKE %s
+                                OR concat('create month ', to_char(event_sequence.update_date, 'month')) iLIKE %s
+                                OR concat('create day ', EXTRACT(DAY FROM event_sequence.update_date)) iLIKE %s
+                                OR concat('create day ', to_char(event_sequence.update_date, 'day')) iLIKE %s
+                                OR concat('update year ', EXTRACT(YEAR FROM event_sequence.update_date)) iLIKE %s
+                                OR concat('update month ', EXTRACT(MONTH FROM event_sequence.update_date)) iLIKE %s
+                                OR concat('update month ', to_char(event_sequence.update_date, 'month')) iLIKE %s
+                                OR concat('update day ', EXTRACT(DAY FROM event_sequence.update_date)) iLIKE %s
+                                OR concat('update day ', to_char(event_sequence.update_date, 'day')) iLIKE %s
+                            )
+                        GROUP BY
+                            event_sequence.id,
+                            event_invite_2.invite_status,
+                            event_sequence.create_date,
+                            event_2.event_name,
+                            event_2.event_type,
+                            event_2.event_description,
+                            member.id,
+                            member.first_name,
+                            member.last_name,
+                            member.email,
+                            file_storage_engine.storage_engine_id
+                    UNION ALL
+                        SELECT
+                            file_share.id as id,
+                            create_user.first_name as first_name,
+                            create_user.last_name as last_name,
+                            create_user.email as email,
+                            '' as status,
+                            member_file.file_name as file_name,
+                            0 as requester_contact_id,
+                            file_share.create_date as create_date,
+                            file_share.update_date as update_date,
+                            'drive_share' as invitation_type,
+                            '' as event_name,
+                            '' as event_type,
+                            '' as event_description,
+                            file_storage_engine.storage_engine_id,
+                            create_user.id as create_user_id,
+                            file.storage_engine_id as file_url,
+                            '{empty_obj}'::json AS host_member_info,
+                            '{empty_obj}'::json AS invitations
+                        FROM member
+                            INNER JOIN file_tree on member.main_file_tree = file_tree.id
+                            INNER JOIN file_tree_item on file_tree.id = file_tree_item.file_tree_id
+                            INNER JOIN file_share on file_share.target_node = file_tree_item.id
+                            INNER JOIN member_file on member_file.id = file_tree_item.member_file_id
+                            INNER JOIN member create_user ON member_file.member_id = create_user.id
+                            LEFT JOIN member_profile ON create_user.id = member_profile.member_id
+                            LEFT JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
+                            LEFT JOIN file_storage_engine file on file.id = member_file.file_id
+                        WHERE
+                            member.id = %s
+                            AND
+                            (
+                                concat_ws(' ', create_user.first_name, create_user.last_name) iLIKE %s
+                                OR concat('create year ', EXTRACT(YEAR FROM file_share.update_date)) iLIKE %s
+                                OR concat('create month ', EXTRACT(MONTH FROM file_share.update_date)) iLIKE %s
+                                OR concat('create month ', to_char(file_share.update_date, 'month')) iLIKE %s
+                                OR concat('create day ', EXTRACT(DAY FROM file_share.update_date)) iLIKE %s
+                                OR concat('create day ', to_char(file_share.update_date, 'day')) iLIKE %s
+                                OR concat('update year ', EXTRACT(YEAR FROM file_share.update_date)) iLIKE %s
+                                OR concat('update month ', EXTRACT(MONTH FROM file_share.update_date)) iLIKE %s
+                                OR concat('update month ', to_char(file_share.update_date, 'month')) iLIKE %s
+                                OR concat('update day ', EXTRACT(DAY FROM file_share.update_date)) iLIKE %s
+                                OR concat('update day ', to_char(file_share.update_date, 'day')) iLIKE %s
+                            )
+                    ) as results
+                ORDER BY {sort_columns_string}
+            """
+
+            like_search_key = f"%{search_key}%"
+            params = (member_id,) + (like_search_key,)*11
+            params = params * 3
+
+            countQuery = f"SELECT COUNT(*) FROM ({query}) src"
+
+            cls.source.execute(countQuery, params)
+
+            count = 0
+            if cls.source.has_results():
+                (count,) = cls.source.cursor.fetchone()
+
+            if page_size and page_number >= 0:
+                query += "LIMIT %s OFFSET %s"
+                offset = 0
+                if page_number > 0:
+                    offset = page_number * page_size
+                params = params + (page_size, offset)
+
+            cls.source.execute(query, params)
+            if cls.source.has_results():
+                for (
+                        id,
+                        first_name,
+                        last_name,
+                        email,
+                        status,
+                        file_name,
+                        requester_contact_id,
+                        create_date,
+                        update_date,
+                        invitation_type,
+                        event_name,
+                        event_type,
+                        event_description,
+                        row_id,
+                        storage_engine_id,
+                        create_user_id,
+                        file_url,
+                        host_member_info,
+                        invitations
+                ) in cls.source.cursor:
+                    activity = {
+                        "id": id,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "email": email,
+                        "status": status,
+                        "file_name": file_name,
+                        "requester_contact_id": requester_contact_id,
+                        "create_date": create_date,
+                        "update_date": update_date,
+                        "invitation_type": invitation_type,
+                        "event_name": event_name,
+                        "event_type": event_type,
+                        "event_description": event_description,
+                        "row_id": row_id,
+                        "amera_avatar_url": amerize_url(storage_engine_id),
+                        "create_user_id": create_user_id,
+                        "file_url": amerize_url(file_url),
+                        "host_member_info": host_member_info,
+                        "invitations": invitations
+                    }
+                    activities.append(activity)
+
+            return {
+                'invitations' : activities,
+                'count': count
+            }
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            return None
+
+
+    @classmethod
+    def get_group_invitations_by_member_id(cls, member_id, is_history=False, search_key='', page_size=None, page_number=None, sort_params=''):
+        try:
+            invitations = list()
+            sort_columns_string = 'update_date DESC'
+            invitation_dict = {
+                "id": "id",
+                "status": "status",
+                "name": "name",
+                "event_type": "event_type",
+                "first_name": "first_name",
+                "last_name": "last_name",
+                "email": "email",
+                "storage_engine_id": "storage_engine_id",
+                "create_user_id": "create_user_id",
+                "description": "description",
+                "group_id": "group_id",
+                "group_name": "group_name",
+                "group_info": "group_info",
+                "create_date": "create_date",
+                "update_date": "update_date"
+            }
+
+            if sort_params:
+                sort_columns_string = cls.formatSortingParams(
+                    sort_params, invitation_dict) or sort_columns_string
+            
+            invited= " AND member_group_membership.status in ('invited', 'active', 'declined')"
+            if not is_history:
+                invited = " AND member_group_membership.status = 'invited'"
+
+            query = f"""
+                SELECT id, status, event_name, event_type, first_name, last_name, email,
+                        storage_engine_id, create_user_id, event_description, group_id,
+                        group_name, group_info, create_date, update_date, invitation_type,
+                        row_number() OVER (ORDER BY {sort_columns_string}) AS row_id
+                FROM (
+                        SELECT
+                            member_group.id as id,
+                            member_group_membership.status::text as status,
+                            '' as event_name,
+                            '' as event_type,
+                            member.first_name as first_name,
+                            member.last_name as last_name,
+                            member.email as email,
+                            file_storage_engine.storage_engine_id as storage_engine_id,
+                            member.id as create_user_id,
+                            '' as event_description,
+                            member_group.id as group_id,
+                            member_group.group_name as group_name,
+                            jsonb_build_object(
+                                'group_id', member_group.id,
+                                'group_name', member_group.group_name,
+                                'group_leader_id', member_group.group_leader_id
+                            ) AS group_info,
+                            member_group_membership.create_date as create_date,
+                            member_group_membership.update_date as update_date,
+                            'group_invitation' as invitation_type 
+                        FROM member_group_membership
+                            INNER JOIN member_group on member_group_membership.group_id = member_group.id
+                            INNER JOIN member ON member_group.group_leader_id = member.id
+                            LEFT JOIN member_profile ON member.id = member_profile.member_id
+                            LEFT JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
+                        WHERE
+                            member_group_membership.member_id = %s 
+                            {invited}
+                            AND
+                            (
+                                concat_ws(' ', member.first_name, member.last_name) iLIKE %s
+                                OR concat('create year ', EXTRACT(YEAR FROM member_group_membership.create_date)) iLIKE %s
+                                OR concat('create month ', EXTRACT(MONTH FROM member_group_membership.create_date)) iLIKE %s
+                                OR concat('create month ', to_char(member_group_membership.create_date, 'month')) iLIKE %s
+                                OR concat('create day ', EXTRACT(DAY FROM member_group_membership.create_date)) iLIKE %s
+                                OR concat('create day ', to_char(member_group_membership.create_date, 'day')) iLIKE %s
+                                OR concat('update year ', EXTRACT(YEAR FROM member_group_membership.update_date)) iLIKE %s
+                                OR concat('update month ', EXTRACT(MONTH FROM member_group_membership.update_date)) iLIKE %s
+                                OR concat('update month ', to_char(member_group_membership.update_date, 'month')) iLIKE %s
+                                OR concat('update day ', EXTRACT(DAY FROM member_group_membership.update_date)) iLIKE %s
+                                OR concat('update day ', to_char(member_group_membership.update_date, 'day')) iLIKE %s
+                            )
+                    UNION
+                        SELECT
+                            event_invite_2.id as id,
+                            event_invite_2.invite_status::text as status,
+                            event_2.event_name as event_name,
+                            event_2.event_type::text as event_type,
+                            member.first_name as first_name,
+                            member.last_name as last_name,
+                            member.email as email, 
+                            file_storage_engine.storage_engine_id as storage_engine_id,
+                            member.id as create_user_id,
+                            event_2.event_description as event_description,
+                            member_group.id as group_id,
+                            member_group.group_name as group_name,
+                            jsonb_build_object(
+                                'group_id', member_group.id,
+                                'group_name', member_group.group_name,
+                                'group_leader_id', member_group.group_leader_id
+                            ) AS group_info,
+                            event_invite_2.create_date as create_date,
+                            event_invite_2.update_date as update_date,
+                            'event_invitation' as invitation_type 
+                        FROM event_invite_2
+                        INNER JOIN event_2 on event_invite_2.event_id = event_2.id
+                        INNER JOIN member_group ON event_2.group_id = member_group.id
+                        INNER JOIN member ON event_2.host_member_id = member.id
+                        LEFT JOIN member_profile ON member.id = member_profile.member_id
+                        LEFT JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
+                        WHERE
+                            event_invite_2.invite_member_id = %s AND event_2.event_status='Active'
+                            AND
+                            (
+                                concat_ws(' ', member.first_name, member.last_name) iLIKE %s
+                                OR concat('create year ', EXTRACT(YEAR FROM event_invite_2.create_date)) iLIKE %s
+                                OR concat('create month ', EXTRACT(MONTH FROM event_invite_2.create_date)) iLIKE %s
+                                OR concat('create month ', to_char(event_invite_2.create_date, 'month')) iLIKE %s
+                                OR concat('create day ', EXTRACT(DAY FROM event_invite_2.create_date)) iLIKE %s
+                                OR concat('create day ', to_char(event_invite_2.create_date, 'day')) iLIKE %s
+                                OR concat('update year ', EXTRACT(YEAR FROM event_invite_2.update_date)) iLIKE %s
+                                OR concat('update month ', EXTRACT(MONTH FROM event_invite_2.update_date)) iLIKE %s
+                                OR concat('update month ', to_char(event_invite_2.update_date, 'month')) iLIKE %s
+                                OR concat('update day ', EXTRACT(DAY FROM event_invite_2.update_date)) iLIKE %s
+                                OR concat('update day ', to_char(event_invite_2.update_date, 'day')) iLIKE %s
+                            )
+                ) as results
+                ORDER BY {sort_columns_string}
+            """
+
+            like_search_key = f"%{search_key}%"
+            params = (member_id,) + (like_search_key,)*11
+            params = params * 2
+
+            countQuery = f"SELECT COUNT(*) FROM ({query}) src"
+
+            cls.source.execute(countQuery, params)
+
+            count = 0
+            if cls.source.has_results():
+                (count,) = cls.source.cursor.fetchone()
+
+            if page_size and page_number >= 0:
+                query += "LIMIT %s OFFSET %s"
+                offset = 0
+                if page_number > 0:
+                    offset = page_number * page_size
+                params = params + (page_size, offset)
+
+            cls.source.execute(query, params)
+            if cls.source.has_results():
+                for (
+                        id,
+                        status,
+                        event_name,
+                        event_type,
+                        first_name,
+                        last_name,
+                        email,
+                        storage_engine_id,
+                        create_user_id,
+                        event_description,
+                        group_id,
+                        group_name,
+                        group_info,
+                        create_date,
+                        update_date,
+                        invitation_type,
+                        row_id
+                ) in cls.source.cursor:
+                    invitation = {
+                        "id": id,
+                        "status": status,
+                        "event_name": event_name,
+                        "event_type": event_type,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "email": email,
+                        "amera_avatar_url": amerize_url(storage_engine_id),
+                        "create_user_id": create_user_id,
+                        "event_description": event_description,
+                        "group_id": group_id,
+                        "group_name": group_name,
+                        "group_info": group_info,
+                        "create_date": create_date,
+                        "update_date": update_date,
+                        "invitation_type": invitation_type,
+                        "row_id": row_id
+                    }
+                    invitations.append(invitation)
+
+            return {
+                'group_invitations' : invitations,
+                'count': count
+            }
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            return None
+
+    @classmethod 
+    def get_mail_activities_by_member_id(cls, member_id, is_history=False, search_key='', page_size=None, page_number=None, sort_params=''):
+        try:
+            activities = list()
+            sort_columns_string = 'update_date DESC'
+            mail_dict = {
+                "id": "id",
+                "status": "status",
+                "name": "name",
+                "event_type": "event_type",
+                "first_name": "first_name",
+                "last_name": "last_name",
+                "email": "email",
+                "storage_engine_id": "storage_engine_id",
+                "create_user_id": "create_user_id",
+                "description": "description",
+                "group_id": "group_id",
+                "group_name": "group_name",
+                "group_info": "group_info",
+                "create_date": "create_date",
+                "update_date": "update_date"
+            }
+
+            if sort_params:
+                sort_columns_string = cls.formatSortingParams(
+                    sort_params, mail_dict) or sort_columns_string
+            
+            # unread = ""
+            # mail_type = ""
+
+            # if not is_history:
+            #     unread = """ AND xref.read = false AND xref.deleted = false AND xref.owner_member_id <> %s"""
+            #     param_mails = (member_id, member_id)
+
+            # if not is_history:
+            #     unread = " AND xref.status = 'unread'" #for media mails
+
+            # if mail_type:
+            #     mail_type = f" AND head.type = {mail_type}"
+
+            empty_obj = '{}'
+
+            query = f"""
+                        SELECT id, subject, message, message_ts, message_to, message_cc, message_bcc, 
+                            type, media_type, xref_id, status, create_date, update_date, mail_url, email, first_name, 
+                            last_name, sender_id, read, new_mail, deleted, group_id, group_name, s3_avatar_url,
+                            invitation_type, row_number() OVER (ORDER BY {sort_columns_string}) AS row_id
+                        FROM (
+                                SELECT
+                                    head.id as id,
+                                    head.subject as subject,
+                                    body.message,
+                                    head.message_ts::text as message_ts,
+                                    head.message_to,
+                                    head.message_cc,
+                                    head.message_bcc,
+                                    '' as type,
+                                    '' as media_type,
+                                    xref.id as xref_id,
+                                    '' as status,
+                                    head.message_ts as create_date,
+                                    head.message_ts as update_date,
+                                    '' as mail_url,
+                                    member.email as email,
+                                    member.first_name as first_name,
+                                    member.last_name as last_name,
+                                    member.id as sender_id,
+                                    xref.read,
+                                    xref.new_mail,
+                                    xref.deleted,
+                                    -1 as group_id,
+                                    '' as group_name,
+                                    file_path(file_storage_engine.storage_engine_id, '/member/file') as s3_avatar_url,
+                                    'text_mail' as invitation_type 
+                                FROM mail_header as head
+                                INNER JOIN mail_xref xref on head.id = xref.mail_header_id
+                                INNER JOIN mail_body body on head.id = body.mail_header_id
+                                INNER JOIN member member on member.id = xref.owner_member_id
+                                LEFT OUTER JOIN member_profile profile on member.id = profile.member_id
+                                LEFT OUTER JOIN file_storage_engine on file_storage_engine.id = profile.profile_picture_storage_id
+                                WHERE
+                                    xref.member_id = %s
+                                    AND
+                                    (
+                                        concat_ws(' ', member.first_name, member.last_name) iLIKE %s
+                                        OR concat('create year ', EXTRACT(YEAR FROM head.message_ts)) iLIKE %s
+                                        OR concat('create month ', EXTRACT(MONTH FROM head.message_ts)) iLIKE %s
+                                        OR concat('create month ', to_char(head.message_ts, 'month')) iLIKE %s
+                                        OR concat('create day ', EXTRACT(DAY FROM head.message_ts)) iLIKE %s
+                                        OR concat('create day ', to_char(head.message_ts, 'day')) iLIKE %s
+                                        OR concat('update year ', EXTRACT(YEAR FROM head.message_ts)) iLIKE %s
+                                        OR concat('update month ', EXTRACT(MONTH FROM head.message_ts)) iLIKE %s
+                                        OR concat('update month ', to_char(head.message_ts, 'month')) iLIKE %s
+                                        OR concat('update day ', EXTRACT(DAY FROM head.message_ts)) iLIKE %s
+                                        OR concat('update day ', to_char(head.message_ts, 'day')) iLIKE %s
+                                    )
+                            UNION
+                                SELECT
+                                    head.id as id,
+                                    head.subject as subject,
+                                    '' as message,
+                                    '' as message_ts,
+                                    '{empty_obj}'::jsonb as message_to,
+                                    '{empty_obj}'::jsonb as message_cc,
+                                    '{empty_obj}'::jsonb as message_bcc,
+                                    head.type::text as type,
+                                    head.media_type::text as media_type,
+                                    xref.id as xref_id,
+                                    xref.status::text AS status,
+                                    head.create_date as create_date,
+                                    head.update_date as update_date,
+                                    mail_storage.storage_engine_id as mail_url,
+                                    member.email as email,
+                                    member.first_name as first_name,
+                                    member.last_name as last_name,
+                                    member.id as sender_id,
+                                    false as read,
+                                    false as new_mail,
+                                    false as deleted,
+                                    member_group.id as group_id,
+                                    member_group.group_name,
+                                    file_storage_engine.storage_engine_id as s3_avatar_url,
+                                    'media_mail' as invitation_type
+                                FROM video_mail as head
+                                INNER JOIN  file_storage_engine mail_storage on mail_storage.id = head.video_storage_id
+                                INNER JOIN video_mail_xref xref on head.id = xref.video_mail_id
+                                INNER JOIN member member on member.id = head.message_from
+                                LEFT OUTER JOIN member_profile profile on member.id = profile.member_id
+                                LEFT OUTER JOIN file_storage_engine on file_storage_engine.id = profile.profile_picture_storage_id
+                                LEFT OUTER JOIN member_group on member_group.id = head.group_id
+                                WHERE
+                                    xref.member_id = %s
+                                    AND
+                                    (
+                                        concat_ws(' ', member.first_name, member.last_name) iLIKE %s
+                                        OR concat('create year ', EXTRACT(YEAR FROM head.create_date)) iLIKE %s
+                                        OR concat('create month ', EXTRACT(MONTH FROM head.create_date)) iLIKE %s
+                                        OR concat('create month ', to_char(head.create_date, 'month')) iLIKE %s
+                                        OR concat('create day ', EXTRACT(DAY FROM head.create_date)) iLIKE %s
+                                        OR concat('create day ', to_char(head.create_date, 'day')) iLIKE %s
+                                        OR concat('update year ', EXTRACT(YEAR FROM head.update_date)) iLIKE %s
+                                        OR concat('update month ', EXTRACT(MONTH FROM head.update_date)) iLIKE %s
+                                        OR concat('update month ', to_char(head.update_date, 'month')) iLIKE %s
+                                        OR concat('update day ', EXTRACT(DAY FROM head.update_date)) iLIKE %s
+                                        OR concat('update day ', to_char(head.update_date, 'day')) iLIKE %s
+                                    )
+                        ) as results
+                        ORDER BY {sort_columns_string}
+                    """
+
+            like_search_key = f"%{search_key}%"
+            params = (member_id,) + (like_search_key,)*11
+            params = params * 2
+
+            countQuery = f"SELECT COUNT(*) FROM ({query}) src"
+
+            cls.source.execute(countQuery, params)
+
+            count = 0
+            if cls.source.has_results():
+                (count,) = cls.source.cursor.fetchone()
+
+            if page_size and page_number >= 0:
+                query += "LIMIT %s OFFSET %s"
+                offset = 0
+                if page_number > 0:
+                    offset = page_number * page_size
+                params = params + (page_size, offset)
+
+            cls.source.execute(query, params)
+            if cls.source.has_results():
+                for (
+                        id,
+                        subject,
+                        message,
+                        message_ts,
+                        message_to,
+                        message_cc,
+                        message_bcc,
+                        type,
+                        media_type,
+                        xref_id,
+                        status,
+                        create_date,
+                        update_date,
+                        mail_url,
+                        email,
+                        first_name,
+                        last_name,
+                        sender_id,
+                        read,
+                        new_mail,
+                        deleted,
+                        group_id,
+                        group_name,
+                        s3_avatar_url,
+                        invitation_type,
+                        row_id
+                ) in cls.source.cursor: 
+                    activity = { 
+                        "id"             : id,
+                        "subject"        : subject,
+                        "message"        : message,
+                        "message_ts"     : message_ts,
+                        "message_to"     : message_to,
+                        "message_cc"     : message_cc,
+                        "message_bcc"    : message_bcc,
+                        "type"           : type,
+                        "media_type"     : media_type,
+                        "xref_id"        : xref_id,
+                        "status"         : status,
+                        "create_date"    : create_date,
+                        "update_date"    : update_date,
+                        "mail_url"       : mail_url,
+                        "email"          : email,
+                        "first_name"     : first_name,
+                        "last_name"      : last_name,
+                        "sender_id"      : sender_id,
+                        "read"           : read,
+                        "new_mail"       : new_mail,
+                        "deleted"        : deleted,
+                        "group_id"       : group_id,
+                        "group_name"     : group_name,
+                        "s3_avatar_url"  : s3_avatar_url,
+                        "invitation_type": invitation_type,
+                        "row_id"         : row_id
+                    } 
+                    activities.append(activity)
+
+            return {
+                'activities' : activities,
+                'count': count
+            }
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            return None

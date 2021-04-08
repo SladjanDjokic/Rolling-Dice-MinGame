@@ -8,8 +8,7 @@ from app.da.session import SessionDA
 from app.da.mail import MailServiceDA
 from app.da.group import GroupDA
 from app.da.member_event import MemberEventDA
-from app.da.file_sharing import ShareFileDA
-from app.da.member import MemberContactDA, MemberVideoMailDA
+from app.da.member import MemberVideoMailDA
 from app import settings
 
 from operator import itemgetter
@@ -67,7 +66,7 @@ class SystemActivitySessionResource(SystemActivityBaseResource):
             resp.body = json.dumps({
                 "success": True,
                 "description": "Activity result fetched sucessfully",
-                "activities": result
+                "data": result
             }, default_parser=json.parser)
         except Exception as err:
             resp.body = json.dumps({
@@ -97,7 +96,7 @@ class SystemActivitySecurityResource(SystemActivityBaseResource):
             resp.body = json.dumps({
                 "success": True,
                 "description": "Security result fetched sucessfully",
-                "security": result
+                "data": result
             }, default_parser=json.parser)
         except Exception as err:
             resp.body = json.dumps({
@@ -122,13 +121,25 @@ class SystemActivityMessageResource(SystemActivityBaseResource):
     def on_get(self, req, resp):
         try:
             session = self._parse_session(req, resp)
-            text_mails = MailServiceDA.get_all_text_mails(session["member_id"], is_history=True)
-            media_mails = MemberVideoMailDA.get_all_media_mails(session["member_id"], is_history=True)
-            result = text_mails + media_mails
+            (search_key, page_size, page_number, sort_params, get_all) = self._parse_params(req, resp)
+
+            result = ActivityDA.get_mail_activities_by_member_id(session["member_id"], is_history=True, search_key=search_key, page_size=page_size, page_number=page_number, sort_params=sort_params)
+            
+            # session = self._parse_session(req, resp)
+            # text_mails = MailServiceDA.get_all_text_mails(session["member_id"], is_history=True)
+            # media_mails = MemberVideoMailDA.get_all_media_mails(session["member_id"], is_history=True)
+
+            # all_mails = text_mails['mails'] + media_mails['mails']
+            # total_count = text_mails['count'] + media_mails['count']
+            # data = {
+            #     "mails": all_mails,
+            #     "count": total_count
+            # }
+            
             resp.body = json.dumps({
                 "success": True,
                 "description": "Message result fetched sucessfully",
-                "message": result
+                "data": result
             }, default_parser=json.parser)
         except Exception as err:
             resp.body = json.dumps({
@@ -153,13 +164,23 @@ class SystemActivityGroupResource(SystemActivityBaseResource):
     def on_get(self, req, resp):
         try:
             session = self._parse_session(req, resp)
-            group_invitations = GroupDA.get_all_group_invitations_by_member_id(session["member_id"], is_history=True)
-            event_group_invitations = MemberEventDA.get_all_group_event_invitations_by_member_id(session["member_id"])
-            result = group_invitations + event_group_invitations
+            (search_key, page_size, page_number, sort_params, get_all) = self._parse_params(req, resp)
+
+            result = ActivityDA.get_group_invitations_by_member_id(session["member_id"], is_history=True, search_key=search_key, page_size=page_size, page_number=page_number, sort_params=sort_params)
+
+            # group_invitations = GroupDA.get_all_group_invitations_by_member_id(session["member_id"], is_history=True)
+            # event_group_invitations = MemberEventDA.get_all_group_event_invitations_by_member_id(session["member_id"])
+            # invitations = group_invitations['groups'] + event_group_invitations['groups']
+            # total_count = group_invitations['count'] + event_group_invitations['count']
+
+            # data = {
+            #     "invitations": invitations,
+            #     "count": total_count
+            # }
             resp.body = json.dumps({
                 "success": True,
                 "description": "Group result fetched sucessfully",
-                "group": result
+                "data": result
             }, default_parser=json.parser)
         except Exception as err:
             resp.body = json.dumps({
@@ -184,17 +205,24 @@ class SystemActivityInvitationsResource(SystemActivityBaseResource):
     def on_get(self, req, resp):
         try:
             session = self._parse_session(req, resp)
+            (search_key, page_size, page_number, sort_params, get_all) = self._parse_params(req, resp)
+            
+            result = ActivityDA.get_invitations_by_member_id(session["member_id"], is_history=True, search_key=search_key, page_size=page_size, page_number=page_number, sort_params=sort_params)
+
             # contact invitation
-            contact_invitations = MemberContactDA.get_all_contact_invitations_by_member_id(session["member_id"], is_history=True)
-            # event invite get_all_event_invitations_by_member_id
-            event_invitations = MemberEventDA.get_all_event_invitations_by_member_id(session["member_id"])
-            # drive files get_all_file_share_invitations_by_member_id
-            drive_sharing = ShareFileDA.get_all_file_share_invitations_by_member_id(session["member_id"])
-            result = contact_invitations + event_invitations + drive_sharing
+            # contact_invitations = MemberContactDA.get_all_contact_invitations_by_member_id(session["member_id"], is_history=True, search_key=search_key, page_size=page_size, page_number=page_number, sort_params=sort_params)
+            # # event invite get_all_event_invitations_by_member_id
+            # event_invitations = MemberEventDA.get_all_event_invitations_by_member_id(session["member_id"])
+            # # drive files get_all_file_share_invitations_by_member_id
+            # drive_sharing = ShareFileDA.get_all_file_share_invitations_by_member_id(session["member_id"])
+            
+            # invitations = contact_invitations["contacts"] + event_invitations["events"] + drive_sharing["files"]
+            # total_count = contact_invitations["count"] + event_invitations["count"] + event_invitations["count"]
+            
             resp.body = json.dumps({
                 "success": True,
                 "description": "Invitations result fetched sucessfully",
-                "invitation": result
+                "data": result
             }, default_parser=json.parser)
         except Exception as err:
             resp.body = json.dumps({

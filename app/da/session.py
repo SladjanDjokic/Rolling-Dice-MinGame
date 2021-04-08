@@ -725,7 +725,8 @@ class SessionDA(object):
                 member_session.remote_postal_code,
                 member_session.remote_timezone_name,
                 member_session.remote_country_code_2,
-                member_session.remote_region_code
+                member_session.remote_region_code,
+                session_id as row_id
             FROM member_session
                 LEFT JOIN member on member_session.member_id = member.id
             WHERE
@@ -757,7 +758,7 @@ class SessionDA(object):
         if cls.source.has_results():
             (count,) = cls.source.cursor.fetchone()
 
-        if page_size and page_number:
+        if page_size and page_number >= 0:
             query += """LIMIT %s OFFSET %s"""
             offset = 0
             if page_number > 0:
@@ -794,6 +795,7 @@ class SessionDA(object):
                     remote_timezone_name,
                     remote_country_code_2,
                     remote_region_code,
+                    row_id
             ) in cls.source.cursor:
                 session = {
                     "session_id": session_id,
@@ -821,6 +823,7 @@ class SessionDA(object):
                     "remote_timezone_name": remote_timezone_name,
                     "country_code": remote_country_code_2,
                     "region_code": remote_region_code,
+                    "row_id": row_id
                 }
 
                 sessions.append(session)
@@ -855,6 +858,23 @@ class SessionDA(object):
             sort_columns_string = formatSortingParams(
                 sort_params, session_dict) or sort_columns_string
 
+        query_condition = f"""
+            LEFT JOIN member on member_session.member_id = member.id
+            WHERE
+                (
+                    {f"member_session.member_id = {member_id} AND " if not get_all else ""}
+                    jsonb_extract_path(ipregistry_response, 'security') -> 'is_threat' = 'true' AND
+                    (
+                        member.username LIKE %s
+                        OR
+                        member.first_name LIKE %s
+                        OR
+                        member.last_name LIKE %s
+                        OR
+                        member.email LIKE %s
+                    )
+                )
+        """
         query = (f"""
             SELECT
                 session_id,
@@ -880,23 +900,10 @@ class SessionDA(object):
                 member_session.remote_postal_code,
                 member_session.remote_timezone_name,
                 member_session.remote_country_code_2,
-                member_session.remote_region_code
+                member_session.remote_region_code,
+                session_id as row_id
             FROM member_session
-                LEFT JOIN member on member_session.member_id = member.id
-            WHERE
-                (
-                    {f"member_session.member_id = {member_id} AND " if not get_all else ""}
-                    jsonb_extract_path(ipregistry_response, 'security') -> 'is_threat' = 'true' AND
-                    (
-                        member.username LIKE %s
-                        OR
-                        member.first_name LIKE %s
-                        OR
-                        member.last_name LIKE %s
-                        OR
-                        member.email LIKE %s
-                    )
-                )
+            {query_condition}
             ORDER BY {sort_columns_string}
             """)
 
@@ -904,13 +911,8 @@ class SessionDA(object):
             SELECT
                 COUNT(*)
             FROM member_session
-            WHERE
-                {f"member_id = {member_id} AND" if not get_all else ""}
-                ( username LIKE %s
-                OR first_name LIKE %s
-                OR last_name LIKE %s
-                OR email LIKE %s )
-            """
+            {query_condition}
+        """
 
         like_search_key = """%{}%""".format(search_key)
         params = tuple(4 * [like_search_key])
@@ -920,7 +922,7 @@ class SessionDA(object):
         if cls.source.has_results():
             (count,) = cls.source.cursor.fetchone()
 
-        if page_size and page_number:
+        if page_size and page_number >= 0:
             query += """LIMIT %s OFFSET %s"""
             offset = 0
             if page_number > 0:
@@ -957,6 +959,7 @@ class SessionDA(object):
                     remote_timezone_name,
                     remote_country_code_2,
                     remote_region_code,
+                    row_id
             ) in cls.source.cursor:
                 session = {
                     "session_id": session_id,
@@ -984,6 +987,7 @@ class SessionDA(object):
                     "remote_timezone_name": remote_timezone_name,
                     "country_code": remote_country_code_2,
                     "region_code": remote_region_code,
+                    "row_id": row_id
                 }
 
                 sessions.append(session)
