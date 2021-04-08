@@ -457,8 +457,9 @@ class MemberDA(object):
             page_type = page_setting['page_type']
             view_type = page_setting['view_type']
             sort_order = page_setting['sort_order']
-            
-            cls.source.execute(query_member_page_settings, (id, page_type, view_type, sort_order))
+
+            cls.source.execute(query_member_page_settings,
+                               (id, page_type, view_type, sort_order))
 
         if commit:
             cls.source.commit()
@@ -801,6 +802,26 @@ class MemberDA(object):
         cls.source.execute(query, params)
         cls.source.commit()
         return True
+
+    @classmethod
+    def get_all_skills(cls,):
+        query = ("""
+            SELECT json_agg(rows)
+            FROM (
+                SELECT DISTINCT ON (name)
+                    id,
+                    name
+                FROM profile_skill
+                WHERE display_status = TRUE
+                ORDER BY name
+            ) AS rows
+        """)
+        params = ()
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        else:
+            return None
 
     @classmethod
     def _get_all_members(cls):
@@ -2116,6 +2137,175 @@ class MemberInfoDA(object):
             return True
         except:
             pass
+
+    @classmethod
+    def get_member_skills(cls, member_id):
+        query = ("""
+            SELECT ARRAY(
+                SELECT profile_skill_id FROM member_skill WHERE member_id =%s
+            )
+        """)
+        cls.source.execute(query, (member_id,))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        return []
+
+    @classmethod
+    def add_skill(cls, member_id, skill_id):
+        query = ("""
+            INSERT INTO member_skill (member_id, profile_skill_id)
+            VALUES (%s, %s)
+        """)
+        params = (member_id, skill_id)
+        cls.source.execute(query, params)
+        cls.source.commit()
+
+    @classmethod
+    def unlist_skill(cls, member_id, skill_id):
+        query = ("""
+            DELETE FROM member_skill
+            WHERE member_id = %s AND profile_skill_id = %s
+        """)
+        params = (member_id, skill_id)
+        cls.source.execute(query, params)
+        cls.source.commit()
+
+    @classmethod
+    def get_all_work_ids(cls, member_id):
+        query = ("""
+            SELECT ARRAY(
+                SELECT id FROM member_workhistory WHERE member_id = %s
+            )    
+        """)
+        cls.source.execute(query, (member_id,))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        return []
+
+    @classmethod
+    def create_work_record(cls, params):
+        query = ("""
+            INSERT INTO member_workhistory (member_id, job_title, employment_type, company_id, company_name, company_location, start_date, end_date)
+            VALUES (%(member_id)s, %(job_title)s, %(employment_type)s, %(company_id)s, %(company_name)s, %(company_location)s, %(start_date)s, %(end_date)s)
+            RETURNING id;
+        """)
+        cls.source.execute(query, params)
+        cls.source.commit()
+
+    @classmethod
+    def update_work_record(cls, params):
+        query = ("""
+            UPDATE member_workhistory
+            SET job_title = %(job_title)s,
+                employment_type=%(employment_type)s,
+                company_id=%(company_id)s,
+                company_name=%(company_name)s,
+                company_location=%(company_location)s,
+                start_date=%(start_date)s,
+                end_date=%(end_date)s
+            WHERE id = %(id)s
+        """)
+        cls.source.execute(query, params)
+        cls.source.commit()
+
+    @classmethod
+    def delete_work_record(cls, id):
+        query = ("""
+            DELETE FROM member_workhistory WHERE id=%s
+        """)
+        params = (id,)
+        cls.source.execute(query, params)
+        cls.source.commit()
+
+    @classmethod
+    def get_all_education_ids(cls, member_id):
+        query = ("""
+            SELECT ARRAY(
+                SELECT id FROM member_education WHERE member_id = %s
+            )
+        """)
+        cls.source.execute(query, (member_id,))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        return []
+
+    @classmethod
+    def create_education_record(cls, params):
+        query = ("""
+            INSERT INTO member_education (member_id, school_name, school_location, degree, field_of_study, start_date, end_date, activity_text) 
+            VALUES (%(member_id)s, %(school_name)s, %(school_location)s, %(degree)s, %(field_of_study)s, %(start_date)s, %(end_date)s, %(activity_text)s)
+            RETURNING id;
+        """)
+        cls.source.execute(query, params)
+        cls.source.commit()
+
+    @classmethod
+    def update_education_record(cls, params):
+        query = ("""
+            UPDATE member_education
+            SET school_name= %(school_name)s,
+                school_location = %(school_location)s, 
+                degree = %(degree)s, 
+                field_of_study = %(field_of_study)s, 
+                start_date = %(start_date)s, 
+                end_date = %(end_date)s, 
+                activity_text = %(activity_text)s
+            WHERE id = %(id)s
+        """)
+        cls.source.execute(query, params)
+        cls.source.commit()
+
+    @classmethod
+    def delete_education_record(cls, id):
+        query = ("""
+            DELETE FROM member_education WHERE id=%s
+        """)
+        params = (id,)
+        cls.source.execute(query, params)
+        cls.source.commit()
+
+    @classmethod
+    def get_all_certificate_ids(cls, member_id):
+        query = ("""
+            SELECT ARRAY (
+                SELECT id FROM member_certificate WHERE member_id = %s
+            )
+        """)
+        cls.source.execute(query, (member_id,))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        return []
+
+    @classmethod
+    def create_certificate_record(cls, params):
+        query = ("""
+            INSERT INTO member_certificate (member_id, title, description, date_received)
+            VALUES (%(member_id)s, %(title)s, %(description)s, %(date_received)s)
+            RETURNING id
+        """)
+        cls.source.execute(query, params)
+        cls.source.commit()
+
+    @classmethod
+    def update_certificate_record(cls, params):
+        query = ("""
+            UPDATE member_certificate
+                SET title =  %(title)s, 
+                    description = %(description)s, 
+                    date_received = %(date_received)s
+            WHERE id = %(id)s   
+        """)
+        cls.source.execute(query, params)
+        cls.source.commit()
+
+    @classmethod
+    def delete_certificate_record(cls, id):
+        query = (""" 
+            DELETE FROM member_certificate WHERE id=%s
+        """)
+        params = (id,)
+        cls.source.execute(query, params)
+        cls.source.commit()
 
 
 class MemberSettingDA(object):

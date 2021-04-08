@@ -671,14 +671,136 @@ class MemberInfoResource(object):
     def on_put(self, req, resp):
         member_id = req.context.auth["session"]["member_id"]
 
-        (member, member_profile, member_achievement, member_contact_2, member_location, member_rate) = request.get_json_or_form(
-            "member", "member_profile", "member_achievement", "member_contact_2", "member_location", "member_rate", req=req)
+        (member, member_profile, member_achievement, member_contact_2, member_location, member_rate, work, educations, certificates, skills) = request.get_json_or_form(
+            "member", "member_profile", "member_achievement", "member_contact_2", "member_location", "member_rate", "work", "educations", "certificates", "skills", req=req)
 
         updated = MemberInfoDA().update_member_info(member_id,
                                                     member, member_profile, member_achievement, member_contact_2, member_location)
 
         updated = ProjectDA().update_member_default_rate(member_id=member_id,
                                                          pay_rate=member_rate["pay_rate"], currency_code_id=member_rate["currency_code_id"])
+
+        # Skills
+        listed_member_skills = MemberInfoDA.get_member_skills(member_id)
+        new_skills = set(skills) - set(listed_member_skills)
+        to_delete_skills = set(listed_member_skills) - set(skills)
+
+        if len(new_skills) > 0:
+            for s in new_skills:
+                MemberInfoDA.add_skill(member_id, s)
+        if len(to_delete_skills) > 0:
+            for s in to_delete_skills:
+                MemberInfoDA.unlist_skill(member_id, s)
+
+        # Work
+
+        received_record_ids = []
+        if not work:
+            received_record_ids = []
+        if isinstance(work, list):
+            received_record_ids = [w["id"] for w in work]
+
+        listed_work_records_ids = MemberInfoDA.get_all_work_ids(member_id)
+
+        to_add_work_ids = list(set(received_record_ids) -
+                               set(listed_work_records_ids))
+
+        to_delete_work_ids = list(set(
+            listed_work_records_ids) - set(received_record_ids))
+
+        to_update_work_ids = list(
+            set(received_record_ids) & set(listed_work_records_ids))
+
+        logger.info('listed', listed_work_records_ids)
+        logger.info('add', to_add_work_ids)
+        logger.info('delete', to_delete_work_ids)
+        logger.info('update', to_update_work_ids)
+
+        if len(to_add_work_ids) > 0:
+            for wid in to_add_work_ids:
+                wr = [w for w in work if w["id"] == wid][0]
+                logger.info('work_id', wr)
+                MemberInfoDA.create_work_record({"member_id": member_id, "job_title": wr["job_title"], "employment_type": wr["employment_type"], "company_id": None, "company_name": wr[
+                                                "company_name"], "company_location": wr["company_location"], "start_date": wr["start_date"], "end_date": json.convert_null(wr["end_date"])})
+
+        if len(to_delete_work_ids) > 0:
+            for wid in to_delete_work_ids:
+                logger.info('work_id', wid)
+                MemberInfoDA.delete_work_record(wid)
+
+        if len(to_update_work_ids) > 0:
+            for wid in to_update_work_ids:
+                wr = [w for w in work if w["id"] == wid][0]
+                logger.info('work_id', wr)
+                MemberInfoDA.update_work_record({"id": wid, "job_title": wr["job_title"], "employment_type": wr["employment_type"], "company_id": None, "company_name": wr[
+                                                "company_name"], "company_location": wr["company_location"], "start_date": wr["start_date"], "end_date": json.convert_null(wr["end_date"])})
+
+        #  Education
+        received_education_ids = []
+        if not educations:
+            received_education_ids = []
+        if isinstance(educations, list):
+            received_education_ids = [edu["id"] for edu in educations]
+
+        listed_education_ids = MemberInfoDA.get_all_education_ids(member_id)
+
+        to_add_educations_ids = list(set(received_education_ids) -
+                                     set(listed_education_ids))
+
+        to_delete_education_ids = list(set(
+            listed_education_ids) - set(received_education_ids))
+
+        to_update_education_ids = list(
+            set(received_education_ids) & set(listed_education_ids))
+
+        if len(to_add_educations_ids) > 0:
+            for eid in to_add_educations_ids:
+                er = [e for e in educations if e["id"] == eid][0]
+                MemberInfoDA.create_education_record({"member_id": member_id, "school_name": er["school_name"], "school_location": er["school_location"], "degree": er[
+                                                     "degree"], "field_of_study": er["field_of_study"], "start_date": er["start_date"], "activity_text": json.convert_null(er["activity_text"]), "end_date": json.convert_null(er["end_date"])})
+
+        if len(to_delete_education_ids) > 0:
+            for eid in to_delete_education_ids:
+                MemberInfoDA.delete_education_record(eid)
+
+        if len(to_update_education_ids) > 0:
+            for eid in to_update_education_ids:
+                er = [e for e in educations if e["id"] == eid][0]
+                MemberInfoDA.update_education_record({"id": eid, "school_name": er["school_name"], "school_location": er["school_location"], "degree": er["degree"], "field_of_study": er[
+                    "field_of_study"],  "start_date": er["start_date"], "end_date": json.convert_null(er["end_date"]), "activity_text": json.convert_null(er["activity_text"])})
+
+        # Certificates
+        received_certs_ids = []
+        if not certificates:
+            received_certs_ids = []
+        if isinstance(certificates, list):
+            received_certs_ids = [cert["id"] for cert in certificates]
+
+        listed_cert_ids = MemberInfoDA.get_all_certificate_ids(member_id)
+
+        to_add_cert_ids = list(set(received_certs_ids) - set(listed_cert_ids))
+
+        to_delete_cert_ids = list(set(
+            listed_cert_ids) - set(received_certs_ids))
+
+        to_update_cert_ids = list(
+            set(received_certs_ids) & set(listed_cert_ids))
+
+        if len(to_add_cert_ids) > 0:
+            for cid in to_add_cert_ids:
+                cr = [c for c in certificates if c["id"] == cid][0]
+                MemberInfoDA.create_certificate_record(
+                    {"member_id": member_id, "title": cr["title"], "description": cr["description"], "date_received": cr["date_received"]})
+
+        if len(to_delete_cert_ids) > 0:
+            for cid in to_delete_cert_ids:
+                MemberInfoDA.delete_certificate_record(cid)
+
+        if len(to_update_cert_ids) > 0:
+            for cid in to_update_cert_ids:
+                cr = [c for c in certificates if c["id"] == cid][0]
+                MemberInfoDA.update_certificate_record(
+                    {"id": cid, "title": cr["title"], "description": cr["description"], "date_received": cr["date_received"]})
 
         if updated:
             member_info = MemberInfoDA().get_member_info(member_id)
@@ -848,6 +970,25 @@ class MemberTimezones(object):
         else:
             resp.body = json.dumps({
                 "description": "Could not get the terms and conditions",
+                "success": False
+            }, default_parser=json.parser)
+
+
+class MemberSkills(object):
+    auth = {
+        'exempt_methods': ['GET']
+    }
+
+    def on_get(self, req, resp):
+        skills = MemberDA().get_all_skills()
+        if skills:
+            resp.body = json.dumps({
+                "data": skills,
+                "success": True
+            }, default_parser=json.parser)
+        else:
+            resp.body = json.dumps({
+                "description": "Could not get the skills",
                 "success": False
             }, default_parser=json.parser)
 

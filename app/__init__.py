@@ -18,7 +18,7 @@ from app.resources.member import MemberRegisterResource, MemberSearchResource, \
     MemberGroupSearchResource, MemberContactResource, MemberContactAccept, ContactMembersResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms, MemberDepartments, MemberContactsRoles, \
     MemberContactsCompanies, MemberContactsCountries, MemberTimezones, MemberInfoByIdResource, \
-    MemberContactSecurity, MemberSettingResource, MemberVideoMailResource, ContactMembersOtherInvitationsResource
+    MemberContactSecurity, MemberSettingResource, MemberVideoMailResource, ContactMembersOtherInvitationsResource, MemberSkills
 from app.resources.verification import Verification
 from app.resources.verifycell import VerifyCell
 from app.resources.promo_codes import PromoCodes
@@ -206,6 +206,7 @@ def _setup_routes(app):
     app.add_route("/member/register/departments", MemberDepartments())
     app.add_route("/member/register/terms", MemberTerms())
     app.add_route("/member/register/tzlist", MemberTimezones())
+    app.add_route("/member/register/skills", MemberSkills())
     # 2FA of cell during registration
     app.add_route("/member/register/verification", Verification())
     app.add_route("/member/register/verify-cell", VerifyCell())
@@ -426,11 +427,13 @@ def _setup_routes(app):
                   newsfeeds_resource, suffix="post")
 
     # Routes for password manager
-    
+
     password_resource = PasswordResource()
 
-    app.add_route("/password/favicon/{password_id:int}", password_resource, suffix="favicon")
-    app.add_route("/password/{password_id:int}", password_resource, suffix="detail")
+    app.add_route(
+        "/password/favicon/{password_id:int}", password_resource, suffix="favicon")
+    app.add_route("/password/{password_id:int}",
+                  password_resource, suffix="detail")
     app.add_route("/password", password_resource)
 
     # Routes for Chat App

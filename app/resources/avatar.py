@@ -46,7 +46,9 @@ class MemberAvatarResource(object):
     @classmethod
     def on_put(cls, req, resp, member_id):
         avatar = req.get_param("avatar")
-        avatar_storage_id = FileStorageDA().put_file_to_storage(avatar)
+        mime = req.get_param("mime")
+        avatar_storage_id = FileStorageDA().put_file_to_storage(
+            file=avatar, mime_type=mime, member_id=member_id)
 
         success = AvatarDA.update_avatar(avatar_storage_id, member_id)
 
