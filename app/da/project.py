@@ -185,12 +185,7 @@ class ProjectDA(object):
                                 project_member_contract.update_by
                             FROM project_member_contract
                             LEFT JOIN project_member ON project_member.id = project_member_id
-                            WHERE project_member.project_id = project.id AND project_member_contract.id IN (
-                                -- Only contracts that apply to existing tasks
-                                SELECT contract_id
-                                FROM project_element
-                                WHERE project_id = project.id
-                            ) 
+                            WHERE project_member.project_id = project.id
                         ) AS rows
                     ),
                     -- defined tasks
@@ -465,12 +460,7 @@ class ProjectDA(object):
                                 project_member_contract.update_by
                             FROM project_member_contract
                             LEFT JOIN project_member ON project_member.id = project_member_id
-                            WHERE project_member.project_id = project.id AND project_member_contract.id IN (
-                                -- Only contracts that apply to existing tasks
-                                SELECT contract_id
-                                FROM project_element
-                                WHERE project_id = project.id
-                            ) 
+                            WHERE project_member.project_id = project.id
                         ) AS rows
                     ),
                     -- defined tasks
@@ -856,7 +846,7 @@ class ProjectDA(object):
     def insert_element(cls, params):
         query = (f"""
             INSERT INTO project_element (project_id, parent_id, element_type, title, description, contract_id, est_hours, rate_type, create_by, update_by, est_rate, currency_code_id, due_date)
-            VALUES (%(project_id)s, %(parent_id)s, %(element_type)s, %(title)s, %(description)s, %(contract_id)s, {"INTERVAL '%(est_hours)s'" if params["est_hours"] else "%(est_hours)s" }, %(rate_type)s, %(author_id)s, %(author_id)s, %(est_rate)s, %(currency_code_id)s, %(due_date)s)
+            VALUES (%(project_id)s, %(parent_id)s, %(element_type)s, %(title)s, %(description)s, %(contract_id)s, %(est_hours)s, %(rate_type)s, %(author_id)s, %(author_id)s, %(est_rate)s, %(currency_code_id)s, %(due_date)s)
             RETURNING id
         """)
         cls.source.execute(query, params)

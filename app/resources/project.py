@@ -66,6 +66,12 @@ class ProjectResource(object):
                                                                          'member_id': creator_member_id,
                                                                          'privileges': ['approve', 'create', 'view', 'edit']
                                                                          })
+            # Creator gets an active contract
+            default_rate = ProjectDA.get_member_default_rate(creator_member_id)
+            creator_contract_id = ProjectDA.create_contract(
+                {'project_member_id': creator_project_member_id, "pay_rate": default_rate["pay_rate"], "currency_code_id": default_rate["currency_code_id"], "rate_type": "hourly", "author_id": creator_project_member_id})
+            status_updated = ProjectDA.create_contract_status_entry(
+                contract_id=creator_contract_id, contract_status="active", author_id=creator_project_member_id)
 
             owner_project_member_id = creator_project_member_id
             if creator_member_id != owner_member_id:
@@ -73,6 +79,13 @@ class ProjectResource(object):
                                                                            'member_id': owner_member_id,
                                                                            'privileges': ['approve', 'create', 'view', 'edit']
                                                                            })
+                # If the creator aasigns someone else as an owner, he/she gets a regular pending contract
+                default_rate = ProjectDA.get_member_default_rate(
+                    creator_member_id)
+                owner_contract_id = ProjectDA.create_contract(
+                    {'project_member_id': owner_project_member_id, "pay_rate": default_rate["pay_rate"], "currency_code_id": default_rate["currency_code_id"], "rate_type": "hourly", "author_id": creator_project_member_id})
+                status_updated = ProjectDA.create_contract_status_entry(
+                    contract_id=owner_contract_id, contract_status="pending", author_id=creator_project_member_id)
 
             # Assign ownership
             ProjectDA.assign_owner({'project_id': project_id,
@@ -557,8 +570,9 @@ class ProjectResource(object):
                 if contract_id not in ProjectDA.get_active_hourly_contracts_by_project(project_id):
                     raise ContractDoesNotBelongProject
 
+            parsed_est_hours = json.convert_null(est_hours)
             element_id = ProjectDA.insert_element({"project_id": project_id, "parent_id": json.convert_null(parent_id), "element_type": element_type,
-                                                   "title": title, "description": description, "contract_id": json.convert_null(contract_id), "est_hours": json.convert_null(est_hours),  "rate_type": rate_type, "author_id": author_id,
+                                                   "title": title, "description": description, "contract_id": json.convert_null(contract_id), "est_hours": f"{parsed_est_hours} hours" if parsed_est_hours else None,  "rate_type": rate_type, "author_id": author_id,
                                                    "est_rate": None, "currency_code_id": None, "due_date": None})
 
             # Create define status
