@@ -711,10 +711,10 @@ class MemberInfoResource(object):
         to_update_work_ids = list(
             set(received_record_ids) & set(listed_work_records_ids))
 
-        logger.info('listed', listed_work_records_ids)
-        logger.info('add', to_add_work_ids)
-        logger.info('delete', to_delete_work_ids)
-        logger.info('update', to_update_work_ids)
+        logger.info(f'listed {listed_work_records_ids}')
+        logger.info(f'add {to_add_work_ids}')
+        logger.info(f'delete {to_delete_work_ids}')
+        logger.info(f'update {to_update_work_ids}')
 
         if len(to_add_work_ids) > 0:
             for wid in to_add_work_ids:
