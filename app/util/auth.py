@@ -7,7 +7,7 @@ from pprint import pformat
 
 import falcon
 import requests
-from ipregistry import IpregistryClient, DefaultCache, ApiError
+from ipregistry import IpregistryClient, InMemoryCache, ApiError
 
 from app import settings
 from app.da import FileTreeDA
@@ -137,10 +137,11 @@ def create_session(req, resp, member):
      client_name, gateway_name, server_name1, server_ip1,
      server_name2, server_ip2) = request.get_request_client_data(req)
 
-    if client_ip == '127.0.0.1':
-        client_ip = '23.113.176.107'
-    if not client_ip:
-        client_ip = '23.113.176.107'
+    if client_ip == '127.0.0.1' or \
+       client_ip == '172.18.0.1' or \
+       not client_ip:
+        client_ip = '216.58.193.142'
+
 
     ip_info = {
         '_json': {
@@ -163,7 +164,7 @@ def create_session(req, resp, member):
         if not api_key:
             raise Exception('Unable to load a proper key')
         client = IpregistryClient(api_key,
-                                  cache=DefaultCache(maxsize=2048, ttl=600))
+                                  cache=InMemoryCache(maxsize=2048, ttl=600))
         try:
             ip_info = client.lookup(client_ip)
             ip_info = vars(ip_info)

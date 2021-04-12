@@ -49,7 +49,7 @@ watchdog = "*"
 argh = "*"
 certifi = "*"
 avro = "*"
-ipregistry = "*"
+ipregistry = "3.0.0"
 mock = "*"
 numpy = "*"
 falcon-auth2 = {extras = ["async"], version = "*"}

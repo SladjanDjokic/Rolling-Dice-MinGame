@@ -4,7 +4,7 @@ import falcon
 import requests
 import app.util.json as json
 
-from ipregistry import IpregistryClient, DefaultCache
+from ipregistry import IpregistryClient, InMemoryCache
 from ipregistry.model import IpInfo, ApiError
 
 
@@ -76,10 +76,10 @@ class MemberLoginResource(object):
          client_name, gateway_name, server_name1, server_ip1,
          server_name2, server_ip2) = request.get_request_client_data(req)
 
-        if client_ip == '127.0.0.1':
-            client_ip = '23.113.176.107'
-        if not client_ip:
-            client_ip = '23.113.176.107'
+        if client_ip == '127.0.0.1' or \
+           client_ip == '172.18.0.1' or \
+           not client_ip:
+            client_ip = '216.58.193.142'
 
         ip_info = {
             '_json': {
@@ -102,7 +102,7 @@ class MemberLoginResource(object):
             if not api_key:
                 raise Exception('Unable to load a proper key')
             client = IpregistryClient(api_key,
-                cache=DefaultCache(maxsize=2048, ttl=600))
+                cache=InMemoryCache(maxsize=2048, ttl=600))
             try:
                 ip_info = client.lookup(client_ip)
                 ip_info = vars(ip_info)
