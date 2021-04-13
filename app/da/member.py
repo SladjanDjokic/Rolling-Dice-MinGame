@@ -2996,7 +2996,7 @@ class MemberStreamMediaDA(object):
                 INNER JOIN file_storage_engine ON stream_media.stream_file_id = file_storage_engine.id
                 WHERE
                     stream_media.stream_status = 'active' AND
-                    stream_media.member_id = %s AND
+                    -- stream_media.member_id = %s AND
                     (
                         (stream_media.category = %s AND stream_media.type @> %s::text[]) OR
                         (stream_media.category = %s AND stream_media.type @> %s::text[]) OR
