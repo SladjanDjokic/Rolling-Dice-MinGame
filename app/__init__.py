@@ -18,7 +18,8 @@ from app.resources.member import MemberRegisterResource, MemberSearchResource, \
     MemberGroupSearchResource, MemberContactResource, MemberContactAccept, ContactMembersResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms, MemberDepartments, MemberContactsRoles, \
     MemberContactsCompanies, MemberContactsCountries, MemberTimezones, MemberInfoByIdResource, \
-    MemberContactSecurity, MemberSettingResource, MemberVideoMailResource, ContactMembersOtherInvitationsResource, MemberSkills
+    MemberContactSecurity, MemberSettingResource, MemberVideoMailResource, \
+    ContactMembersOtherInvitationsResource, MemberSkills, MemberProduceContent
 from app.resources.verification import Verification
 from app.resources.verifycell import VerifyCell
 from app.resources.promo_codes import PromoCodes
@@ -542,3 +543,8 @@ def _setup_routes(app):
     # trello
     app.add_route("/trello/oauth/login", TrelloLoginResource())
     app.add_route("/trello/auth", TrelloOAuthResource())
+
+    # Streaming
+    produce_content_resource = MemberProduceContent()
+    app.add_route("/member/streaming/upload", produce_content_resource)
+    app.add_route("/member/streaming/videos", produce_content_resource)
