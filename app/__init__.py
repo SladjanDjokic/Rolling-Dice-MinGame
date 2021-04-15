@@ -73,6 +73,8 @@ from app.resources.trelloResource import TrelloOAuthResource
 from app.resources.newsfeeds import NewsFeedsResource
 from app.resources.password import PasswordResource
 
+from app.resources.billing import BillingResource
+
 from app.resources.bug_report import BugReportResource, BugReportUsersResource
 
 from app.resources.admin import AdminMemberResource
@@ -80,6 +82,7 @@ from app.util.request import get_request_host
 from app.util.config import setup_vyper
 from app.util.error import error_handler
 from app.util.logging import setup_logging
+import app.util.stored_procedure as stored_procedure
 
 try:
     imsecure_spec = importlib.util.find_spec(
@@ -145,6 +148,8 @@ def create_app():
     app.add_error_handler(Exception, error_handler)
 
     _setup_routes(app)
+
+    stored_procedure.init_procedures()
 
     return app
 
@@ -437,6 +442,7 @@ def _setup_routes(app):
                   password_resource, suffix="detail")
     app.add_route("/password", password_resource)
 
+
     # Routes for Chat App
     app.add_route("/chat", ChatView())
 
@@ -520,7 +526,7 @@ def _setup_routes(app):
     billing_resource = BillingResource()
 
     app.add_route("/billing/currency", billing_resource, suffix="currency")
-
+    app.add_route("/billing/weekly", billing_resource, suffix="weekly_billing")
     # Admin Resources
     admin_resource = AdminMemberResource()
     app.add_route("/admin/member/{member_id:int}/session/{session_id:uuid}",
