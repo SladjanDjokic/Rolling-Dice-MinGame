@@ -19,7 +19,7 @@ from app.resources.member import MemberRegisterResource, MemberSearchResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms, MemberDepartments, MemberContactsRoles, \
     MemberContactsCompanies, MemberContactsCountries, MemberTimezones, MemberInfoByIdResource, \
     MemberContactSecurity, MemberSettingResource, MemberVideoMailResource, \
-    ContactMembersOtherInvitationsResource, MemberSkills, MemberProduceContent
+    ContactMembersOtherInvitationsResource, MemberSkills, MemberProduceContent, MemberIndustry
 from app.resources.verification import Verification
 from app.resources.verifycell import VerifyCell
 from app.resources.promo_codes import PromoCodes
@@ -213,6 +213,7 @@ def _setup_routes(app):
     app.add_route("/member/register/terms", MemberTerms())
     app.add_route("/member/register/tzlist", MemberTimezones())
     app.add_route("/member/register/skills", MemberSkills())
+    app.add_route("/member/register/industries", MemberIndustry())
     # 2FA of cell during registration
     app.add_route("/member/register/verification", Verification())
     app.add_route("/member/register/verify-cell", VerifyCell())

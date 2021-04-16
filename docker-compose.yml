@@ -248,27 +248,27 @@ services:
       timeout: 1s
       retries: 1000
 
-  amera-signaling:
-    container_name: amera-signaling
-    image: amera-signaling:latest
-    restart: always
-    logging:
-      options:
-        max-size: "500k"
-        max-file: "1"
-    build:
-      context: ../web-signaling/
-      dockerfile: Dockerfile
-    networks:
-      - amera-net
-    ports:
-      - 8080:8080
-    expose:
-      - 8080
-    volumes:
-      - ../web-signaling:/app
-      - demo-signaling-python-packages:/root/.local/share
-    command: ["pipenv", "run", "docker"]
+  # amera-signaling:
+  #   container_name: amera-signaling
+  #   image: amera-signaling:latest
+  #   restart: always
+  #   logging:
+  #     options:
+  #       max-size: "500k"
+  #       max-file: "1"
+  #   build:
+  #     context: ../web-signaling/
+  #     dockerfile: Dockerfile
+  #   networks:
+  #     - amera-net
+  #   ports:
+  #     - 8080:8080
+  #   expose:
+  #     - 8080
+  #   volumes:
+  #     - ../web-signaling:/app
+  #     - demo-signaling-python-packages:/root/.local/share
+  #   command: ["pipenv", "run", "docker"]
 
   amera-eventserver:
     container_name: amera-eventserver
@@ -437,6 +437,8 @@ services:
       - ../web-api/datasource/postgresql/schema-updates-2021-03-31_due_date.sql:/docker-entrypoint-initdb.d/r-3-project_update.sql
       - ../web-api/datasource/postgresql/profile_jobs.sql:/docker-entrypoint-initdb.d/r-profile-jobs.sql
       - ../web-api/datasource/postgresql/profile_mbr_tables.sql:/docker-entrypoint-initdb.d/r-profile-member-tables.sql
+      - ../web-api/datasource/postgresql/company_industry.sql:/docker-entrypoint-initdb.d/s-1-company_industry.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-04-12_drop_company_role_xref.sql:/docker-entrypoint-initdb.d/s-2-drop_xref.sql
       - ../web-api/datasource/postgresql/project_invoice.sql:/docker-entrypoint-initdb.d/r-project_invoice.sql
       - ../web-api/datasource/postgresql/stream_media.sql:/docker-entrypoint-initdb.d/r-stream_media.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-04-09_page_settings-type.sql:/docker-entrypoint-initdb.d/t-1-page_settings-type.sql
@@ -450,12 +452,11 @@ services:
       - ../web-api/datasource/postgresql/test-achievements.dev.sql:/docker-entrypoint-initdb.d/z-6-test-achievements.dev.sql
       - ../web-api/datasource/postgresql/test-fileshare.sql:/docker-entrypoint-initdb.d/z-7-test-fileshare.dev.sql
       - ../web-api/datasource/postgresql/test-event.dev.sql:/docker-entrypoint-initdb.d/z-8-test-event.dev.sql
-      - ../web-api/datasource/postgresql/test-company.dev.sql:/docker-entrypoint-initdb.d/z-9-0-test-company.dev.sql
-      - ../web-api/datasource/postgresql/test-company-role_xref.dev.sql:/docker-entrypoint-initdb.d/z-9-1-test-company-roles.dev.sql
+      - ../web-api/datasource/postgresql/test-profile-data.sql:/docker-entrypoint-initdb.d/z-9-0-test-profile-data.sql
+      - ../web-api/datasource/postgresql/test-company.dev.sql:/docker-entrypoint-initdb.d/z-9-1-test-company.dev.sql
       - ../web-api/datasource/postgresql/test-project.dev.sql:/docker-entrypoint-initdb.d/z-9-2-test-project-dev.sql
       - ../web-api/datasource/postgresql/test-member-contact-2.sql:/docker-entrypoint-initdb.d/z-9-3-test-member-contact-2.sql
       - ../web-api/datasource/postgresql/test-page-settings.sql:/docker-entrypoint-initdb.d/z-9-4-test-page-settings.sql
-      - ../web-api/datasource/postgresql/test-profile-data.sql:/docker-entrypoint-initdb.d/z-9-5-test-profile-data.sql
     environment:
       POSTGRES_DB: ameraiot
       POSTGRES_USER: amera
@@ -714,4 +715,3 @@ volumes:
 networks:
   amera-net:
     name: amera-net
-    

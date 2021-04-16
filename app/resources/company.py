@@ -18,7 +18,7 @@ class CompanyResource(object):
         (name, place_id, address_1, address_2, city,
          state, postal, country_code_id,
          main_phone, primary_url, logo) = request.get_json_or_form(
-            "name", "place_id", "address_1", "address_2", 
+            "name", "place_id", "address_1", "address_2",
             "city", "state", "postal", "country_code_id",
             "main_phone", "primary_url", "logo", req=req)
 
@@ -27,7 +27,7 @@ class CompanyResource(object):
             logo_storage_id = None
             if logo is not None:
                 logo_storage_id = FileStorageDA().put_file_to_storage(logo)
-            
+
             name = None if not name else name
             place_id = None if not place_id else place_id
             address_1 = None if not address_1 else address_1
@@ -39,7 +39,8 @@ class CompanyResource(object):
             main_phone = None if not main_phone else main_phone
             primary_url = None if not primary_url else primary_url
 
-            company_id = CompanyDA().create_company(name, place_id, address_1, address_2, city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id)
+            company_id = CompanyDA().create_company(name, place_id, address_1, address_2,
+                                                    city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id)
 
             company = CompanyDA.get_company(company_id)
             resp.body = json.dumps({
@@ -60,7 +61,8 @@ class CompanyResource(object):
         page_size = req.get_param_as_int('page_size')
         page_number = req.get_param_as_int('page_number')
 
-        data = CompanyDA.get_companies(member_id, sort_params, page_size, page_number)
+        data = CompanyDA.get_companies(
+            member_id, sort_params, page_size, page_number)
         resp.body = json.dumps({
             "data": data,
             "description": "load successfully",
@@ -93,9 +95,9 @@ class CompanyResource(object):
         (name, place_id, address_1, address_2, city,
          state, postal, country_code_id,
          main_phone, primary_url, logo) = request.get_json_or_form(
-          "name", "place_id", "address_1", "address_2",
-          "city", "state", "postal", "country_code_id",
-          "main_phone", "primary_url", "logo", req=req)
+            "name", "place_id", "address_1", "address_2",
+            "city", "state", "postal", "country_code_id",
+            "main_phone", "primary_url", "logo", req=req)
 
         try:
 
@@ -117,7 +119,8 @@ class CompanyResource(object):
             main_phone = None if not main_phone else main_phone
             primary_url = None if not primary_url else primary_url
 
-            CompanyDA().update_company(company_id, name, place_id, address_1, address_2, city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id)
+            CompanyDA().update_company(company_id, name, place_id, address_1, address_2,
+                                       city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id)
             company = CompanyDA.get_company(company_id)
             resp.body = json.dumps({
                 "data": company,
@@ -183,7 +186,8 @@ class CompanyUnregisteredResource(object):
         page_number = req.get_param_as_int('page_number')
 
         try:
-            data = CompanyDA.get_unregistered_company(sort_params, page_size, page_number)
+            data = CompanyDA.get_unregistered_company(
+                sort_params, page_size, page_number)
 
             resp.body = json.dumps({
                 "data": data,

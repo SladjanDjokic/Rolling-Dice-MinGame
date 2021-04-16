@@ -13,207 +13,273 @@ class CompanyDA(object):
     @classmethod
     def get_company(cls, company_id=None):
         query = ("""
-            SELECT
-                company.id,
-                company.name,
-                company.place_id,
-                company.address_1,
-                company.address_2,
-                company.city,
-                company.state,
-                company.postal,
-                company.country_code_id,
-                country_code.name as country,
-                currency_code.id AS currency_code_id,
-                currency_code.currency_code,
-                currency_code.currency_name,
-                company.main_phone,
-                company.primary_url,
-                company.logo_storage_id,
-                file_path(file_storage_engine.storage_engine_id, '/member/file') as s3_logo_url,
-                company.create_date,
-                COALESCE(json_agg(DISTINCT t1.*) FILTER (WHERE t1.id IS NOT NULL), '[]') AS members
-            FROM company
-            LEFT JOIN country_code ON country_code.id = company.country_code_id
-            LEFT JOIN currency_code ON currency_code.id = country_code.currency_code_id
-            LEFT OUTER JOIN file_storage_engine ON file_storage_engine.id = company.logo_storage_id
-            LEFT OUTER JOIN company_role_xref crx on crx.company_id = company.id
-            LEFT OUTER JOIN (
+            SELECT row_to_json(row) AS company
+            FROM (
                 SELECT
-                    member.id,
-                    member.first_name,
-                    member.last_name,
-                    job_title.name as title
-                FROM member
-                LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
-            ) as t1 ON t1.id = crx.member_id
-            WHERE company.id = %s
-            GROUP BY
-                company.id,
-                company.name,
-                company.place_id,
-                company.address_1,
-                company.address_2,
-                company.city,
-                company.state,
-                company.postal,
-                company.country_code_id,
-                country_code.name,
-                currency_code.id,
-                currency_code.currency_code,
-                currency_code.currency_name,
-                company.main_phone,
-                company.primary_url,
-                company.logo_storage_id,
-                file_storage_engine.storage_engine_id,
-                company.create_date
+                    company.id,
+                    company.name,
+                    company.place_id,
+                    parent_company.id AS parent_company_id,
+	                parent_company.name AS parent_company_name,
+                    -- industries
+                    (
+                        SELECT ARRAY (
+                            SELECT industry_id 
+                            FROM company_industry
+                            WHERE company_id = company.id
+                        ) AS company_industries
+                    ),
+                    -- departments
+                    (
+                        SELECT COALESCE(json_agg(rows),'[]'::json) AS departments
+                        FROM (
+                            SELECT 
+                                company_department.id AS company_department_id,
+                                department_id,
+                                department.name AS department_name
+                            FROM company_department
+                            LEFT JOIN department ON department.id = company_department.department_id
+                            WHERE company_id = company.id
+                        ) AS rows
+                    ),
+                    -- members
+                    (
+                        SELECT COALESCE(json_agg(rows), '[]'::json) AS company_members
+                        FROM (
+                            SELECT 
+                                company_member.id AS company_member_id,
+                                ls.company_role,
+                                ls.company_department_id,
+                                ls.department_name,
+                                ls.department_status,
+                                ls.update_date AS status_update_date,
+                                member.id AS member_id,
+                                member.first_name,
+                                member.middle_name,
+                                member.last_name,
+                                member.email,
+                                job_title.name,
+                                file_path(file_storage_engine.storage_engine_id, '/member/file') AS amera_avatar_url
+                            FROM company_member
+                            LEFT JOIN (
+                                SELECT DISTINCT ON (company_member_id)
+                                    company_member_id,
+                                    company_role,
+                                    company_status,
+                                    company_department_id,
+                                    department.name AS department_name,
+                                    department_status,
+                                    company_member_status.update_date
+                                FROM company_member_status
+                                LEFT JOIN company_department ON company_department.id = company_member_status.company_department_id
+                                LEFT JOIN department ON department.id = company_department.department_id
+                                ORDER BY company_member_id, update_date ASC
+                            ) AS ls ON ls.company_member_id = company_member.id
+                            LEFT JOIN member ON company_member.member_id = member.id
+                            LEFT JOIN job_title ON job_title_id = job_title.id
+                            LEFT JOIN member_profile ON member.id = member_profile.member_id
+                            LEFT JOIN file_storage_engine  ON file_storage_engine.id = member_profile.profile_picture_storage_id
+                            WHERE company_id = company.id AND ls.company_status = 'active'
+                        ) AS rows
+                    ),
+                    -- children
+                    (
+                        WITH ch AS (
+                            SELECT 
+                                company.id,
+                                company.name,
+                                company.parent_company_id
+                            FROM company
+                        )
+                        SELECT COALESCE(json_agg(rows), '[]'::json) AS child_companies
+                        FROM (
+                            SELECT 
+                                ch.id,
+                                ch.name
+                            FROM ch
+                            WHERE ch.parent_company_id = company.id
+                        ) AS rows
+                    ),
+                    company.address_1,
+                    company.address_2,
+                    company.city,
+                    company.state,
+                    company.postal,
+                    company.province,
+                    company.country_code_id,
+                    country_code.name as country,
+                    country_code.alpha3,
+                    currency_code.id AS currency_code_id,
+                    currency_code.currency_code,
+                    currency_code.currency_name,
+                    company.main_phone,
+                    company.primary_url,
+                    company.email,
+                    company.logo_storage_id,
+                    file_path(file_storage_engine.storage_engine_id, '/member/file') as logo_url,
+                    company.create_date
+                FROM company
+                LEFT JOIN country_code ON country_code.id = company.country_code_id
+                LEFT JOIN currency_code ON currency_code.id = country_code.currency_code_id
+                LEFT JOIN file_storage_engine ON file_storage_engine.id = company.logo_storage_id
+                LEFT JOIN company AS parent_company ON parent_company.id = company.parent_company_id
+                WHERE company.id = %s
+            ) AS row
         """)
 
         params = (company_id, )
 
         cls.source.execute(query, params)
         if cls.source.has_results():
-            (
-                id,
-                name,
-                place_id,
-                address_1,
-                address_2,
-                city,
-                state,
-                postal,
-                country_code_id,
-                country,
-                currency_code_id,
-                currency_code,
-                currency_name,
-                main_phone,
-                primary_url,
-                logo_storage_id,
-                s3_logo_url,
-                create_date,
-                members
-            ) = cls.source.cursor.fetchone()
-            return {
-                "id": id,
-                "name": name,
-                "place_id": place_id,
-                "address_1": address_1,
-                "address_2": address_2,
-                "city": city,
-                "state": state,
-                "postal": postal,
-                "country_code_id": country_code_id,
-                "country": country,
-                "currency_code_id": currency_code_id,
-                "currency_code": currency_code,
-                "currency_name": currency_name,
-                "main_phone": main_phone,
-                "primary_url": primary_url,
-                "logo_storage_id": logo_storage_id,
-                "s3_logo_url": s3_logo_url,
-                "create_date": create_date,
-                "members": members
-            }
-
+            return cls.source.cursor.fetchone()[0]
         return None
 
     @classmethod
     def get_companies(cls, member_id=None, sort_params=None, page_size=None, page_number=None):
         sort_columns_string = 'company.name ASC'
         company_dict = {
-            'company_name'   : 'company.name',
-            'address_1'      : 'company.address_1',
-            'address_2'      : 'company.address_2',
-            'city'           : 'company.city',
-            'state'          : 'company.state',
-            'postal'         : 'company.postal',
+            'company_name': 'company.name',
+            'address_1': 'company.address_1',
+            'address_2': 'company.address_2',
+            'city': 'company.city',
+            'state': 'company.state',
+            'postal': 'company.postal',
             'country_code_id': 'company.country_code_id',
-            'country'        : 'country_code.name',
-            'main_phone'     : 'company.main_phone',
-            'primary_url'    : 'company.primary_url',
-            'create_date'    : 'company.create_date',
-            'update_date'    : 'company.update_date'
+            'country': 'country_code.name',
+            'main_phone': 'company.main_phone',
+            'primary_url': 'company.primary_url',
+            'create_date': 'company.create_date',
+            'update_date': 'company.update_date'
         }
 
         if sort_params:
-            sort_columns_string = formatSortingParams(sort_params, company_dict) or sort_columns_string
-        
+            sort_columns_string = formatSortingParams(
+                sort_params, company_dict) or sort_columns_string
+
         query = (f"""
-        SELECT
-            company.id,
-            company.name,
-            company.place_id,
-            company.address_1,
-            company.address_2,
-            company.city,
-            company.state,
-            company.postal,
-            company.country_code_id,
-            country_code.name as country,
-            currency_code.id AS currency_code_id,
-            currency_code.currency_code,
-            currency_code.currency_name,
-            company.main_phone,
-            company.primary_url,
-            company.logo_storage_id,
-            file_path(file_storage_engine.storage_engine_id, '/member/file') as s3_logo_url,
-            company.create_date,
-            company.update_date,
-            COALESCE(json_agg(json_build_object(
-                'company_id', member_crx.company_id,
-                'id', member.id,
-                'first_name', member.first_name,
-                'middle_name', member.middle_name,
-                'last_name', member.last_name,
-                'email', member.email,
-                'company_role', member_crx.company_role,
-                'title', job_title.name,
-                'department', department.name,
-                'amera_avatar_url', file_path(member_fse.storage_engine_id, '/member/file')
-            )) FILTER (WHERE member.id IS NOT NULL), '[]') as members
-        FROM company
-        LEFT JOIN country_code ON country_code.id = company.country_code_id
-        LEFT JOIN currency_code ON currency_code.id = country_code.currency_code_id
-        LEFT OUTER JOIN file_storage_engine ON file_storage_engine.id = company.logo_storage_id
-        {"INNER JOIN company_role_xref AS crx on crx.company_id = company.id" if member_id else ""}
-        LEFT OUTER JOIN company_role_xref AS member_crx on member_crx.company_id = company.id
-        LEFT OUTER JOIN member ON member_crx.member_id = member.id
-        LEFT OUTER JOIN job_title ON job_title_id = job_title.id
-        LEFT OUTER JOIN department ON department_id = department.id
-        LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id
-        LEFT OUTER JOIN file_storage_engine as member_fse ON member_fse.id = member_profile.profile_picture_storage_id
-        {"WHERE crx.member_id = %s" if member_id else ""}
-        GROUP BY
-            company.id,
-            company.name,
-            company.place_id,
-            company.address_1,
-            company.address_2,
-            company.city,
-            company.state,
-            company.postal,
-            company.country_code_id,
-            currency_code.id,
-            currency_code.currency_code,
-            currency_code.currency_name,
-            country_code.name,
-            company.main_phone,
-            company.primary_url,
-            company.logo_storage_id,
-            file_storage_engine.storage_engine_id,
-            company.create_date,
-            company.update_date
-        ORDER BY {sort_columns_string}
+            SELECT json_agg(rows) AS companies
+            FROM (
+                SELECT
+                    company.id,
+                    company.name,
+                    company.place_id,
+                    parent_company.id AS parent_company_id,
+	                parent_company.name AS parent_company_name,
+                    -- industries
+                    (
+                        SELECT ARRAY (
+                            SELECT industry_id 
+                            FROM company_industry
+                            WHERE company_id = company.id
+                        ) AS company_industries
+                    ),
+                    -- departments
+                    (
+                        SELECT COALESCE(json_agg(rows),'[]'::json) AS departments
+                        FROM (
+                            SELECT 
+                                company_department.id AS company_department_id,
+                                department_id,
+                                department.name AS department_name
+                            FROM company_department
+                            LEFT JOIN department ON department.id = company_department.department_id
+                            WHERE company_id = company.id
+                        ) AS rows
+                    ),
+                    -- members
+                    (
+                        SELECT COALESCE(json_agg(rows), '[]'::json) AS company_members
+                        FROM (
+                            SELECT 
+                                company_member.id AS company_member_id,
+                                ls.company_role,
+                                ls.company_department_id,
+                                ls.department_name,
+                                ls.department_status,
+                                ls.update_date AS status_update_date,
+                                member.id AS member_id,
+                                member.first_name,
+                                member.middle_name,
+                                member.last_name,
+                                member.email,
+                                job_title.name,
+                                file_path(file_storage_engine.storage_engine_id, '/member/file') AS amera_avatar_url
+                            FROM company_member
+                            LEFT JOIN (
+                                SELECT DISTINCT ON (company_member_id)
+                                    company_member_id,
+                                    company_role,
+                                    company_status,
+                                    company_department_id,
+                                    department.name AS department_name,
+                                    department_status,
+                                    company_member_status.update_date
+                                FROM company_member_status
+                                LEFT JOIN company_department ON company_department.id = company_member_status.company_department_id
+                                LEFT JOIN department ON department.id = company_department.department_id
+                                ORDER BY company_member_id, update_date ASC
+                            ) AS ls ON ls.company_member_id = company_member.id
+                            LEFT JOIN member ON company_member.member_id = member.id
+                            LEFT JOIN job_title ON job_title_id = job_title.id
+                            LEFT JOIN member_profile ON member.id = member_profile.member_id
+                            LEFT JOIN file_storage_engine  ON file_storage_engine.id = member_profile.profile_picture_storage_id
+                            WHERE company_id = company.id AND ls.company_status = 'active'
+                        ) AS rows
+                    ),
+                    -- children
+                    (
+                        WITH ch AS (
+                            SELECT 
+                                company.id,
+                                company.name,
+                                company.parent_company_id
+                            FROM company
+                        )
+                        SELECT COALESCE(json_agg(rows), '[]'::json) AS child_companies
+                        FROM (
+                            SELECT 
+                                ch.id,
+                                ch.name
+                            FROM ch
+                            WHERE ch.parent_company_id = company.id
+                        ) AS rows
+                    ),
+                    company.address_1,
+                    company.address_2,
+                    company.city,
+                    company.state,
+                    company.postal,
+                    company.province,
+                    company.country_code_id,
+                    country_code.name as country,
+                    country_code.alpha3,
+                    currency_code.id AS currency_code_id,
+                    currency_code.currency_code,
+                    currency_code.currency_name,
+                    company.email,
+                    company.main_phone,
+                    company.primary_url,
+                    company.logo_storage_id,
+                    file_path(file_storage_engine.storage_engine_id, '/member/file') as logo_url,
+                    company.create_date
+                FROM company
+                LEFT JOIN country_code ON country_code.id = company.country_code_id
+                LEFT JOIN currency_code ON currency_code.id = country_code.currency_code_id
+                LEFT JOIN file_storage_engine ON file_storage_engine.id = company.logo_storage_id
+                LEFT JOIN company AS parent_company ON parent_company.id = company.parent_company_id
+                {"INNER JOIN company_member ON company_member.company_id = company.id WHERE company_member.member_id = %s" if member_id else ''}
+                ORDER BY {sort_columns_string}
+            ) AS rows
         """)
+
         companies = []
         params = ()
         if member_id:
             params = (member_id,)
 
         count_member_where = """
-            INNER JOIN company_role_xref AS crx ON company.id = crx.company_id
-            WHERE crx.member_id = %s
+            INNER JOIN company_member ON company_member.company_id = company.id 
+            WHERE company_member.member_id = %s
         """
 
         count_query = (f"""
@@ -238,7 +304,7 @@ class CompanyDA(object):
                 "data": companies,
                 "count": count
             }
-        
+
         if page_size and page_number >= 0:
             query += """LIMIT %s OFFSET %s"""
             offset = 0
@@ -246,55 +312,9 @@ class CompanyDA(object):
                 offset = page_number * page_size
             params = params + (page_size, offset)
 
-
         cls.source.execute(query, params)
         if cls.source.has_results():
-            for (
-                id,
-                name,
-                place_id,
-                address_1,
-                address_2,
-                city,
-                state,
-                postal,
-                country_code_id,
-                country,
-                currency_code_id,
-                currency_code,
-                currency_name,
-                main_phone,
-                primary_url,
-                logo_storage_id,
-                s3_logo_url,
-                create_date,
-                update_date,
-                members
-            ) in cls.source.cursor:
-                company = {
-                    "id": id,
-                    "name": name,
-                    "place_id": place_id,
-                    "address_1": address_1,
-                    "address_2": address_2,
-                    "city": city,
-                    "state": state,
-                    "postal": postal,
-                    "country_code_id": country_code_id,
-                    "country": country,
-                    "currency_code_id": currency_code_id,
-                    "currency_code": currency_code,
-                    "currency_name": currency_name,
-                    "main_phone": main_phone,
-                    "primary_url": primary_url,
-                    "logo_storage_id": logo_storage_id,
-                    "s3_logo_url": s3_logo_url,
-                    "create_date": create_date,
-                    "update_date": update_date,
-                    "members": members
-                }
-
-                companies.append(company)
+            companies = cls.source.cursor.fetchone()[0]
 
         return {
             "data": companies,
@@ -339,7 +359,7 @@ class CompanyDA(object):
             WHERE id = %s
         """)
 
-        params = (name, place_id, address_1, address_2, 
+        params = (name, place_id, address_1, address_2,
                   city, state, postal, country_code_id,
                   main_phone, primary_url, logo_storage_id, company_id)
 
@@ -362,20 +382,20 @@ class CompanyDA(object):
         return res
 
     @classmethod
-    def add_member(cls, company_id, member_id, company_role, commit=True):
+    def add_member(cls, company_id, member_id, commit=True):
         try:
             query = ("""
-                INSERT INTO company_role_xref (company_id, member_id, company_role)
-                VALUES (%s, %s, %s)
+                INSERT INTO company_member (company_id, member_id)
+                VALUES (%s, %s)
             """)
 
-            params = (company_id, member_id, company_role)
+            params = (company_id, member_id)
             cls.source.execute(query, params)
 
             if commit:
                 cls.source.commit()
         except Exception:
-            logger.exception('UNable to add a member')
+            logger.exception('Unable to add a member')
             return None
 
     @classmethod
@@ -383,7 +403,7 @@ class CompanyDA(object):
         try:
             query = ("""
                 DELETE
-                FROM company_role_xref
+                FROM company_member
                 WHERE company_id = %s and member_id = %s
             """)
 
@@ -405,7 +425,8 @@ class CompanyDA(object):
                 'total_members': 'total_members'
             }
             if sort_params:
-                sort_columns_string = formatSortingParams(sort_params, company_dict) or sort_columns_string
+                sort_columns_string = formatSortingParams(
+                    sort_params, company_dict) or sort_columns_string
 
             query = (f"""
                 SELECT member.company_name, count(distinct (member.company_name)) as total_members
@@ -457,7 +478,7 @@ class CompanyDA(object):
             return {
                 "data": companies,
                 "count": count
-                }
+            }
 
         except Exception:
             return None
@@ -479,7 +500,7 @@ class CompanyDA(object):
                 cls.source.commit()
 
             query = ("""
-                INSERT INTO company_role_xref (company_id, member_id)
+                INSERT INTO company_member (company_id, member_id)
                 SELECT %s as company_id, member.id as member_id
                 FROM member
                 WHERE member.company_name = %s

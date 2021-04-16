@@ -994,6 +994,25 @@ class MemberSkills(object):
             }, default_parser=json.parser)
 
 
+class MemberIndustry(object):
+    auth = {
+        'exempt_methods': ['GET']
+    }
+
+    def on_get(self, req, resp):
+        industries = MemberDA().get_all_industries()
+        if industries:
+            resp.body = json.dumps({
+                "data": industries,
+                "success": True
+            }, default_parser=json.parser)
+        else:
+            resp.body = json.dumps({
+                "description": "Could not get the industries",
+                "success": False
+            }, default_parser=json.parser)
+
+
 class MemberContactsCountries(object):
     def on_get(self, req, resp):
         try:

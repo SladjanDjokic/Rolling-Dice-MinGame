@@ -824,6 +824,27 @@ class MemberDA(object):
             return None
 
     @classmethod
+    def get_all_industries(cls,):
+        query = ("""
+            SELECT json_agg(rows) AS industries
+            FROM (
+                SELECT 
+                    id AS industry_id,
+                    name AS industry_name
+                FROM profile_industry
+                WHERE display_status = TRUE
+                ORDER BY name
+            ) AS rows
+        """)
+        params = ()
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        else:
+            return None
+
+
+    @classmethod
     def _get_all_members(cls):
         members = list()
         query = ("""
@@ -949,8 +970,8 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN member_achievement ON member_achievement.member_id = member.id
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
                 LEFT OUTER JOIN online_sessions ON contact.contact_member_id  = online_sessions.member_id
-                LEFT OUTER JOIN company_role_xref ON company_role_xref.member_id = member.id
-                LEFT OUTER JOIN company ON company_role_xref.company_id = company.id
+                LEFT JOIN company_member ON company_member.member_id = member.id
+                LEFT JOIN company ON company.id = company_member.company_id
                 LEFT JOIN member_rate ON member_rate.member_id = member.id
                 LEFT JOIN member_skill ON member_skill.member_id = member.id
                 LEFT JOIN profile_skill ON profile_skill.id = member_skill.profile_skill_id
