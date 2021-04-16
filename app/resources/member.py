@@ -6,7 +6,7 @@ import app.util.json as json
 import app.util.request as request
 from app.util.auth import check_session
 from app import settings
-from app.da.member import MemberDA, MemberContactDA, MemberInfoDA, MemberSettingDA, MemberVideoMailDA, MemberStreamMediaDA
+from app.da.member import MemberDA, MemberContactDA, MemberInfoDA, MemberSettingDA, MemberVideoMailDA
 from app.da.file_sharing import FileStorageDA, FileTreeDA
 from app.da.invite import InviteDA
 from app.da.group import GroupMembershipDA, GroupDA
@@ -45,16 +45,21 @@ class MemberSearchResource(object):
             session = validate_session(session_id)
             member_id = session["member_id"]
 
+            count = -1
+
             if exclude_group_id:
                 members = GroupMembershipDA.get_members_not_in_group(group_id=exclude_group_id, member_id=member_id,
                                                                      search_key=search_key, page_size=page_size,
                                                                      page_number=page_number)
             else:
-                members = MemberDA.get_members(member_id=member_id, search_key=search_key, page_size=page_size,
+                result = MemberDA.get_members(member_id=member_id, search_key=search_key, page_size=page_size,
                                                page_number=page_number)
+                members = result['members']
+                count = result['count']
 
             resp.body = json.dumps({
                 "members": members,
+                "count": count,
                 "success": True
             })
         except InvalidSessionError as err:
@@ -1255,74 +1260,5 @@ class MemberVideoMailResource(object):
         except Exception as e:
             resp.body = json.dumps({
                 "description": "Something went wrong",
-                "success": False
-            }, default_parser=json.parser)
-
-
-class MemberProduceContent(object):
-
-    def __init__(self):
-        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.create_event_attachment'),
-                                    "topic": settings.get('kafka.topics.calendar')
-                                    },
-                           "GET": {"event_type": settings.get('kafka.event_types.delete.delete_event_attachment'),
-                                      "topic": settings.get('kafka.topics.calendar')
-                                      },
-                           }
-
-    @check_session
-    def on_get(self, req, resp):
-        member = req.context.auth["session"]
-        member_id = member["member_id"]
-        streaming_now = req.get_param("streaming_now")
-        upcoming_streams = req.get_param("upcoming_streams")
-        past_streams = req.get_param("past_streams")
-
-        data = MemberStreamMediaDA.get_stream_medias(member_id, streaming_now, upcoming_streams, past_streams)
-
-        if data is not None:
-            resp.body = json.dumps({
-                "data": data,
-                "success": True
-            }, default_parser=json.parser)
-        else:
-            resp.body = json.dumps({
-                "description": "Could not get video file",
-                "success": False
-            }, default_parser=json.parser)
-
-    @check_session
-    def on_post(self, req, resp):
-        file = req.get_param("file")
-        title = req.get_param("title")
-        description = req.get_param("description")
-        category = req.get_param("category")
-        type = req.get_param("type")
-        member = req.context.auth["session"]
-        member_id = member["member_id"]
-
-        storage_file_id = FileStorageDA().put_file_to_storage(file)
-
-        
-        # save stream media
-        file_data = MemberStreamMediaDA.create_stream_media(
-            member_id, title, description, category, storage_file_id, type
-        )
-
-        file_detail = FileStorageDA().get_file_detail(member, storage_file_id)
-
-        if file_data is not None:
-            file_data['video_url'] = amerize_url(file_detail['file_location'])
-            file_data['email'] = file_detail['member_email']
-            file_data['first_name'] = file_detail['member_first_name']
-            file_data['last_name'] = file_detail['member_last_name']
-
-            resp.body = json.dumps({
-                "data": file_data,
-                "success": True
-            }, default_parser=json.parser)
-        else:
-            resp.body = json.dumps({
-                "description": "Could not save file",
                 "success": False
             }, default_parser=json.parser)

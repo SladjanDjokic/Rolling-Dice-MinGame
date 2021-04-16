@@ -19,7 +19,7 @@ from app.resources.member import MemberRegisterResource, MemberSearchResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms, MemberDepartments, MemberContactsRoles, \
     MemberContactsCompanies, MemberContactsCountries, MemberTimezones, MemberInfoByIdResource, \
     MemberContactSecurity, MemberSettingResource, MemberVideoMailResource, \
-    ContactMembersOtherInvitationsResource, MemberSkills, MemberProduceContent, MemberIndustry
+    ContactMembersOtherInvitationsResource, MemberSkills, MemberIndustry
 from app.resources.verification import Verification
 from app.resources.verifycell import VerifyCell
 from app.resources.promo_codes import PromoCodes
@@ -38,6 +38,7 @@ from app.resources.group import MemberGroupResource, GroupMembershipResource, Gr
     GroupActivityDriveResource, GroupActivityCalendarResource
 from app.resources.system import SystemActivityResource
 from app.resources.system import SystemActivityUsersResource
+from app.resources.system import SystemMemberResource
 from app.resources.language import LanguageResource
 from app.resources.member_scheduler_setting import MemberSchedulerSettingResource
 from app.resources.member_schedule_event import MemberScheduleEventResource, MemberScheduleEventColors, \
@@ -78,11 +79,12 @@ from app.resources.billing import BillingResource
 from app.resources.bug_report import BugReportResource, BugReportUsersResource
 
 from app.resources.admin import AdminMemberResource
+from app.resources.stream import StreamResource, StreamCategoryResource, StreamTypeResource
 from app.util.request import get_request_host
 from app.util.config import setup_vyper
 from app.util.error import error_handler
 from app.util.logging import setup_logging
-import app.util.stored_procedure as stored_procedure
+# import app.util.stored_procedure as stored_procedure
 
 try:
     imsecure_spec = importlib.util.find_spec(
@@ -149,7 +151,7 @@ def create_app():
 
     _setup_routes(app)
 
-    stored_procedure.init_procedures()
+    # stored_procedure.init_procedures()
 
     return app
 
@@ -269,6 +271,8 @@ def _setup_routes(app):
     app.add_route("/system/activity/behaviour",
                   SystemActivityResource("behaviour"))
     app.add_route("/system/activity/users", SystemActivityUsersResource())
+    app.add_route("/system/activity/members/registered", SystemMemberResource())
+
 
     app.add_route("/member/activity", ActivitiesResource())
 
@@ -552,6 +556,13 @@ def _setup_routes(app):
     app.add_route("/trello/auth", TrelloOAuthResource())
 
     # Streaming
-    produce_content_resource = MemberProduceContent()
-    app.add_route("/member/streaming/upload", produce_content_resource)
-    app.add_route("/member/streaming/videos", produce_content_resource)
+    stream_resource = StreamResource()
+    app.add_route("/streaming/upload", stream_resource)
+    app.add_route("/streaming/videos", stream_resource)
+    app.add_route("/streaming/video/{id:int}", stream_resource)
+
+    stream_category_resource = StreamCategoryResource()
+    app.add_route("/streaming/categories", stream_category_resource)
+
+    stream_type_resource = StreamTypeResource()
+    app.add_route("/streaming/types", stream_type_resource)

@@ -443,6 +443,8 @@ services:
       - ../web-api/datasource/postgresql/stream_media.sql:/docker-entrypoint-initdb.d/r-stream_media.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-04-09_page_settings-type.sql:/docker-entrypoint-initdb.d/t-1-page_settings-type.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-04-10_stream_media-category-and-type.sql:/docker-entrypoint-initdb.d/s-2-stream_media-category-and-type.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-04-13_stream_media-category-and-type.sql:/docker-entrypoint-initdb.d/s-3-stream_media-category-and-type.sql
+      - ../web-api/datasource/postgresql/stream_media_category_type.sql:/docker-entrypoint-initdb.d/t-stream_media_category_type.sql
       # Test data
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
@@ -457,6 +459,7 @@ services:
       - ../web-api/datasource/postgresql/test-project.dev.sql:/docker-entrypoint-initdb.d/z-9-2-test-project-dev.sql
       - ../web-api/datasource/postgresql/test-member-contact-2.sql:/docker-entrypoint-initdb.d/z-9-3-test-member-contact-2.sql
       - ../web-api/datasource/postgresql/test-page-settings.sql:/docker-entrypoint-initdb.d/z-9-4-test-page-settings.sql
+      - ../web-api/datasource/postgresql/test-stream-type-and-category.sql:/docker-entrypoint-initdb.d/z-9-5-test-stream-type-and-category.sql
     environment:
       POSTGRES_DB: ameraiot
       POSTGRES_USER: amera

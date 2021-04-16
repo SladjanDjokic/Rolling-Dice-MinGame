@@ -120,9 +120,27 @@ class MemberDA(object):
         return cls.__get_password_reset_info('forgot_key', forgot_key)
 
     @classmethod
-    def get_members(cls, member_id, search_key, page_size=None, page_number=None):
+    def get_members(cls, member_id, search_key, page_size=None, page_number=None, sort_params=''):
+        sort_columns_string = 'create_date DESC, first_name ASC'
+        members_dict = {
+            "member_id": "member.id",
+            "email": "member.email",
+            "create_date": "member.create_date",
+            "update_date": "member.update_date",
+            "username": "member.username",
+            "status": "member.status",
+            "first_name": "member.first_name",
+            "middle_name": "member.middle_name",
+            "last_name": "member.last_name",
+            "company_name": "member.company_name",
+            "department": "department.name",
+            "title": "job_title.name"
+        }
 
-        query = """
+        if sort_params:
+            sort_columns_string = formatSortingParams(sort_params, members_dict) or sort_columns_string
+        
+        query = f"""
             SELECT
                 member.id as member_id,
                 member.email as email,
@@ -134,20 +152,59 @@ class MemberDA(object):
                 member.middle_name as middle_name,
                 member.last_name as last_name,
                 member.company_name as company_name,
-                job_title.name as title
+                department.name as department,
+                job_title.name as title,
+                file_storage_engine.storage_engine_id as s3_avatar_url
             FROM member
-            LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
-            WHERE ( email LIKE %s OR username LIKE %s OR first_name LIKE %s OR last_name LIKE %s ) AND member.id <> %s
+                LEFT OUTER JOIN department ON department.id = member.department_id
+                LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
+                LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id
+                LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+                WHERE 
+                    (
+                        email LIKE %s 
+                        OR 
+                        username LIKE %s 
+                        OR first_name LIKE %s 
+                        OR last_name LIKE %s 
+                    ) 
+                    AND member.id <> %s
+            ORDER BY {sort_columns_string}
             """
+        
+        count = (f"""
+                    SELECT COUNT(*)
+                    FROM
+                        (
+                            SELECT id FROM member
+                            WHERE 
+                                (
+                                    email LIKE %s 
+                                    OR 
+                                    username LIKE %s 
+                                    OR first_name LIKE %s 
+                                    OR last_name LIKE %s 
+                                ) 
+                                AND id <> %s
+                        ) src;
+            """)
 
         like_search_key = """%{}%""".format(search_key)
         params = (like_search_key, like_search_key,
                   like_search_key, like_search_key, member_id)
+        
+        cls.source.execute(count, params)
 
-        if page_size and page_number:
+        count = 0
+        if cls.source.has_results():
+            (count,) = cls.source.cursor.fetchone()
+
+        if count > 0 and page_size and page_number >=0 :
             query += """LIMIT %s OFFSET %s"""
-            params = (like_search_key, like_search_key, like_search_key, like_search_key, member_id, page_size,
-                      (page_number - 1) * page_size)
+            offset = 0
+            if page_number > 0:
+                offset = page_number * page_size
+            params = params + (page_size, offset)
 
         members = []
         cls.source.execute(query, params)
@@ -163,25 +220,33 @@ class MemberDA(object):
                     middle_name,
                     last_name,
                     company_name,
-                    title
+                    department,
+                    title,
+                    s3_avatar_url
             ) in cls.source.cursor:
                 member = {
                     "member_id": member_id,
                     "email": email,
-                    "create_date": datetime.datetime.strftime(create_date, "%Y-%m-%d %H:%M:%S"),
-                    "update_date": datetime.datetime.strftime(update_date, "%Y-%m-%d %H:%M:%S"),
+                    "create_date": create_date,
+                    "update_date": update_date,
                     "username": username,
                     "status": status,
                     "first_name": first_name,
                     "middle_name": middle_name,
                     "last_name": last_name,
                     "member_name": f'{first_name}{middle_name}{last_name}',
-                    "title": title
+                    "company_name": company_name,
+                    "department": department,
+                    "title": title,
+                    "amera_avatar_url": amerize_url(s3_avatar_url)
                 }
 
                 members.append(member)
 
-        return members
+        return {
+            "members": members,
+            "count": count
+            }
 
     @classmethod
     def get_group_members(cls, member_id, search_key, page_size, page_number):
@@ -268,8 +333,8 @@ class MemberDA(object):
                 member = {
                     "member_id": member_id,
                     "email": email,
-                    "create_date": datetime.datetime.strftime(create_date, "%Y-%m-%d %H:%M:%S"),
-                    "update_date": datetime.datetime.strftime(update_date, "%Y-%m-%d %H:%M:%S"),
+                    "create_date": create_date,
+                    "update_date": update_date,
                     "username": username,
                     "status": status,
                     "first_name": first_name,
@@ -931,7 +996,7 @@ class MemberContactDA(object):
         }
 
         if sort_params:
-            sort_columns_string = cls.formatSortingParams(
+            sort_columns_string = formatSortingParams(
                 sort_params, contact_dict) or sort_columns_string
 
         (filter_conditions_query, filter_conditions_params) = cls.formatFilterConditions(
@@ -1346,10 +1411,9 @@ class MemberContactDA(object):
                 'title': 'job_title.name',
                 'contact_member_id': 'contact.contact_member_id'
             }
-            sort_columns_string = cls.formatSortingParams(
+            sort_columns_string = formatSortingParams(
                 sort_params, member_dict) or sort_columns_string
-        logger.debug('sorting params for members {} and sort_by_columns {}'.format(
-            sort_params, sort_columns_string))
+        
         members = list()
         get_members_query = (f"""
                 SELECT
@@ -1398,26 +1462,6 @@ class MemberContactDA(object):
                     }
                     members.append(member)
         return members
-
-    @classmethod
-    def formatSortingParams(cls, sort_by, entity_dict):
-        columns_list = sort_by.split(',')
-        new_columns_list = list()
-
-        for column in columns_list:
-            if column[0] == '-':
-                column = column[1:]
-                column = entity_dict.get(column)
-                if column:
-                    column = column + ' DESC'
-                    new_columns_list.append(column)
-            else:
-                column = entity_dict.get(column)
-                if column:
-                    column = column + ' ASC'
-                    new_columns_list.append(column)
-
-        return (',').join(column for column in new_columns_list)
 
     @classmethod
     def formatFilterConditions(cls, filter_by, entity_dict):
@@ -2813,7 +2857,7 @@ class MemberVideoMailDA(object):
                     "type": type,
                     "media_type": media_type,
                     "status": status,
-                    "create_date": datetime.datetime.strftime(create_date, "%Y-%m-%d %H:%M:%S"),
+                    "create_date": create_date,
                     "group_id": group_id,
                     "group_name": group_name,
                     "member_id": member_id,
@@ -2956,160 +3000,3 @@ class MemberVideoMailDA(object):
         except Exception as e:
             logger.error(e, exc_info=True)
             return None
-
-
-class MemberStreamMediaDA(object):
-    source = source
-
-    @classmethod
-    def create_stream_media(cls, member_id, title, description, category, stream_file_id, type):
-        try:
-            types = list(type.split(','))
-
-            query = """
-                INSERT INTO stream_media (member_id, title, description, category, stream_file_id, type)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                RETURNING *
-            """
-            params = (member_id, title, description, category, stream_file_id, types)
-
-            cls.source.execute(query, params)
-
-            cls.source.commit()
-
-            if cls.source.has_results():
-                result = cls.source.cursor.fetchone()
-                media = {
-                    "id": result[0],
-                    "user_id": result[1],
-                    "title": result[2],
-                    "description": result[3],
-                    "type": result[4],
-                    "create_date": result[10],
-                    "update_date": result[11],
-                    "category": result[12]
-                }
-                return media
-
-            return None
-        except Exception as e:
-            logger.debug(e)
-
-    @classmethod
-    def get_stream_medias(cls, member_id, streaming_now, upcoming_streams, past_streams):
-        try:
-            query = f"""
-                SELECT
-                    stream_media.id,
-                    stream_media.title,
-                    stream_media.description,
-                    stream_media.category,
-                    stream_media.type,
-                    stream_media.create_date,
-                    stream_media.update_date,
-                    member.id as user_id,
-                    member.email,
-                    member.first_name,
-                    member.last_name,
-                    file_storage_engine.storage_engine_id as url
-                FROM stream_media
-                INNER JOIN member ON stream_media.member_id = member.id
-                INNER JOIN file_storage_engine ON stream_media.stream_file_id = file_storage_engine.id
-                WHERE
-                    stream_media.stream_status = 'active' AND
-                    -- stream_media.member_id = %s AND
-                    (
-                        (stream_media.category = %s AND stream_media.type @> %s::text[]) OR
-                        (stream_media.category = %s AND stream_media.type @> %s::text[]) OR
-                        (stream_media.category = %s AND stream_media.type @> %s::text[])
-                    )
-                GROUP BY
-                    stream_media.id,
-                    stream_media.title,
-                    stream_media.description,
-                    stream_media.category,
-                    stream_media.type,
-                    stream_media.create_date,
-                    stream_media.update_date,
-                    member.id,
-                    member.email,
-                    member.first_name,
-                    member.last_name,
-                    file_storage_engine.storage_engine_id
-                ORDER BY stream_media.update_date desc
-                """
-            params = (
-                member_id,
-                'streaming_now',
-                list(streaming_now.split(',')),
-                'upcoming_streams',
-                list(upcoming_streams.split(',')),
-                'past_streams',
-                list(past_streams.split(',')),
-            )
-
-            medias = []
-            cls.source.execute(query, params)
-            if cls.source.has_results():
-                for (
-                    id,
-                    title,
-                    description,
-                    category,
-                    type,
-                    create_date,
-                    update_date,
-                    user_id,
-                    email,
-                    first_name,
-                    last_name,
-                    url
-                ) in cls.source.cursor:
-                    media = {
-                        "id": id,
-                        "title": title,
-                        "description": description,
-                        "category": category,
-                        "type": type,
-                        "create_date": create_date,
-                        "update_date": update_date,
-                        "user_id": user_id,
-                        "email": email,
-                        "first_name": first_name,
-                        "last_name": last_name,
-                        "video_url": amerize_url(url)
-                    }
-
-                    medias.append(media)
-            return medias
-        except Exception as e:
-            logger.debug(e)
-
-    @classmethod
-    def delete_stream_media(cls, member_id, media_id):
-        try:
-            where = ""
-            params = (media_id,)
-            if member_id:
-                where = " AND member_id = %s"
-                params += (member_id,)
-
-            query = f"""
-                UPDATE stream_media SET
-                    stream_status = 'delete'
-                WHERE 
-                    id = %s
-                    {where}
-                RETURNING id
-            """
-
-            cls.source.execute(query, params)
-            if commit:
-                cls.source.commit()
-
-            if cls.source.has_results():
-                (id, ) = cls.source.cursor.fetchone()
-                return id
-            return None
-        except Exception as e:
-            logger.debug(e)

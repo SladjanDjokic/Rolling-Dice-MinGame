@@ -14,6 +14,7 @@ from app.config import settings
 from app.da.invite import InviteDA
 from app.da.session import SessionDA
 from app.da.activity import ActivityDA
+from app.da.member import MemberDA
 
 logger = logging.getLogger(__name__)
 
@@ -77,3 +78,37 @@ class SystemActivityUsersResource(object):
             'users': result,
             'success': True
         }, default_parser=json.parser)
+
+
+class SystemMemberResource(object):
+    def on_get(self, req, resp):
+        try:
+            get_all = req.get_param_as_bool('get_all')
+            session_id = get_session_cookie(req)
+            session = validate_session(session_id)
+
+            logger.debug(f"User Type: {session['user_type']}")
+
+            if get_all and session["user_type"] != 'administrator':
+                raise falcon.HTTPForbidden(description="Not enough permissions")
+
+            search_key = req.get_param('search_key') or ''
+            page_size = req.get_param_as_int('page_size')
+            page_number = req.get_param_as_int('page_number')
+            sort_params = req.get_param('sort')
+            member_id = session["member_id"]
+
+            result = MemberDA.get_members(member_id, search_key, page_size, page_number, sort_params)
+            
+            resp.body = json.dumps({
+                "data": result,
+                "description": "Successfully loaded.",
+                "success": True
+            }, default_parser=json.parser)
+
+        except Exception as e:
+            resp.body = json.dumps({
+                "data": {},
+                "description": "Something went wrong",
+                "success": False
+            }, default_parser=json.parser)
