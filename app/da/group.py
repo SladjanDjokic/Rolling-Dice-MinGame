@@ -2,7 +2,7 @@ import logging
 
 # import uuid
 # from dateutil.relativedelta import relativedelta
-from app.util.db import source
+from app.util.db import source, formatSortingParams
 from app.exceptions.data import DuplicateKeyError, DataMissingError, \
     RelationshipReferenceError
 from app.exceptions.invite import InviteExistsError, InviteDataMissingError, \
@@ -146,7 +146,7 @@ class GroupDA(object):
                 'total_files': 'total_files',
                 'total_videos': 'total_videos'
             }
-            sort_columns_string = cls.formatSortingParams(
+            sort_columns_string = formatSortingParams(
                 sort_params, group_dict) or sort_columns_string
 
         search_query = ("""
@@ -309,7 +309,7 @@ class GroupDA(object):
                 'total_files': 'total_files',
                 'total_videos': 'total_videos'
             }
-            sort_columns_string = cls.formatSortingParams(
+            sort_columns_string = formatSortingParams(
                 sort_params, entity_dict) or sort_columns_string
         search_query = ("""
         AND (
@@ -463,25 +463,6 @@ class GroupDA(object):
 
         return group_list
 
-    @classmethod
-    def formatSortingParams(cls, sort_by, entity_dict):
-        columns_list = sort_by.split(',')
-        new_columns_list = list()
-
-        for column in columns_list:
-            if column[0] == '-':
-                column = column[1:]
-                column = entity_dict.get(column)
-                if column:
-                    column = column + ' DESC'
-                    new_columns_list.append(column)
-            else:
-                column = entity_dict.get(column)
-                if column:
-                    column = column + ' ASC'
-                    new_columns_list.append(column)
-
-        return (',').join(column for column in new_columns_list)
 
     @classmethod
     def create_group(cls, member_id, group_name, commit=True):
@@ -1044,22 +1025,3 @@ class GroupMemberInviteDA(object):
 
         return res
 
-
-def formatSortingParams(sort_by, entity_dict):
-    columns_list = sort_by.split(',')
-    new_columns_list = list()
-
-    for column in columns_list:
-        if column[0] == '-':
-            column = column[1:]
-            column = entity_dict.get(column)
-            if column:
-                column = column + ' DESC'
-                new_columns_list.append(column)
-        else:
-            column = entity_dict.get(column)
-            if column:
-                column = column + ' ASC'
-                new_columns_list.append(column)
-
-    return (',').join(column for column in new_columns_list)

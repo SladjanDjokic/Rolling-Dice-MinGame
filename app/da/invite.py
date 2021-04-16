@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from app.util.db import source
+from app.util.db import source, formatSortingParams
 from app.exceptions.data import DuplicateKeyError, DataMissingError, \
     RelationshipReferenceError
 from app.exceptions.invite import InviteExistsError, InviteDataMissingError, \
@@ -367,22 +367,3 @@ class InviteDA(object):
 
         return {"activities": invites, "count": count}
 
-
-def formatSortingParams(sort_by, entity_dict):
-    columns_list = sort_by.split(',')
-    new_columns_list = list()
-
-    for column in columns_list:
-        if column[0] == '-':
-            column = column[1:]
-            column = entity_dict.get(column)
-            if column:
-                column = column + ' DESC'
-                new_columns_list.append(column)
-        else:
-            column = entity_dict.get(column)
-            if column:
-                column = column + ' ASC'
-                new_columns_list.append(column)
-
-    return (',').join(column for column in new_columns_list)

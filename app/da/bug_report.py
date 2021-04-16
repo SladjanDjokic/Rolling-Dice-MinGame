@@ -1,5 +1,5 @@
 import logging
-from app.util.db import source
+from app.util.db import source, formatSortingParams
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ class BugReportDA(object):
                     'first_name':'member.first_name',
                     'last_name':'member.last_name'
                 }
-                sort_columns_string = cls.formatSortingParams(
+                sort_columns_string = formatSortingParams(
                     sort_params, bug_reports_dict) or sort_columns_string
             
             query_conditions = f"""
@@ -172,26 +172,6 @@ class BugReportDA(object):
         except Exception as e:
             logger.error(e, exc_info=True)
             return None
-
-    @classmethod
-    def formatSortingParams(cls, sort_by, entity_dict):
-        columns_list = sort_by.split(',')
-        new_columns_list = list()
-
-        for column in columns_list:
-            if column[0] == '-':
-                column = column[1:]
-                column = entity_dict.get(column)
-                if column:
-                    column = column + ' DESC'
-                    new_columns_list.append(column)
-            else:
-                column = entity_dict.get(column)
-                if column:
-                    column = column + ' ASC'
-                    new_columns_list.append(column)
-
-        return (',').join(column for column in new_columns_list)
 
     @classmethod 
     def get_bug_report_users(cls):

@@ -1,6 +1,6 @@
 import json
 
-from app.util.db import source
+from app.util.db import source, formatSortingParams
 import logging
 
 logger = logging.getLogger(__name__)
@@ -351,7 +351,7 @@ class ActivityDA(object):
                     # 'event_types': 'event_types', currently not sure how to sort by json_agg
                     'create_date': 'min(activity_trace.create_date)',
                 }
-                sort_columns_string = cls.formatSortingParams(
+                sort_columns_string = formatSortingParams(
                     sort_params, activities_dict) or sort_columns_string
 
             query = (f"""
@@ -460,25 +460,6 @@ class ActivityDA(object):
             logger.error(e, exc_info=True)
             return None
 
-    @classmethod
-    def formatSortingParams(cls, sort_by, entity_dict):
-        columns_list = sort_by.split(',')
-        new_columns_list = list()
-
-        for column in columns_list:
-            if column[0] == '-':
-                column = column[1:]
-                column = entity_dict.get(column)
-                if column:
-                    column = column + ' DESC'
-                    new_columns_list.append(column)
-            else:
-                column = entity_dict.get(column)
-                if column:
-                    column = column + ' ASC'
-                    new_columns_list.append(column)
-
-        return (',').join(column for column in new_columns_list)
 
     def get_group_drive_activity(cls, group_id, search_key, page_size=None, page_number=None, sort_params=''):
         try:
@@ -492,7 +473,7 @@ class ActivityDA(object):
                     # 'event_types': 'event_types', currently not sure how to sort by json_agg
                     'create_date': 'a.create_date',
                 }
-                sort_columns_string = cls.formatSortingParams(
+                sort_columns_string = formatSortingParams(
                     sort_params, activities_dict) or sort_columns_string
 
             event_types = [settings.get(f'kafka.event_types.{method}.group_file_cloud') for method in [
@@ -620,7 +601,7 @@ class ActivityDA(object):
                     # 'event_types': 'event_types', currently not sure how to sort by json_agg
                     'create_date': 'activity_trace.create_date',
                 }
-                sort_columns_string = cls.formatSortingParams(
+                sort_columns_string = formatSortingParams(
                     sort_params, activities_dict) or sort_columns_string
             event_types = [
                 'kafka.event_types.post.create_event',
@@ -738,7 +719,7 @@ class ActivityDA(object):
             }
 
             if sort_params:
-                sort_columns_string = cls.formatSortingParams(
+                sort_columns_string = formatSortingParams(
                     sort_params, invitation_dict) or sort_columns_string
             
             # pending = ""
@@ -1018,7 +999,7 @@ class ActivityDA(object):
             }
 
             if sort_params:
-                sort_columns_string = cls.formatSortingParams(
+                sort_columns_string = formatSortingParams(
                     sort_params, invitation_dict) or sort_columns_string
             
             invited= " AND member_group_membership.status in ('invited', 'active', 'declined')"
@@ -1215,7 +1196,7 @@ class ActivityDA(object):
             }
 
             if sort_params:
-                sort_columns_string = cls.formatSortingParams(
+                sort_columns_string = formatSortingParams(
                     sort_params, mail_dict) or sort_columns_string
             
             # unread = ""

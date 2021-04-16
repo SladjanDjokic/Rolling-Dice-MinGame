@@ -1,6 +1,6 @@
 import logging
 import datetime
-from app.util.db import source
+from app.util.db import source, formatSortingParams
 from app.util.filestorage import amerize_url
 
 logger = logging.getLogger(__name__)
@@ -531,21 +531,3 @@ class ForumDA(object):
         cls.source.execute(query, params)
         cls.source.commit()
 
-def formatSortingParams(sort_by, entity_dict):
-    columns_list = sort_by.split(',')
-    new_columns_list = list()
-
-    for column in columns_list:
-        if column[0] == '-':
-            column = column[1:]
-            column = entity_dict.get(column)
-            if column:
-                column = column + ' DESC'
-                new_columns_list.append(column)
-        else:
-            column = entity_dict.get(column)
-            if column:
-                column = column + ' ASC'
-                new_columns_list.append(column)
-
-    return (',').join(column for column in new_columns_list)
