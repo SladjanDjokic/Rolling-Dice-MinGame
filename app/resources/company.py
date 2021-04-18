@@ -121,7 +121,7 @@ class CompanyResource(object):
             raise err
 
     @check_session
-    def on_post_details_update(Self, req, resp, company_id):
+    def on_post_details_update(self, req, resp, company_id):
         member_id = req.context.auth['session']['member_id']
         try:
             (name, industries, email, primary_url, main_phone, country_code_id, place_id, address_1, address_2, city, state, postal, province) = request.get_json_or_form(
