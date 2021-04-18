@@ -7,11 +7,18 @@ from app.util.auth import check_session, check_session_administrator
 from app.da.file_sharing import FileStorageDA
 
 from app.da.company import CompanyDA
+from app.exceptions.company import NotEnoughCompanyPrivileges
 
 logger = logging.getLogger(__name__)
 
 
 class CompanyResource(object):
+
+    def _check_company_update_privileges(self, req, member_role):
+        if req.context.auth['session']['user_type'] != 'administrator' \
+           and (not member_role or member_role not in ['owner', 'administrator']):
+            raise NotEnoughCompanyPrivileges
+
 
     @check_session_administrator
     def on_post(self, req, resp):
@@ -78,6 +85,92 @@ class CompanyResource(object):
             "success": True
         }, default_parser=json.parser)
 
+    @check_session
+    def on_post_picture(self, req, resp, company_id):
+        member_id = req.context.auth['session']['member_id']
+        try:
+            (file, size, mime) = request.get_json_or_form(
+                "file", "size", "mime", req=req)
+
+            member_role = CompanyDA.get_member_role(member_id, company_id)
+            self._check_company_update_privileges(req, member_role)
+
+            picture_storage_id = None
+            picture_storage_id = FileStorageDA().put_file_to_storage(
+                file=file, file_size_bytes=size, mime_type=mime)
+
+            CompanyDA.update_company_picture(
+                company_id, picture_storage_id)
+
+            company = CompanyDA.get_company(company_id)
+
+            if company:
+                resp.body = json.dumps({
+                    "description": "Picture updated successfully",
+                    "data": company,
+                    "success": True
+                }, default_parser=json.parser)
+            else:
+                resp.body = json.dumps({
+                    "description": "Something went wrong when updating picture",
+                    "success": False
+                }, default_parser=json.parser)
+
+        except Exception as err:
+            logger.exception(err)
+            raise err
+
+    @check_session
+    def on_post_details_update(Self, req, resp, company_id):
+        member_id = req.context.auth['session']['member_id']
+        try:
+            (name, industries, email, primary_url, main_phone, country_code_id, place_id, address_1, address_2, city, state, postal, province) = request.get_json_or_form(
+                "name", "industries", "email", "primaryUrl", "phone", "countryCode", "placeId", "address1", "address2", "city", "state", "postal", "province", req=req)
+
+            member_role = CompanyDA.get_member_role(member_id, company_id)
+            self._check_company_update_privileges(req, member_role)
+            
+            CompanyDA.update_company_details({"company_id": company_id, "name": name, "email": json.convert_null(email), "primary_url": json.convert_null(primary_url), "main_phone": json.convert_null(main_phone), "country_code_id": country_code_id, "place_id": json.convert_null(
+                place_id), "address_1": json.convert_null(address_1), "address_2": json.convert_null(address_2), "city": json.convert_null(city), "state": json.convert_null(state), "postal": json.convert_null(postal), "province": json.convert_null(province)})
+
+            # Industries
+            posted_industries = []
+            if json.convert_null(industries):
+                posted_industries = industries
+            listed_industries = CompanyDA.get_company_industry_ids(company_id)
+
+            new_industries = set(posted_industries) - set(listed_industries)
+            to_delete_industries = set(
+                listed_industries) - set(posted_industries)
+
+            if len(new_industries) > 0:
+                for industry_id in new_industries:
+                    CompanyDA.add_company_industry(
+                        industry_id=industry_id, company_id=company_id)
+
+            if len(to_delete_industries) > 0:
+                for industry_id in to_delete_industries:
+                    CompanyDA.unlist_company_industry(
+                        industry_id=industry_id, company_id=company_id)
+
+            company = CompanyDA.get_company(company_id)
+
+            if company:
+                resp.body = json.dumps({
+                    "description": "Company details updated successfully",
+                    "data": company,
+                    "success": True
+                }, default_parser=json.parser)
+            else:
+                resp.body = json.dumps({
+                    "description": "Something went wrong when updating company details",
+                    "success": False
+                }, default_parser=json.parser)
+
+        except Exception as err:
+            logger.exception(err)
+            raise err
+
     @check_session_administrator
     def on_delete(self, req, resp):
         (company_ids) = request.get_json_or_form("companyIds", req=req)
@@ -86,7 +179,7 @@ class CompanyResource(object):
         res = CompanyDA.delete_companies(company_ids[0])
         resp.body = json.dumps({
             "data": res,
-            "description": "Group's deleted successfully!",
+            "description": "Company's deleted successfully!",
             "success": True
         }, default_parser=json.parser)
 

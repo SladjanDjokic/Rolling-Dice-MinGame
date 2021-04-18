@@ -23,11 +23,15 @@ class CompanyDA(object):
 	                parent_company.name AS parent_company_name,
                     -- industries
                     (
-                        SELECT ARRAY (
-                            SELECT industry_id 
+                        SELECT COALESCE(json_agg(rows), '[]'::json) as company_industries
+                        FROM (
+                            SELECT 
+                                company_industry.industry_id,
+                                profile_industry.name AS industry_name
                             FROM company_industry
-                            WHERE company_id = company.id
-                        ) AS company_industries
+                            LEFT JOIN profile_industry ON profile_industry.id =  company_industry.industry_id
+                            WHERE company_id = company.id AND profile_industry.display_Status = TRUE
+                        ) AS rows
                     ),
                     -- departments
                     (
@@ -167,11 +171,15 @@ class CompanyDA(object):
 	                parent_company.name AS parent_company_name,
                     -- industries
                     (
-                        SELECT ARRAY (
-                            SELECT industry_id 
+                        SELECT COALESCE(json_agg(rows), '[]'::json) as company_industries
+                        FROM (
+                            SELECT 
+                                company_industry.industry_id,
+                                profile_industry.name AS industry_name
                             FROM company_industry
-                            WHERE company_id = company.id
-                        ) AS company_industries
+                            LEFT JOIN profile_industry ON profile_industry.id =  company_industry.industry_id
+                            WHERE company_id = company.id AND profile_industry.display_Status = TRUE
+                        ) AS rows
                     ),
                     -- departments
                     (
@@ -369,6 +377,81 @@ class CompanyDA(object):
             cls.source.commit()
 
     @classmethod
+    def update_company_picture(cls, company_id, picture_id, commit=True):
+        query = ("""
+            UPDATE company
+            SET logo_storage_id = %s
+            WHERE id = %s
+            RETURNING id
+        """)
+        params = (picture_id, company_id)
+        cls.source.execute(query, params)
+        if commit:
+            cls.source.commit()
+        id = cls.source.get_last_row_id()
+        return id
+
+    @classmethod
+    def update_company_details(cls, params, commit=True):
+        query = ("""
+            UPDATE company
+            SET name = %(name)s,
+                email = %(email)s,
+                primary_url = %(primary_url)s,
+                main_phone = %(main_phone)s,
+                country_code_id = %(country_code_id)s,
+                place_id = %(place_id)s,
+                address_1 = %(address_1)s,
+                address_2 = %(address_2)s,
+                city = %(city)s,
+                state = %(state)s,
+                postal = %(postal)s,
+                province = %(province)s
+            WHERE id = %(company_id)s
+            RETURNING id
+        """)
+        cls.source.execute(query, params)
+        if commit:
+            cls.source.commit()
+        id = cls.source.get_last_row_id()
+        return id
+
+    # Industries
+    @classmethod
+    def get_company_industry_ids(cls, company_id):
+        query = ("""
+            SELECT ARRAY (
+                SELECT industry_id
+                FROM company_industry
+                WHERE company_id = %s
+            )
+        """)
+        cls.source.execute(query, (company_id,))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        return None
+
+    @classmethod
+    def add_company_industry(cls, industry_id, company_id, commit=True):
+        query = ("""
+            INSERT INTO company_industry (industry_id, company_id)
+            VALUES (%s, %s)
+        """)
+        cls.source.execute(query, (industry_id, company_id))
+        if commit:
+            cls.source.commit()
+
+    @classmethod
+    def unlist_company_industry(cls, industry_id, company_id, commit=True):
+        query = ("""
+            DELETE FROM company_industry
+            WHERE industry_id = %s AND company_id = %s
+        """)
+        cls.source.execute(query, (industry_id, company_id))
+        if commit:
+            cls.source.commit()
+
+    @classmethod
     def delete_companies(cls, company_ids, commit=True):
         query = ("""
             DELETE FROM company WHERE id IN ( {} )
@@ -416,6 +499,24 @@ class CompanyDA(object):
             logger.exception('UNable to remove a member')
             return None
 
+    # Owner and admins
+    @classmethod
+    def get_member_role(cls, member_id, company_id):
+        query = ("""
+            SELECT company_role
+            FROM company_member
+            LEFT JOIN company_member_status ON company_member_status.company_member_id = company_member.id
+            WHERE member_id = %s AND company_id = %s
+            ORDER BY company_member_status.update_date DESC
+            LIMIT 1
+        """)
+        params = (member_id, company_id)
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        return None
+
+    # Unregistered
     @classmethod
     def get_unregistered_company(cls, sort_params, page_size=None, page_number=None):
         try:
@@ -553,4 +654,3 @@ class CompanyDA(object):
 
         if commit:
             cls.source.commit()
-

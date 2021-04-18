@@ -271,8 +271,8 @@ def _setup_routes(app):
     app.add_route("/system/activity/behaviour",
                   SystemActivityResource("behaviour"))
     app.add_route("/system/activity/users", SystemActivityUsersResource())
-    app.add_route("/system/activity/members/registered", SystemMemberResource())
-
+    app.add_route("/system/activity/members/registered",
+                  SystemMemberResource())
 
     app.add_route("/member/activity", ActivitiesResource())
 
@@ -447,7 +447,6 @@ def _setup_routes(app):
                   password_resource, suffix="detail")
     app.add_route("/password", password_resource)
 
-
     # Routes for Chat App
     app.add_route("/chat", ChatView())
 
@@ -523,6 +522,10 @@ def _setup_routes(app):
     app.add_route("/company", company_resource)
     app.add_route("/company/{company_id:int}",
                   company_resource, suffix="detail")
+    app.add_route("/company/picture/{company_id:int}",
+                  company_resource, suffix="picture")
+    app.add_route("/company/details/{company_id:int}",
+                  company_resource, suffix="details_update")
     app.add_route("/company/member", company_resource, suffix="member")
 
     app.add_route("/company/unregistered", CompanyUnregisteredResource())
