@@ -172,5 +172,10 @@
   "app.home.standard": "標準",
   "app.home.high": "高い",
   "app.home.popcallquality": "通話品質",
-  "app.home.savechange": "変更内容を保存"
+  "app.home.savechange": "変更内容を保存",
+  "app.facerecognition.lookForward": "楽しみにする",
+  "app.facerecognition.lookUp": "見上げる",
+  "app.facerecognition.lookLeft": "左を見てください",
+  "app.facerecognition.lookDown": "見下ろす",
+  "app.facerecognition.lookRight": "右に見て"
 }

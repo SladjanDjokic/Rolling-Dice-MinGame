@@ -172,5 +172,10 @@
   "app.home.standard": "标准",
   "app.home.high": "高",
   "app.home.popcallquality": "通话质量",
-  "app.home.savechange": "保存更改"
+  "app.home.savechange": "保存更改",
+  "app.facerecognition.lookForward": "向前看",
+  "app.facerecognition.lookUp": "抬头",
+  "app.facerecognition.lookLeft": "看左边",
+  "app.facerecognition.lookDown": "向下看",
+  "app.facerecognition.lookRight": "向右看"
 }

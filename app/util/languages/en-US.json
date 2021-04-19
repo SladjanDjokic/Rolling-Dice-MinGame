@@ -173,5 +173,10 @@
   "app.home.standard": "Standard",
   "app.home.high": "High",
   "app.home.popcallquality": "Call Quality",
-  "app.home.savechange": "Save changes"
+  "app.home.savechange": "Save changes",
+  "app.facerecognition.lookForward": "Look forward",
+  "app.facerecognition.lookUp": "Look up",
+  "app.facerecognition.lookLeft": "Look left",
+  "app.facerecognition.lookDown": "Look down",
+  "app.facerecognition.lookRight": "Look right"
 }

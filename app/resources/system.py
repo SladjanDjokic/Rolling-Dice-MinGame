@@ -98,7 +98,7 @@ class SystemMemberResource(object):
             sort_params = req.get_param('sort')
             member_id = session["member_id"]
 
-            result = MemberDA.get_members(member_id, search_key, page_size, page_number, sort_params)
+            result = MemberDA.get_members(member_id, search_key, page_size, page_number, sort_params, all_members=True)
             
             resp.body = json.dumps({
                 "data": result,

@@ -171,5 +171,10 @@
   "app.home.standard": "der Standard",
   "app.home.high": "Hoch",
   "app.home.popcallquality": "Anrufqualität",
-  "app.home.savechange": "Änderungen speichern"
+  "app.home.savechange": "Änderungen speichern",
+  "app.facerecognition.lookForward": "freuen",
+  "app.facerecognition.lookUp": "Nachschlagen",
+  "app.facerecognition.lookLeft": "Guck nach links",
+  "app.facerecognition.lookDown": "Schau runter",
+  "app.facerecognition.lookRight": "schau richtig"
 }

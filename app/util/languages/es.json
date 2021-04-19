@@ -174,5 +174,10 @@
   "app.home.standard": "Estándar",
   "app.home.high": "Alto",
   "app.home.popcallquality": "Calidad de llamada",
-  "app.home.savechange": "Guardar cambios"
+  "app.home.savechange": "Guardar cambios",
+  "app.facerecognition.lookForward": "esperar",
+  "app.facerecognition.lookUp": "mirar para arriba",
+  "app.facerecognition.lookLeft": "mira a la izquierda",
+  "app.facerecognition.lookDown": "mira abajo",
+  "app.facerecognition.lookRight": "mira a la derecha"
 }

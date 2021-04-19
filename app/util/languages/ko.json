@@ -172,5 +172,10 @@
   "app.home.standard": "표준",
   "app.home.high": "높은",
   "app.home.popcallquality": "통화 품질",
-  "app.home.savechange": "변경 사항을 저장하다"
+  "app.home.savechange": "변경 사항을 저장하다",
+  "app.facerecognition.lookForward": "전방 보기",
+  "app.facerecognition.lookUp": "올려다 보기",
+  "app.facerecognition.lookLeft": "왼쪽을 보기",
+  "app.facerecognition.lookDown": "아래를 보기",
+  "app.facerecognition.lookRight": "오른쪽 보기"
 }

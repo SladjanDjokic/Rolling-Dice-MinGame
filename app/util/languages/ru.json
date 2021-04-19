@@ -173,5 +173,10 @@
   "app.home.standard": "Стандарт",
   "app.home.high": "Высоко",
   "app.home.popcallquality": "Качество звонка",
-  "app.home.savechange": "Сохранить изменения"
+  "app.home.savechange": "Сохранить изменения",
+  "app.facerecognition.lookForward": "смотреть в будущее",
+  "app.facerecognition.lookUp": "смотреть вверх",
+  "app.facerecognition.lookLeft": "посмотри налево",
+  "app.facerecognition.lookDown": "смотреть вниз",
+  "app.facerecognition.lookRight": "смотреть прямо"
 }
