@@ -15,16 +15,16 @@ class StreamMediaDA(object):
     source = source
 
     @classmethod
-    def create_stream_media(cls, member_id, title, description, category, stream_file_id, type):
+    def create_stream_media(cls, member_id, title, description, category, stream_file_id, type, thumbnail, duration):
         try:
             types = [int(type)]
 
             query = """
-                INSERT INTO stream_media (member_id, title, description, category, stream_file_id, type)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO stream_media (member_id, title, description, category, stream_file_id, type, thumbnail, duration)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING *
             """
-            params = (member_id, title, description, category, stream_file_id, types)
+            params = (member_id, title, description, category, stream_file_id, types, thumbnail, f'PT{duration}S')
 
             cls.source.execute(query, params)
 
@@ -37,10 +37,11 @@ class StreamMediaDA(object):
                     "user_id": result[1],
                     "title": result[2],
                     "description": result[3],
-                    "type": result[11],
-                    "create_date": result[9],
-                    "update_date": result[10],
-                    "category": result[12]
+                    "type": result[10],
+                    "create_date": result[8],
+                    "update_date": result[9],
+                    "category": result[11],
+                    "duration": result[12]
                 }
                 return media
 
@@ -77,10 +78,13 @@ class StreamMediaDA(object):
                     member.email,
                     member.first_name,
                     member.last_name,
-                    file_storage_engine.storage_engine_id as url
+                    file_storage_engine.storage_engine_id as video_url,
+                    stream_media.duration,
+                    thumbnail.storage_engine_id as thumbnail_url
                 FROM stream_media
                 INNER JOIN member ON stream_media.member_id = member.id
                 INNER JOIN file_storage_engine ON stream_media.stream_file_id = file_storage_engine.id
+                LEFT JOIN file_storage_engine as thumbnail ON stream_media.thumbnail = thumbnail.id
                 WHERE
                     stream_media.stream_status = 'active'
                     {where}
@@ -96,7 +100,8 @@ class StreamMediaDA(object):
                     member.email,
                     member.first_name,
                     member.last_name,
-                    file_storage_engine.storage_engine_id
+                    file_storage_engine.storage_engine_id,
+                    thumbnail.storage_engine_id
                 ORDER BY stream_media.update_date desc
                 """
 
@@ -116,7 +121,9 @@ class StreamMediaDA(object):
                     email,
                     first_name,
                     last_name,
-                    url
+                    video_url,
+                    duration,
+                    thumbnail_url
                 ) in cls.source.cursor:
                     media = {
                         "id": id,
@@ -130,7 +137,9 @@ class StreamMediaDA(object):
                         "email": email,
                         "first_name": first_name,
                         "last_name": last_name,
-                        "video_url": amerize_url(url)
+                        "video_url": amerize_url(video_url),
+                        "duration": duration,
+                        "thumbnail_url": amerize_url(thumbnail_url)
                     }
 
                     medias.append(media)
@@ -188,10 +197,10 @@ class StreamMediaDA(object):
                     "user_id": result[1],
                     "title": result[2],
                     "description": result[3],
-                    "type": result[11],
-                    "create_date": result[9],
-                    "update_date": result[10],
-                    "category": result[12]
+                    "type": result[10],
+                    "create_date": result[8],
+                    "update_date": result[9],
+                    "category": result[11]
                 }
                 return media
             return None

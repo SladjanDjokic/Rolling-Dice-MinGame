@@ -19,7 +19,7 @@ from app.resources.member import MemberRegisterResource, MemberSearchResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms, MemberDepartments, MemberContactsRoles, \
     MemberContactsCompanies, MemberContactsCountries, MemberTimezones, MemberInfoByIdResource, \
     MemberContactSecurity, MemberSettingResource, MemberVideoMailResource, \
-    ContactMembersOtherInvitationsResource, MemberSkills, MemberIndustry
+    ContactMembersTextMailsResource, MemberSkills, MemberIndustry
 from app.resources.verification import Verification
 from app.resources.verifycell import VerifyCell
 from app.resources.promo_codes import PromoCodes
@@ -236,8 +236,8 @@ def _setup_routes(app):
     app.add_route("/member/contacts/countries", MemberContactsCountries())
     app.add_route("/member/file/{file_path}", FileDownloadResource())
     app.add_route("/member-contacts", ContactMembersResource())
-    app.add_route("/member/other-invitations",
-                  ContactMembersOtherInvitationsResource())
+    app.add_route("/member/text-mails",
+                  ContactMembersTextMailsResource())
 
     app.add_route("/valid-session", ValidateSessionResource())
 

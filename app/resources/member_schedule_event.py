@@ -7,10 +7,12 @@ from app.util.session import get_session_cookie, validate_session
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 from app.da.member_event import MemberEventDA
 from app.da.member_schedule_event import MemberScheduleEventDA
-from app.da.member import MemberDA, MemberContactDA
+from app.da.member import MemberDA, MemberContactDA, MemberVideoMailDA
+from app.da.group import GroupDA
 from app.da.file_sharing import FileStorageDA, FileTreeDA
 from app.da.member_schedule_event_invite import MemberScheduleEventInviteDA
 from app.da.file_sharing import FileStorageDA
+
 from app.util.auth import check_session
 from app.exceptions.member import MemberNotFound
 from app.exceptions.member_schedule_event import ScheduleEventAddingFailed
@@ -540,10 +542,41 @@ class MemberEventInvitations(object):
     @check_session
     def on_get(self, req, resp):
         member_id = req.context.auth["session"]["member_id"]
-        success = MemberEventDA().get_event_invitations(member_id)
+
+        event_invitations = MemberEventDA().get_event_invitations(member_id)
+
+        # contact invitation
+        contact_invitations = MemberContactDA.get_all_contact_invitations_by_member_id(
+            member_id)
+
+        # group invite
+        group_invitations = GroupDA.get_all_group_invitations_by_member_id(
+            member_id)            # project contract invite
+
+        # new media message
+        new_media_messages = MemberVideoMailDA.get_all_media_mails(
+            member_id)
+
+        if not event_invitations:
+            event_invitations = []
+        if not contact_invitations:
+            contact_invitations = []
+        if not group_invitations:
+            group_invitations = []
+        if not new_media_messages:
+            new_media_messages = []
+
+        ### TODO: not sure about it whether to include or not
+        # contract_invitations = ProjectDA.get_member_contract_invites(
+        #     member_id)
+        # if not contract_invitations:
+        #     contract_invitations = []
+
+        result = event_invitations + contact_invitations + \
+            new_media_messages + group_invitations
 
         resp.body = json.dumps({
-            "data": success,
+            "data": result,
             "message": "Invitations",
             "status": "success",
             "success": True

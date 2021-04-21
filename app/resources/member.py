@@ -61,7 +61,7 @@ class MemberSearchResource(object):
                 "members": members,
                 "count": count,
                 "success": True
-            })
+            }, default_parser=json.parser)
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
 
@@ -91,7 +91,7 @@ class MemberGroupSearchResource(object):
             resp.body = json.dumps({
                 "members": members,
                 "success": True
-            })
+            }, default_parser=json.parser)
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
 
@@ -414,7 +414,7 @@ class ContactMembersResource(object):
         }, default_parser=json.parser)
 
 
-class ContactMembersOtherInvitationsResource(object):
+class ContactMembersTextMailsResource(object):
 
     def __init__(self):
         self.kafka_data = {
@@ -430,28 +430,12 @@ class ContactMembersOtherInvitationsResource(object):
             session = validate_session(session_id)
             member_id = session["member_id"]
 
-            # contact invitation
-            contact_invitations = MemberContactDA.get_all_contact_invitations_by_member_id(
-                member_id)
             # new text message
-            new_messages = MailServiceDA.get_all_text_mails(member_id)
-            # new media message
-            new_media_messages = MemberVideoMailDA.get_all_media_mails(
-                member_id)
-            # group invite
-            group_invitations = GroupDA.get_all_group_invitations_by_member_id(
-                member_id)            # project contract invite
-            contract_invitations = ProjectDA.get_member_contract_invites(
-                member_id)
-            if not contract_invitations:
-                contract_invitations = []
-
-            result = contact_invitations + new_messages + \
-                new_media_messages + group_invitations + contract_invitations
+            result = MailServiceDA.get_all_text_mails(member_id)
 
             resp.body = json.dumps({
                 "data": result,
-                "description": "Other Invitations result fetched sucessfully",
+                "description": "Text Mails fetched sucessfully",
                 "success": True
             }, default_parser=json.parser)
         except Exception as err:

@@ -55,21 +55,27 @@ class StreamResource(object):
         description = req.get_param("description")
         category = req.get_param("category")
         type = req.get_param("type")
+        thumbnail = req.get_param("thumbnail")
+        duration = req.get_param("duration")
         member = req.context.auth["session"]
         member_id = member["member_id"]
 
         storage_file_id = FileStorageDA().put_file_to_storage(file)
 
-        
+        # thumbnail
+        thumbnail_storage_file_id = FileStorageDA().put_file_to_storage(thumbnail)
+
         # save stream media
         file_data = StreamMediaDA.create_stream_media(
-            member_id, title, description, category, storage_file_id, type
+            member_id, title, description, category, storage_file_id, type, thumbnail_storage_file_id, duration
         )
 
         file_detail = FileStorageDA().get_file_detail(member, storage_file_id)
+        thumbnail_detail = FileStorageDA().get_file_detail(member, thumbnail_storage_file_id)
 
         if file_data is not None:
             file_data['video_url'] = amerize_url(file_detail['file_location'])
+            file_data['thumbnail_url'] = amerize_url(thumbnail_detail['file_location'])
             file_data['email'] = file_detail['member_email']
             file_data['first_name'] = file_detail['member_first_name']
             file_data['last_name'] = file_detail['member_last_name']

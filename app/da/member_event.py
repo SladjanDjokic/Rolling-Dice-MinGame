@@ -940,6 +940,8 @@ class MemberEventDA(object):
                     event_2.id AS event_id,
                     row_to_json(member_location) as event_location,
                     sequence_id,
+                    event_invite_2.create_date,
+                    'event_invitation' as invitation_type,
                     (
                         SELECT row_to_json(group_data) as group_info
                         FROM (

@@ -655,20 +655,58 @@ class GroupDA(object):
                     member_group_membership.status,
                     member_group_membership.create_date,
                     member_group.group_name,
+                    member_group.create_date as group_create_date,
+                    member_group.status as group_status,
+                    member_group.exchange_option as group_exchange_option,
                     member.id as create_user_id,
                     member.first_name,
                     member.last_name,
                     member.email,
-                    file_storage_engine.storage_engine_id
+                    file_storage_engine.storage_engine_id,
+                    (
+                        SELECT COUNT(*)
+                        FROM member_group_membership
+                        WHERE group_id = member_group.id
+                    ) AS total_member,
+                    COUNT(DISTINCT file_tree_item.id) AS total_files,
+                    (
+                        CASE
+                            WHEN COUNT(file_tree_item.id) = 0 THEN 0
+                            ELSE
+                                sum(
+                                CASE
+                                    WHEN left(group_files.mime_type, 5) = 'video' THEN 1
+                                    ELSE 0
+                                END
+                            ) * COUNT(DISTINCT file_tree_item.id) / COUNT(file_tree_item.id)
+                        END
+                    )  AS total_videos
                 FROM member_group_membership
                 INNER JOIN member_group on member_group_membership.group_id = member_group.id
                 INNER JOIN member_group_membership AS mgm_leader ON mgm_leader.group_id = member_group.id AND mgm_leader.group_role = 'owner'
                 INNER JOIN member ON mgm_leader.member_id = member.id
                 LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id
                 LEFT OUTER JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
+                LEFT OUTER JOIN file_tree ON (file_tree.id = member_group.main_file_tree)
+                LEFT OUTER JOIN file_tree_item ON file_tree_item.member_file_id IS NOT NULL AND file_tree_item.file_tree_id = file_tree.id
+                LEFT JOIN member_file ON member_file.id = file_tree_item.member_file_id
+                LEFT JOIN file_storage_engine as group_files ON group_files.id = member_file.file_id
                 WHERE
                     member_group_membership.member_id = %s
                     {invited}
+                GROUP BY
+                    member_group.id, 
+                    member_group_membership.status,
+                    member_group_membership.create_date,
+                    member_group.group_name,
+                    member_group.create_date,
+                    member_group.status,
+                    member_group.exchange_option,
+                    member.id,
+                    member.first_name,
+                    member.last_name,
+                    member.email,
+                    file_storage_engine.storage_engine_id
                 ORDER BY member_group_membership.create_date DESC
                 LIMIT 25
             """
@@ -682,25 +720,37 @@ class GroupDA(object):
                         status,
                         create_date,
                         group_name,
+                        group_create_date,
+                        group_status,
+                        group_exchange_option,
                         create_user_id,
                         first_name,
                         last_name,
                         email,
-                        storage_engine_id
+                        storage_engine_id,
+                        total_member,
+                        total_files,
+                        total_videos
                 ) in cls.source.cursor:
-                    mail = {
+                    group = {
                         "id": id,
                         "status": status,
                         "create_date": create_date,
                         "group_name": group_name,
+                        "group_create_date": group_create_date,
+                        "group_status": group_status,
+                        "group_exchange_option": SECURITY_EXCHANGE_OPTIONS.get(group_exchange_option, 0),
                         "create_user_id": create_user_id,
                         "first_name": first_name,
                         "last_name": last_name,
                         "email": email,
                         "amera_avatar_url": amerize_url(storage_engine_id),
+                        "total_member": total_member,
+                        "total_files": total_files,
+                        "total_videos": total_videos,
                         "invitation_type": "group_invitation"
                     }
-                    groups.append(mail)
+                    groups.append(group)
 
             return groups
         except Exception as e:

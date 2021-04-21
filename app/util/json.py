@@ -32,6 +32,9 @@ def parser(obj):
     # supported types
     if hasattr(obj, 'isoformat'):
         return obj.isoformat()
+    # datetime.timedelta for javascript/json
+    if hasattr(obj, 'total_seconds'):
+        return obj.total_seconds()
     # for uuid types
     if hasattr(obj, 'hex') and type(obj) == uuid.UUID:
         return obj.hex

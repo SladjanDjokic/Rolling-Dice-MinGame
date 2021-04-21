@@ -133,7 +133,7 @@ class MemberDA(object):
             "first_name": "member.first_name",
             "middle_name": "member.middle_name",
             "last_name": "member.last_name",
-            "company_name": "member.company_name",
+            "company_name": "company_name",
             "department": "department.name",
             "title": "job_title.name"
         }
@@ -173,7 +173,7 @@ class MemberDA(object):
                 member.first_name as first_name,
                 member.middle_name as middle_name,
                 member.last_name as last_name,
-                member.company_name as company_name,
+                COALESCE(company.name, member.company_name) as company_name,
                 department.name as department,
                 job_title.name as title,
                 file_storage_engine.storage_engine_id as s3_avatar_url
@@ -182,6 +182,8 @@ class MemberDA(object):
                 LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
                 LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+                LEFT JOIN company_member ON company_member.member_id = member.id
+                LEFT JOIN company ON company_member.company_id=company.id
                 {where_clause}
             ORDER BY {sort_columns_string}
             """
@@ -1826,8 +1828,27 @@ class MemberContactDA(object):
                     member.first_name,
                     member.last_name,
                     member.email,
-                    file_storage_engine.storage_engine_id,
-                    contact.id as requester_contact_id
+                    COALESCE(company.name, member.company_name) as company,
+                    member.job_title_id as job_title_id,
+                    member.department_id as department_id,
+                    contact.id as requester_contact_id,
+                    contact.security_exchange_option,
+                    job_title.name as job_title,
+                    department.name as department_name,
+                    COALESCE(json_agg(DISTINCT member_location.*) FILTER (WHERE member_location.id IS NOT NULL), '[]') AS location_information,
+                    COALESCE(json_agg(DISTINCT member_contact_2.*) FILTER (WHERE member_contact_2.id IS NOT NULL), '[]') AS contact_information,
+                    COALESCE(json_agg(DISTINCT country_code.*) FILTER (WHERE country_code.id IS NOT NULL), '[]') AS country_code,
+                    COALESCE(json_agg(DISTINCT member_achievement.*) FILTER (WHERE member_achievement.id IS NOT NULL), '[]') AS achievement_information,
+                    COALESCE(json_agg(DISTINCT profile_skill.*) FILTER (WHERE profile_skill.display_status = TRUE), '[]') AS skills_information,
+                    COALESCE(json_agg(DISTINCT member_workhistory.*), '[]') AS workhistory_information, 
+                    COALESCE(json_agg(DISTINCT member_education.*), '[]') AS education_information,
+                    COALESCE(json_agg(DISTINCT member_certificate.*), '[]') AS certificate_information,
+                    member_profile.biography as biography,
+                    member_security_preferences.facial_recognition as facial_recognition,
+                    member_rate.pay_rate,
+                    member_rate.currency_code_id,
+                    currency_code.currency_code,
+                    file_storage_engine.storage_engine_id
                 FROM contact
                 INNER JOIN contact receiver_contact ON
                         contact.contact_member_id = receiver_contact.member_id
@@ -1835,9 +1856,43 @@ class MemberContactDA(object):
                 INNER JOIN member ON contact.member_id = member.id
                 LEFT JOIN member_profile ON member.id = member_profile.member_id
                 LEFT JOIN file_storage_engine on file_storage_engine.id = member_profile.profile_picture_storage_id
-                WHERE
+                LEFT OUTER JOIN job_title ON job_title.id = member.job_title_id
+                LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = member.id
+                LEFT OUTER JOIN country_code ON country_code.id = member_contact_2.device_country
+                LEFT OUTER JOIN member_location ON member_location.member_id = member.id
+                LEFT OUTER JOIN member_achievement ON member_achievement.member_id = member.id
+                LEFT OUTER JOIN member_security_preferences ON member_security_preferences.member_id = member.id 
+                LEFT JOIN member_rate ON member_rate.member_id = member.id
+                LEFT JOIN member_skill ON member_skill.member_id = member.id
+                LEFT JOIN profile_skill ON profile_skill.id = member_skill.profile_skill_id
+                LEFT JOIN member_workhistory ON member_workhistory.member_id = member.id
+                LEFT JOIN member_education ON member_education.member_id = member.id
+                LEFT JOIN member_certificate ON member_certificate.member_id = member.id
+                LEFT JOIN department ON department.id = member.department_id
+                LEFT JOIN currency_code ON currency_code.id = member_rate.currency_code_id
+                LEFT JOIN company_member ON company_member.member_id = member.id
+                LEFT JOIN company ON company_member.company_id=company.id
+                WHERE 
                     receiver_contact.member_id = %s
                     {pending}
+                GROUP BY
+                    receiver_contact.id,
+                    member.id,
+                    contact.id,
+                    company.name,
+                    member.company_name,
+                    member.job_title_id,
+                    job_title.name,
+                    department.name,
+                    member.department_id,
+                    receiver_contact.create_date,
+                    receiver_contact.update_date,
+                    file_storage_engine.storage_engine_id,
+                    member_profile.biography,
+                    member_security_preferences.facial_recognition,
+                    member_rate.pay_rate,
+                    member_rate.currency_code_id,
+                    currency_code.currency_code
                 ORDER BY receiver_contact.update_date DESC
                 LIMIT 25
             """
@@ -1855,8 +1910,27 @@ class MemberContactDA(object):
                         first_name,
                         last_name,
                         email,
+                        company,
+                        job_title_id,
+                        department_id,
+                        requester_contact_id,
+                        security_exchange_option,
+                        job_title,
+                        department_name,
+                        location_information,
+                        contact_information,
+                        country_code,
+                        achievement_information,
+                        skills_information,
+                        workhistory_information, 
+                        education_information,
+                        certificate_information,
+                        biography,
+                        facial_recognition,
+                        pay_rate,
+                        currency_code_id,
+                        currency_code,
                         storage_engine_id,
-                        requester_contact_id
                 ) in cls.source.cursor:
                     contact = {
                         "id": id,
@@ -1867,8 +1941,27 @@ class MemberContactDA(object):
                         "first_name": first_name,
                         "last_name": last_name,
                         "email": email,
-                        "amera_avatar_url": amerize_url(storage_engine_id),
+                        "company": company,
+                        "job_title_id": job_title_id,
+                        "department_id": department_id,
                         "requester_contact_id": requester_contact_id,
+                        "security_exchange_option": SECURITY_EXCHANGE_OPTIONS.get(security_exchange_option, 0),
+                        "job_title": job_title,
+                        "department_name": department_name,
+                        "location_information": location_information,
+                        "contact_information": contact_information,
+                        "country_code": country_code,
+                        "achievement_information": achievement_information,
+                        "skills_information": skills_information,
+                        "workhistory_information": workhistory_information, 
+                        "education_information": education_information,
+                        "certificate_information": certificate_information,
+                        "biography": biography,
+                        "facial_recognition": facial_recognition,
+                        "pay_rate": pay_rate,
+                        "currency_code_id": currency_code_id,
+                        "currency_code": currency_code,
+                        "amera_avatar_url": amerize_url(storage_engine_id),
                         "invitation_type": "contact_invitation"
                     }
                     contacts.append(contact)
