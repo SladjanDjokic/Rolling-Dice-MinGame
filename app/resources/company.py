@@ -19,7 +19,6 @@ class CompanyResource(object):
            and (not member_role or member_role not in ['owner', 'administrator']):
             raise NotEnoughCompanyPrivileges
 
-
     @check_session_administrator
     def on_post(self, req, resp):
         (name, place_id, address_1, address_2, city,
@@ -129,7 +128,7 @@ class CompanyResource(object):
 
             member_role = CompanyDA.get_member_role(member_id, company_id)
             self._check_company_update_privileges(req, member_role)
-            
+
             CompanyDA.update_company_details({"company_id": company_id, "name": name, "email": json.convert_null(email), "primary_url": json.convert_null(primary_url), "main_phone": json.convert_null(main_phone), "country_code_id": country_code_id, "place_id": json.convert_null(
                 place_id), "address_1": json.convert_null(address_1), "address_2": json.convert_null(address_2), "city": json.convert_null(city), "state": json.convert_null(state), "postal": json.convert_null(postal), "province": json.convert_null(province)})
 
@@ -152,6 +151,66 @@ class CompanyResource(object):
                 for industry_id in to_delete_industries:
                     CompanyDA.unlist_company_industry(
                         industry_id=industry_id, company_id=company_id)
+
+            company = CompanyDA.get_company(company_id)
+
+            if company:
+                resp.body = json.dumps({
+                    "description": "Company details updated successfully",
+                    "data": company,
+                    "success": True
+                }, default_parser=json.parser)
+            else:
+                resp.body = json.dumps({
+                    "description": "Something went wrong when updating company details",
+                    "success": False
+                }, default_parser=json.parser)
+
+        except Exception as err:
+            logger.exception(err)
+            raise err
+
+    @check_session
+    def on_post_members_update(self, req, resp, company_id):
+        member_id = req.context.auth['session']['member_id']
+        try:
+            (company_members, departments) = request.get_json_or_form(
+                "companyMembers", "departments", req=req)
+
+            member_role = CompanyDA.get_member_role(member_id, company_id)
+            self._check_company_update_privileges(req, member_role)
+
+            listed_dep_ids = CompanyDA.get_company_departments(company_id)
+            incoming_dep_ids = []
+            if not departments:
+                incoming_dep_ids = []
+            if isinstance(departments, list):
+                incoming_dep_ids = [dep["department_id"]
+                                    for dep in departments]
+
+            to_add_deps = set(incoming_dep_ids) - set(listed_dep_ids)
+            to_delete_deps = set(listed_dep_ids) - set(incoming_dep_ids)
+
+            logger.info(f"to_add_deps {to_add_deps}")
+            logger.info(f"to_delete_deps {to_delete_deps}")
+            if len(to_add_deps) > 0:
+                for department_id in to_add_deps:
+                    CompanyDA.add_company_department(company_id, department_id)
+
+            if company_members and isinstance(company_members, list):
+                if len(company_members) > 0:
+                    for company_member in company_members:
+                        CompanyDA.update_company_member_status({"company_member_id": company_member["company_member_id"],
+                                                                "company_role": company_member["company_role"],
+                                                                "department_name": json.convert_null(company_member["department_name"]),
+                                                                "company_id": company_id,
+                                                                "department_status": company_member["department_status"],
+                                                                "author_id": member_id})
+
+            if len(to_delete_deps) > 0:
+                for department_id in to_delete_deps:
+                    CompanyDA.unlist_company_department(
+                        company_id, department_id)
 
             company = CompanyDA.get_company(company_id)
 

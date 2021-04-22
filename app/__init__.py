@@ -526,6 +526,9 @@ def _setup_routes(app):
                   company_resource, suffix="picture")
     app.add_route("/company/details/{company_id:int}",
                   company_resource, suffix="details_update")
+    app.add_route("/company/members/{company_id:int}",
+                  company_resource, suffix="members_update")
+
     app.add_route("/company/member", company_resource, suffix="member")
 
     app.add_route("/company/unregistered", CompanyUnregisteredResource())

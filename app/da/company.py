@@ -77,7 +77,7 @@ class CompanyDA(object):
                                 FROM company_member_status
                                 LEFT JOIN company_department ON company_department.id = company_member_status.company_department_id
                                 LEFT JOIN department ON department.id = company_department.department_id
-                                ORDER BY company_member_id, update_date ASC
+                                ORDER BY company_member_id, update_date DESC
                             ) AS ls ON ls.company_member_id = company_member.id
                             LEFT JOIN member ON company_member.member_id = member.id
                             LEFT JOIN job_title ON job_title_id = job_title.id
@@ -225,7 +225,7 @@ class CompanyDA(object):
                                 FROM company_member_status
                                 LEFT JOIN company_department ON company_department.id = company_member_status.company_department_id
                                 LEFT JOIN department ON department.id = company_department.department_id
-                                ORDER BY company_member_id, update_date ASC
+                                ORDER BY company_member_id, update_date DESC
                             ) AS ls ON ls.company_member_id = company_member.id
                             LEFT JOIN member ON company_member.member_id = member.id
                             LEFT JOIN job_title ON job_title_id = job_title.id
@@ -448,6 +448,65 @@ class CompanyDA(object):
             WHERE industry_id = %s AND company_id = %s
         """)
         cls.source.execute(query, (industry_id, company_id))
+        if commit:
+            cls.source.commit()
+
+    # Departments
+    @classmethod
+    def get_company_departments(cls, company_id):
+        query = ("""
+            SELECT ARRAY (
+                SELECT department.id
+                FROM company_department
+                LEFT JOIN department ON department.id = company_department.department_id
+                WHERE company_id = %s
+            )
+        """)
+        cls.source.execute(query, (company_id,))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        return None
+
+    @classmethod
+    def add_company_department(cls, company_id, department_id, commit=True):
+        query = ("""
+            INSERT INTO company_department (company_id, department_id) 
+            VALUES (%s, %s)
+            RETURNING id
+        """)
+        cls.source.execute(query, (company_id, department_id))
+        if commit:
+            cls.source.commit()
+
+    @classmethod
+    def unlist_company_department(cls, company_id, department_id, commit=True):
+        query = ("""
+            DELETE FROM company_department
+            WHERE company_id = %s AND department_id = %s
+        """)
+        cls.source.execute(query, (company_id, department_id))
+        if commit:
+            cls.source.commit()
+
+    # Company member props update
+    @classmethod
+    def update_company_member_status(cls, params, commit=True):
+        query = ("""
+            INSERT INTO company_member_status (company_member_id, company_role, company_department_id, department_status, update_by) 
+            VALUES (
+                %(company_member_id)s,
+                %(company_role)s,
+                (
+                    SELECT company_department.id 
+                    FROM company_department
+                    LEFT JOIN department ON department.id = company_department.department_id
+                    WHERE department.name = %(department_name)s AND company_id = %(company_id)s
+                ),
+                %(department_status)s,
+                %(author_id)s
+            )
+        """)
+        cls.source.execute(query, params)
         if commit:
             cls.source.commit()
 
