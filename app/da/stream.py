@@ -22,7 +22,7 @@ class StreamMediaDA(object):
             query = """
                 INSERT INTO stream_media (member_id, title, description, category, stream_file_id, type, thumbnail, duration)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING *
+                RETURNING id, member_id, title, description, type, create_date, update_date, category, duration
             """
             params = (member_id, title, description, category, stream_file_id, types, thumbnail, f'PT{duration}S')
 
@@ -37,11 +37,11 @@ class StreamMediaDA(object):
                     "user_id": result[1],
                     "title": result[2],
                     "description": result[3],
-                    "type": result[10],
-                    "create_date": result[8],
-                    "update_date": result[9],
-                    "category": result[11],
-                    "duration": result[12]
+                    "type": result[4],
+                    "create_date": result[5],
+                    "update_date": result[6],
+                    "category": result[7],
+                    "duration": result[8]
                 }
                 return media
 
@@ -58,8 +58,13 @@ class StreamMediaDA(object):
             params = ()
             for index, category in enumerate(categories):
                 type = types[index]
-                where += "(stream_media.category = %s AND stream_media.type @> %s::INTEGER[])"
-                params += (category, [type],)
+                if int(type) > 0:
+                    where += "(stream_media.category = %s AND stream_media.type @> %s::INTEGER[])"
+                    params += (category, [type],)
+                else:
+                    where += "(stream_media.category = %s)"
+                    params += (category,)
+
                 if index < len(categories) - 1:
                     where += " OR "
                 else:
@@ -185,7 +190,7 @@ class StreamMediaDA(object):
                     description = %s
                 WHERE 
                     id = %s
-                RETURNING *
+                RETURNING id, member_id, title, description, type, create_date, update_date, category
             """
             cls.source.execute(query, params)
             cls.source.commit()
@@ -197,10 +202,10 @@ class StreamMediaDA(object):
                     "user_id": result[1],
                     "title": result[2],
                     "description": result[3],
-                    "type": result[10],
-                    "create_date": result[8],
-                    "update_date": result[9],
-                    "category": result[11]
+                    "type": result[4],
+                    "create_date": result[5],
+                    "update_date": result[6],
+                    "category": result[7]
                 }
                 return media
             return None

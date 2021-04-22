@@ -445,7 +445,8 @@ services:
       - ../web-api/datasource/postgresql/schema-updates-2021-04-10_stream_media-category-and-type.sql:/docker-entrypoint-initdb.d/s-2-stream_media-category-and-type.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-04-13_stream_media-category-and-type.sql:/docker-entrypoint-initdb.d/s-3-stream_media-category-and-type.sql
       - ../web-api/datasource/postgresql/stream_media_category_type.sql:/docker-entrypoint-initdb.d/t-stream_media_category_type.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-04-19_stream_media-duration-and-thumbnail.sql:/docker-entrypoint-initdb.d/t-t-schema-updates-2021-04-19_stream_media-duration-and-thumbnail.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-04-19_stream_media-duration-and-thumbnail.sql:/docker-entrypoint-initdb.d/t-t-stream_media-duration-and-thumbnail.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-04-21_page_settings-type.sql:/docker-entrypoint-initdb.d/t-2-page_settings-type.sql
       # Test data
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
