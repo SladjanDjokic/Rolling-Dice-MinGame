@@ -403,13 +403,20 @@ class ContactMembersResource(object):
     def on_get(self, req, resp):
         member_id = req.context.auth["session"]["member_id"]
 
-        # sort_by_params = 'first_name, last_name, -company' or '+first_name, +last_name, -company'
+        search_key = req.get_param('searchKey') or ''
+        page_size = req.get_param_as_int('pageSize')
+        page_number = req.get_param_as_int('pageNumber')
         sort_params = req.get_param('sort')
+        filter_params = req.get_param('filter')
 
-        members = MemberContactDA.get_members(member_id, sort_params)
+        result = MemberContactDA.get_members(
+            member_id, sort_params, filter_params,
+            search_key, page_size, page_number
+        )
 
         resp.body = json.dumps({
-            "members": members,
+            "members": result['members'],
+            "count": result['count'],
             "success": True
         }, default_parser=json.parser)
 

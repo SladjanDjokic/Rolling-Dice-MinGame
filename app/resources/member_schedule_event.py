@@ -12,6 +12,7 @@ from app.da.group import GroupDA
 from app.da.file_sharing import FileStorageDA, FileTreeDA
 from app.da.member_schedule_event_invite import MemberScheduleEventInviteDA
 from app.da.file_sharing import FileStorageDA
+from app.da.project import ProjectDA
 
 from app.util.auth import check_session
 from app.exceptions.member import MemberNotFound
@@ -556,6 +557,10 @@ class MemberEventInvitations(object):
         # new media message
         new_media_messages = MemberVideoMailDA.get_all_media_mails(
             member_id)
+        
+        # project contract invitations
+        contract_invitations = ProjectDA.get_member_contract_invites(
+            member_id)
 
         if not event_invitations:
             event_invitations = []
@@ -565,15 +570,11 @@ class MemberEventInvitations(object):
             group_invitations = []
         if not new_media_messages:
             new_media_messages = []
-
-        ### TODO: not sure about it whether to include or not
-        # contract_invitations = ProjectDA.get_member_contract_invites(
-        #     member_id)
-        # if not contract_invitations:
-        #     contract_invitations = []
+        if not contract_invitations:
+            contract_invitations = []
 
         result = event_invitations + contact_invitations + \
-            new_media_messages + group_invitations
+            new_media_messages + group_invitations + contract_invitations
 
         resp.body = json.dumps({
             "data": result,

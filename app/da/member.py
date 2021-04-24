@@ -1408,21 +1408,42 @@ class MemberContactDA(object):
         return countries
 
     @classmethod
-    def get_members(cls, member_id, sort_params):
+    def get_members(cls, member_id, sort_params, filter_params, search_key='', page_size=None, page_number=None):
         sort_columns_string = 'first_name ASC'
+        member_dict = {
+            'id': 'member.id',
+            'first_name': 'member.first_name',
+            'middle_name': 'member.middle_name',
+            'last_name': 'member.last_name',
+            'email': 'member.email',
+            'company': 'member.company_name',
+            'title': 'job_title.name',
+            'contact_member_id': 'contact.contact_member_id'
+        }
+        
         if sort_params:
-            member_dict = {
-                'id': 'member.id',
-                'first_name': 'member.first_name',
-                'middle_name': 'member.middle_name',
-                'last_name': 'member.last_name',
-                'email': 'member.email',
-                'company': 'member.company_name',
-                'title': 'job_title.name',
-                'contact_member_id': 'contact.contact_member_id'
-            }
             sort_columns_string = formatSortingParams(
                 sort_params, member_dict) or sort_columns_string
+
+        # (filter_conditions_query, filter_conditions_params) = cls.formatFilterConditions(
+        #     filter_params, member_dict)
+
+        get_members_params = (member_id, member_id, ) 
+        # + filter_conditions_params
+
+        get_members_search_query = ""
+        if search_key:
+            get_members_search_query = """
+                AND
+                (
+                    concat_ws('', member.first_name, member.last_name, member.last_name) iLIKE %s
+                    OR member.email iLIKE %s
+                    OR job_title.name iLIKE %s
+                    OR member.company_name iLIKE %s
+                )
+            """
+            like_search_key = """%{}%""".format(search_key)
+            get_members_params = get_members_params + ((like_search_key, )*4)
 
         members = list()
         get_members_query = (f"""
@@ -1441,10 +1462,29 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
                 LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
-                WHERE member.id <> %s
+                WHERE 
+                    member.id <> %s 
+                    AND contact.contact_member_id IS NULL
+                    {get_members_search_query}
                 ORDER BY {sort_columns_string}
                 """)
-        get_members_params = (member_id, member_id,)
+        
+        countQuery = (f"SELECT COUNT(*) FROM ({get_members_query}) src;")
+
+        count = 0
+        cls.source.execute(countQuery, get_members_params)
+        if cls.source.has_results():
+            result = cls.source.cursor.fetchone()
+            (count, ) = result
+        if count > 0:
+            if page_size and page_number >= 0:
+                get_members_query += """LIMIT %s OFFSET %s"""
+                offset = 0
+                if page_number > 0:
+                    offset = page_number * page_size
+                get_members_params = get_members_params + (page_size, offset)
+
+
         cls.source.execute(get_members_query, get_members_params)
         if cls.source.has_results():
             for (
@@ -1458,20 +1498,22 @@ class MemberContactDA(object):
                     contact_member_id,
                     s3_avatar_url
             ) in cls.source.cursor:
-                if not contact_member_id:
-                    member = {
-                        "id": id,
-                        "first_name": first_name,
-                        "middle_name": middle_name,
-                        "last_name": last_name,
-                        "email": email,
-                        "company": company,
-                        "title": title,
-                        "contact_member_id": contact_member_id,
-                        "amera_avatar_url": amerize_url(s3_avatar_url)
-                    }
-                    members.append(member)
-        return members
+                member = {
+                    "id": id,
+                    "first_name": first_name,
+                    "middle_name": middle_name,
+                    "last_name": last_name,
+                    "email": email,
+                    "company": company,
+                    "title": title,
+                    "contact_member_id": contact_member_id,
+                    "amera_avatar_url": amerize_url(s3_avatar_url)
+                }
+                members.append(member)
+        return {
+            "members": members,
+            "count": count
+        }
 
     @classmethod
     def formatFilterConditions(cls, filter_by, entity_dict):

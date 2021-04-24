@@ -1291,7 +1291,7 @@ class ProjectDA(object):
             SELECT json_agg(rows) AS invites
             FROM (
                 SELECT
-                    'contract' AS type,
+                    'contract_invitation' AS invitation_type,
                     project.id AS project_id,
                     company.name AS company_name,
                     project.project_title,

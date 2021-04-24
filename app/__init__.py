@@ -563,6 +563,7 @@ def _setup_routes(app):
 
     # Streaming
     stream_resource = StreamResource()
+    app.add_route("/streaming/upload-video", stream_resource, suffix="video")
     app.add_route("/streaming/upload", stream_resource)
     app.add_route("/streaming/videos", stream_resource)
     app.add_route("/streaming/video/{id:int}", stream_resource)

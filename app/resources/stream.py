@@ -16,15 +16,6 @@ logger = logging.getLogger(__name__)
 
 class StreamResource(object):
 
-    def __init__(self):
-        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.create_event_attachment'),
-                                    "topic": settings.get('kafka.topics.calendar')
-                                    },
-                           "GET": {"event_type": settings.get('kafka.event_types.delete.delete_event_attachment'),
-                                      "topic": settings.get('kafka.topics.calendar')
-                                      },
-                           }
-
     @check_session
     def on_get(self, req, resp):
         member = req.context.auth["session"]
@@ -50,38 +41,58 @@ class StreamResource(object):
 
     @check_session
     def on_post(self, req, resp):
-        file = req.get_param("file")
         title = req.get_param("title")
         description = req.get_param("description")
         category = req.get_param("category")
         type = req.get_param("type")
+        video = req.get_param("video")
         thumbnail = req.get_param("thumbnail")
         duration = req.get_param("duration")
         member = req.context.auth["session"]
         member_id = member["member_id"]
 
-        storage_file_id = FileStorageDA().put_file_to_storage(file)
+        # save stream media
+        file_data = StreamMediaDA.create_stream_media(
+            member_id, title, description, category, video, type, thumbnail, duration
+        )
+
+        video_detail = FileStorageDA().get_file_detail(member, video)
+        thumbnail_detail = FileStorageDA().get_file_detail(member, thumbnail)
+
+        if file_data is not None:
+            file_data['video_url'] = amerize_url(video_detail['file_location'])
+            file_data['thumbnail_url'] = amerize_url(thumbnail_detail['file_location'])
+            file_data['email'] = video_detail['member_email']
+            file_data['first_name'] = video_detail['member_first_name']
+            file_data['last_name'] = video_detail['member_last_name']
+
+            resp.body = json.dumps({
+                "data": file_data,
+                "success": True,
+            }, default_parser=json.parser)
+        else:
+            resp.body = json.dumps({
+                "description": "Could not save content",
+                "success": False
+            }, default_parser=json.parser)
+
+    @check_session
+    def on_post_video(self, req, resp):
+        video = req.get_param("video")
+        thumbnail = req.get_param("thumbnail")
+
+        video_storage_file_id = FileStorageDA().put_file_to_storage(video)
 
         # thumbnail
         thumbnail_storage_file_id = FileStorageDA().put_file_to_storage(thumbnail)
 
-        # save stream media
-        file_data = StreamMediaDA.create_stream_media(
-            member_id, title, description, category, storage_file_id, type, thumbnail_storage_file_id, duration
-        )
-
-        file_detail = FileStorageDA().get_file_detail(member, storage_file_id)
-        thumbnail_detail = FileStorageDA().get_file_detail(member, thumbnail_storage_file_id)
-
-        if file_data is not None:
-            file_data['video_url'] = amerize_url(file_detail['file_location'])
-            file_data['thumbnail_url'] = amerize_url(thumbnail_detail['file_location'])
-            file_data['email'] = file_detail['member_email']
-            file_data['first_name'] = file_detail['member_first_name']
-            file_data['last_name'] = file_detail['member_last_name']
+        if video_storage_file_id is not None and thumbnail_storage_file_id is not None:
 
             resp.body = json.dumps({
-                "data": file_data,
+                "data": {
+                    "video": video_storage_file_id,
+                    "thumbnail": thumbnail_storage_file_id
+                },
                 "success": True
             }, default_parser=json.parser)
         else:
@@ -131,15 +142,6 @@ class StreamResource(object):
 
 class StreamCategoryResource(object):
 
-    def __init__(self):
-        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.create_event_attachment'),
-                                    "topic": settings.get('kafka.topics.calendar')
-                                    },
-                           "GET": {"event_type": settings.get('kafka.event_types.delete.delete_event_attachment'),
-                                      "topic": settings.get('kafka.topics.calendar')
-                                      },
-                           }
-
     @check_session
     def on_get(self, req, resp):
 
@@ -158,15 +160,6 @@ class StreamCategoryResource(object):
 
 
 class StreamTypeResource(object):
-
-    def __init__(self):
-        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.create_event_attachment'),
-                                    "topic": settings.get('kafka.topics.calendar')
-                                    },
-                           "GET": {"event_type": settings.get('kafka.event_types.delete.delete_event_attachment'),
-                                      "topic": settings.get('kafka.topics.calendar')
-                                      },
-                           }
 
     @check_session
     def on_get(self, req, resp):
