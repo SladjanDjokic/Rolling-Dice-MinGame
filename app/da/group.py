@@ -2,6 +2,9 @@ import logging
 
 # import uuid
 # from dateutil.relativedelta import relativedelta
+
+from falcon import HTTPInternalServerError
+
 from app.util.db import source, formatSortingParams
 from app.exceptions.data import DuplicateKeyError, DataMissingError, \
     RelationshipReferenceError
@@ -130,7 +133,7 @@ class GroupDA(object):
         return None
 
     @classmethod
-    def get_groups_by_group_leader_id(cls, group_leader_id, sort_params, group_type='contact', search_key=None):
+    def get_groups_by_group_leader_id(cls, group_leader_id, sort_params=None, search_key=None, group_type='contact', group_status='active',):
         sort_columns_string = 'group_name ASC'
         if sort_params:
             group_dict = {
@@ -236,7 +239,11 @@ class GroupDA(object):
             LEFT OUTER JOIN file_tree_item ON file_tree_item.member_file_id IS NOT NULL AND file_tree_item.file_tree_id = file_tree.id
             LEFT JOIN member_file ON member_file.id = file_tree_item.member_file_id
             LEFT JOIN file_storage_engine as group_files ON group_files.id = member_file.file_id
-            WHERE member_group_membership.member_id = %s AND member_group_membership.group_role = 'owner' AND group_type = %s
+            WHERE 
+                member_group_membership.member_id = %s 
+                AND member_group_membership.group_role = 'owner' 
+                AND group_type = %s
+                AND member_group.status = %s
             {search_query if search_key else ""}
             GROUP BY member_group.id,
                     member_group_membership.member_id,
@@ -255,7 +262,7 @@ class GroupDA(object):
 
         group_list = list()
 
-        params = (group_leader_id, group_type)
+        params = (group_leader_id, group_type, group_status)
 
         if search_key:
             like_search_key = f"%{search_key}%"
@@ -289,7 +296,7 @@ class GroupDA(object):
         return group_list
 
     @classmethod
-    def get_all_groups_by_member_id(cls, member_id, sort_params, group_type='contact', member_only=False, search_key=None):
+    def get_all_groups_by_member_id(cls, member_id, sort_params, member_only=False, search_key=None, group_type='contact', group_status='active'):
         sort_columns_string = 'member_group.group_name ASC'
         if sort_params:
             entity_dict = {
@@ -405,7 +412,7 @@ class GroupDA(object):
                 member_group_membership.member_id = %s 
                 AND group_type = %s
                 {"AND member_group_membership.group_role != 'owner'" if member_only else ""}
-                AND member_group.status = 'active'
+                AND member_group.status = %s
                 {search_query if search_key else ""}
 
             GROUP BY member_group.id,
@@ -428,7 +435,7 @@ class GroupDA(object):
             search_key = ""
 
         like_search_key = f"%{search_key}%"
-        params = (member_id, group_type)
+        params = (member_id, group_type, group_status)
 
         if search_key:
             like_search_key = f"%{search_key}%"
@@ -757,6 +764,21 @@ class GroupDA(object):
             logger.error(e, exc_info=True)
             return None
 
+    @classmethod
+    def update_group_name(cls, group_id, group_name, commit=True):
+        query = """
+            UPDATE member_group
+            SET group_name = %s
+            WHERE id = %s
+        """
+        params = (group_name, group_id)
+        try:
+            cls.source.execute(query, params)
+            if commit:
+                cls.source.commit()
+        except:
+            raise HTTPInternalServerError()
+            
 class GroupMembershipDA(object):
     source = source
 
@@ -912,13 +934,20 @@ class GroupMembershipDA(object):
             query = ("""
                 DELETE FROM member_group_membership
                 WHERE group_id = %s AND member_id = %s
+                RETURNING group_id
             """)
             params = (group_id, member_id,)
+
             cls.source.execute(query, params)
+
+            id = None
+            if cls.source.has_results():
+                id = cls.source.cursor.fetchone()[0]
+
             if commit:
                 cls.source.commit()
 
-            return member_id
+            return id
         except Exception:
             logger.exception('Unable to delete from group membership')
             return None
@@ -970,7 +999,6 @@ class GroupMembershipDA(object):
         params = (group_role, group_id, member_id)
         cls.source.execute(query, params)
         cls.source.commit()
-
 
 class GroupMemberInviteDA(object):
     source = source

@@ -94,10 +94,17 @@ class MemberGroupResource(object):
     def on_get(self, req, resp):
         member_id = req.context.auth['session']['member_id']
 
-        get_all = req.get_param('get_all')
+        get_all = req.get_param_as_bool(
+            'get_all',
+            blank_as_true=False,
+            required=False,
+            default=False
+        )
         # sort_params = '-member_group.group_name' names in descending order
         sort_params = req.get_param('sort')
         search_key = req.get_param('search_key')
+
+        logger.debug(f"Get groups: {get_all}")
 
         if get_all:
             resp_list = GroupDA.get_all_groups_by_member_id(
@@ -215,6 +222,28 @@ class GroupDetailResource(object):
         group['total_member'] = len(members)
         return group
 
+    @check_session
+    def on_put(self, req, resp, group_id=None):
+        try:
+            (group_name, ) = request.get_json_or_form(
+                "group_name", req=req
+            )
+            GroupDA().update_group_name(group_id, group_name)
+
+            resp.body = json.dumps({
+                    "data": {
+                        'group_name': group_name
+                    },
+                    "description": "Group Updated Successfully.",
+                    "success": True
+                }, default_parser=json.parser)
+        except:
+            resp.body = json.dumps({
+                "data": {},
+                "description": "Something went wrong!",
+                "success": False
+            })
+
 
 class GroupMembershipResource(object):
 
@@ -272,15 +301,31 @@ class GroupMembershipResource(object):
 
     @staticmethod
     def on_delete(req, resp):
-        (group_id, member_id) = request.get_json_or_form(
-            "groupId", "groupMemberId", req=req)
-        group_member_id = GroupMembershipDA().remove_group_member(group_id, member_id)
-        if not group_member_id:
-            raise MemberNotFound
-        group = GroupDetailResource().get_group_detail(group_id)
+        (group_ids, member_id) = request.get_json_or_form(
+            "groupIds", "groupMemberId", req=req)
+
+        group_ids = group_ids.split(',')
+
+        delete_status = []
+        for group_id in group_ids:
+            id = GroupMembershipDA().remove_group_member(group_id, member_id)
+            if id:
+                delete_status.append({ 
+                    "group_id" : group_id,
+                    "member_id": member_id,
+                    "status": True
+                })
+            else:
+                delete_status.append({
+                    "group_id" : group_id,
+                    "member_id": member_id,
+                    "status": False
+                })
+        
+        # group = GroupDetailResource().get_group_detail(group_id)
         resp.body = json.dumps({
-            "data": group,
-            "description": "Member removed successfully!",
+            "data": delete_status,
+            "description": "Member's removed successfully!",
             "success": True
         }, default_parser=json.parser)
 
@@ -389,7 +434,6 @@ class GroupMemberAccept(object):
         member_id = req.context.auth['session']['member_id']
 
         try:
-
             (status, ) = request.get_json_or_form(
                 "status", req=req
             )
