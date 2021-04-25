@@ -63,8 +63,8 @@ INSERT INTO company_member_status (company_member_id, company_role, company_depa
     (1, 'administrator', 1, 'standard', CURRENT_TIMESTAMP - INTERVAL '2 hours',1);
 
 INSERT INTO company_member_status (company_member_id, company_role, company_department_id, department_status, update_by) VALUES
-    (1, 'administrator', 1, 'leader', 1),
-    (2, 'owner', 1, 'standard', 1),
+    (1, 'owner', 1, 'leader', 1),
+    (2, 'standard', 1, 'standard', 1),
     (3, 'standard', 1, 'standard', 1),
     (4, 'standard', 1, 'standard', 1),
     (5, 'standard', 1, 'standard', 1),

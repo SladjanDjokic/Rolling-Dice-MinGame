@@ -53,7 +53,7 @@ class MemberSearchResource(object):
                                                                      page_number=page_number)
             else:
                 result = MemberDA.get_members(member_id=member_id, search_key=search_key, page_size=page_size,
-                                               page_number=page_number)
+                                              page_number=page_number)
                 members = result['members']
                 count = result['count']
 
@@ -111,11 +111,11 @@ class MemberRegisterResource(object):
     def on_post(self, req, resp, invite_key=None):
 
         (city, state, province, pin, email, password, confirm_password, first_name, last_name, date_of_birth,
-         phone_number, country, postal, company_name, job_title_id, profilePicture,
-         cell_confrimation_ts, email_confrimation_ts, promo_code_id, department_id, company_id, ) = request.get_json_or_form(
+         phone_number, country, postal, company, job_title_id, profilePicture,
+         cell_confrimation_ts, email_confrimation_ts, promo_code_id, department_id, ) = request.get_json_or_form(
             "city", "state", "province", "pin", "email", "password", "confirm_password", "first_name", "last_name", "dob",
-            "cell", "country", "postal_code", "company_name", "job_title_id", "profilePicture",
-            "cellConfirmationTS", "emailConfirmationTS", "activatedPromoCode", "department_id", "company_id", req=req)
+            "cell", "country", "postal_code", "company", "job_title_id", "profilePicture",
+            "cellConfirmationTS", "emailConfirmationTS", "activatedPromoCode", "department_id", req=req)
         try:
             # We store the key in hex format in the database
 
@@ -127,11 +127,10 @@ class MemberRegisterResource(object):
 
             job_title_id = None if job_title_id == 'not_applicable' else job_title_id
             department_id = None if department_id == 'not_applicable' else department_id
-            company_name = None if company_name == 'null' else company_name
-            company_id = None if company_id == 'null' else company_id
+            company = json.loads(company)
+            company_name = company["name"]
+            company_id = company["id"]
 
-            if company_id is not None:
-                company_name = None
             if (not email or not password or
                     not first_name or not last_name):  # or
                 #            not date_of_birth or not phone_number or
@@ -147,7 +146,6 @@ class MemberRegisterResource(object):
             # logger.debug("Middle_name: {}".format(middle_name))
             logger.debug("Last_name: {}".format(last_name))
             logger.debug("Password: {}".format(password))
-            logger.debug("Company name: {}".format(company_name))
             # logger.debug("group id: {}".format(group_id))
 
             member = MemberDA.get_member_by_email(email)
@@ -191,6 +189,33 @@ class MemberRegisterResource(object):
                 country=country, postal=postal, cell_confrimation_ts=cell_confrimation_ts, email_confrimation_ts=email_confrimation_ts,
                 department_id=department_id, main_file_tree_id=main_file_tree_id, bin_file_tree_id=bin_file_tree_id, commit=True)
             logger.debug("New registered member_id: {}".format(member_id))
+
+            # If not listed company - create one, then handle membership and deps
+            if not company_id:
+                company_id = CompanyDA.create_company(name=company_name)
+
+            if company_id and member_id:
+                company_member_id = CompanyDA.create_company_membership(
+                    company_id, member_id)
+                if company_member_id and department_id:
+
+                    # Check if department already listed. Create if not
+                    listed_deps = CompanyDA.get_company_departments(company_id)
+
+                    if department_id not in listed_deps:
+                        CompanyDA.add_company_department(
+                            company_id, department_id)
+
+                    department_name = MemberDA.get_department_name(
+                        department_id)
+                    CompanyDA.update_company_member_status({
+                        "company_member_id": company_member_id,
+                        "company_role": "standard",
+                        "department_name": department_name,
+                        "company_id": company_id,
+                        "department_status": "standard",
+                        "author_id": member_id
+                    })
 
             if member_id:
                 group = None
@@ -247,9 +272,6 @@ class MemberRegisterResource(object):
                 # Update the promo code reference for the newly created member_id
                 if promo_code_id != "null":
                     PromoCodesDA().create_activation_entry(member_id, promo_code_id)
-
-                if company_id is not None:
-                    CompanyDA.add_member(company_id, member_id, 'standard')
 
                 resp.body = json.dumps({
                     "member_id": member_id,
@@ -668,14 +690,40 @@ class MemberInfoResource(object):
     def on_put(self, req, resp):
         member_id = req.context.auth["session"]["member_id"]
 
-        (member, member_profile, member_achievement, member_contact_2, member_location, member_rate, work, educations, certificates, skills) = request.get_json_or_form(
-            "member", "member_profile", "member_achievement", "member_contact_2", "member_location", "member_rate", "work", "educations", "certificates", "skills", req=req)
+        (member, company, member_profile, member_achievement, member_contact_2, member_location, member_rate, work, educations, certificates, skills) = request.get_json_or_form(
+            "member", "company", "member_profile", "member_achievement", "member_contact_2", "member_location", "member_rate", "work", "educations", "certificates", "skills", req=req)
 
         updated = MemberInfoDA().update_member_info(member_id,
                                                     member, member_profile, member_achievement, member_contact_2, member_location)
 
         updated = ProjectDA().update_member_default_rate(member_id=member_id,
                                                          pay_rate=member_rate["pay_rate"], currency_code_id=member_rate["currency_code_id"])
+
+        # If comopany exists - make sure
+        company_id = json.convert_null(company["id"])
+        company_name = company["name"]
+        if not company_id:
+            company_id = CompanyDA.create_company(name=company_name)
+
+        if company_id and member_id:
+            company_member_record = CompanyDA.get_membership_by_member_id(
+                company_id, member_id)
+
+            company_member_id = company_member_record["company_member_id"] if company_member_record else CompanyDA.add_member(
+                company_id, member_id)
+            company_role = company_member_record["company_role"] if company_member_record else 'standard'
+            department_status = company_member_record["department_status"] if company_member_record else 'standard'
+            department_name = MemberDA.get_department_name(
+                member["department_id"])
+
+            CompanyDA.update_company_member_status({
+                "company_member_id": company_member_id,
+                "company_role": company_role,
+                "department_name": department_name,
+                "company_id": company_id,
+                "department_status": department_status,
+                "author_id": member_id
+            })
 
         # Skills
         listed_member_skills = MemberInfoDA.get_member_skills(member_id)

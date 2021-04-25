@@ -330,7 +330,7 @@ class CompanyDA(object):
         }
 
     @classmethod
-    def create_company(cls, name, place_id, address_1, address_2, city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id, commit=True):
+    def create_company(cls, name, place_id = None, address_1 = None, address_2 = None, city = None, state = None , postal =None, country_code_id = None, main_phone = None, primary_url = None, logo_storage_id = None , commit=True):
         query = ("""
             INSERT INTO company (name, place_id, address_1, address_2, city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -489,6 +489,42 @@ class CompanyDA(object):
             cls.source.commit()
 
     # Company member props update
+    @classmethod
+    def get_membership_by_member_id(cls, company_id, member_id):
+        query = ("""
+            SELECT row_to_json(row) AS company_member_record
+            FROM (
+                SELECT 
+                    company_member.id AS company_member_id,
+                    ls.company_role,
+                    ls.company_department_id,
+                    ls.department_name,
+                    ls.department_status,
+                    ls.update_date AS status_update_date
+                FROM company_member
+                LEFT JOIN (
+                    SELECT DISTINCT ON (company_member_id)
+                        company_member_id,
+                        company_role,
+                        company_status,
+                        company_department_id,
+                        department.name AS department_name,
+                        department_status,
+                        company_member_status.update_date
+                    FROM company_member_status
+                    LEFT JOIN company_department ON company_department.id = company_member_status.company_department_id
+                    LEFT JOIN department ON department.id = company_department.department_id
+                    ORDER BY company_member_id, update_date DESC
+                ) AS ls ON ls.company_member_id = company_member.id
+                WHERE company_id = %s AND member_id = %s
+            ) AS row
+        """)
+        params =(company_id, member_id)
+        cls.source.execute(query, params)
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        return None
+
     @classmethod
     def update_company_member_status(cls, params, commit=True):
         query = ("""
@@ -713,3 +749,21 @@ class CompanyDA(object):
 
         if commit:
             cls.source.commit()
+
+    @classmethod
+    def create_company_membership(cls, company_id, member_id, commit=True):
+        query = ("""
+            INSERT INTO company_member (company_id, member_id)
+            VALUES (%s, %s)
+            RETURNING id
+        """)
+        cls.source.execute(query, (company_id, member_id))
+        if commit:
+            cls.source.commit()
+        id = cls.source.get_last_row_id()
+        logger.debug(
+            f"[create_company_membership] TRANSACTION IDENTIFIER: {id}")
+        if id:
+            return id
+        else:
+            return None

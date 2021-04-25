@@ -139,7 +139,8 @@ class MemberDA(object):
         }
 
         if sort_params:
-            sort_columns_string = formatSortingParams(sort_params, members_dict) or sort_columns_string
+            sort_columns_string = formatSortingParams(
+                sort_params, members_dict) or sort_columns_string
 
         where_clause = ""
         if search_key != "" and len(search_key) > 0:
@@ -194,7 +195,7 @@ class MemberDA(object):
         params = ()
         if search_key != "" and len(search_key) > 0:
             params = (like_search_key, like_search_key,
-                    like_search_key, like_search_key)
+                      like_search_key, like_search_key)
         if not all_members:
             params = params + (member_id, )
 
@@ -207,7 +208,7 @@ class MemberDA(object):
             (count,) = cls.source.cursor.fetchone()
         logger.debug(f"COUNT RESULT: {count}")
 
-        if count > 0 and page_size and page_number >=0 :
+        if count > 0 and page_size and page_number >= 0:
             query += """LIMIT %s OFFSET %s"""
             offset = 0
             if page_number > 0:
@@ -256,7 +257,7 @@ class MemberDA(object):
         return {
             "members": members,
             "count": count
-            }
+        }
 
     @classmethod
     def get_group_members(cls, member_id, search_key, page_size, page_number):
@@ -806,6 +807,18 @@ class MemberDA(object):
         return None
 
     @classmethod
+    def get_department_name(cls, department_id):
+        query = ("""
+            SELECT name
+            FROM department
+            WHERE id = %s
+        """)
+        cls.source.execute(query, (department_id,))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        return None
+
+    @classmethod
     def get_terms(cls,):
         query = ("""
                 SELECT
@@ -917,7 +930,6 @@ class MemberDA(object):
             return cls.source.cursor.fetchone()[0]
         else:
             return None
-
 
     @classmethod
     def _get_all_members(cls):
@@ -1057,6 +1069,7 @@ class MemberContactDA(object):
                 contact.member_id = %s {filter_conditions_query}
                 {get_contacts_search_query if search_key != "" else ''}
             GROUP BY
+                member.id,
                 contact.id,
                 contact.contact_member_id,
                 member_rate.pay_rate,
@@ -1143,6 +1156,40 @@ class MemberContactDA(object):
                         AND member_group.group_type = 'contact'
                     ) AS rows
                 ),
+                -- company membership
+                (
+                    SELECT row_to_json(row) AS company_membership
+                    FROM (
+                        SELECT 
+                            company.*,
+                            ls.company_role,
+                            ls.company_department_id,
+                            ls.department_name,
+                            ls.department_id,
+                            ls.department_status,
+                            ls.update_date AS status_update_date
+                        FROM company_member
+                        LEFT JOIN (
+                            SELECT DISTINCT ON (company_member_id)
+                                company_member_id,
+                                company_role,
+                                company_status,
+                                company_department_id,
+                                department.name AS department_name,
+                                department.id AS department_id,
+                                department_status,
+                                company_member_status.update_date
+                            FROM company_member_status
+                            LEFT JOIN company_department ON company_department.id = company_member_status.company_department_id
+                            LEFT JOIN department ON department.id = company_department.department_id
+                            ORDER BY company_member_id, update_date DESC
+                        ) AS ls ON ls.company_member_id = company_member.id
+                        LEFT JOIN company ON company.id = company_member.company_id
+                        WHERE company_member.member_id = member.id
+                        ORDER BY company_member.create_date DESC
+                        LIMIT 1
+                    ) AS row
+                ),
                 role.name as role,
                 role.id as role_id,
                 contact.create_date as create_date,
@@ -1159,6 +1206,7 @@ class MemberContactDA(object):
                 contact.security_exchange_option,
                 contact.status,
                 CASE WHEN online_sessions.online_status IS NOT NULL THEN online_sessions.online_status ELSE 'offline' END as online_status,
+                -- Leaving the below for now
                 COALESCE(json_agg(DISTINCT company.*) FILTER (WHERE company.id IS NOT NULL), '[]')->0->'id' as company_id,
                 COALESCE(json_agg(DISTINCT company.*) FILTER (WHERE company.id IS NOT NULL), '[]')->0->'name' as member_company_name,
                 COALESCE(json_agg(DISTINCT company.*) FILTER (WHERE company.id IS NOT NULL), '[]') AS companies
@@ -1227,6 +1275,7 @@ class MemberContactDA(object):
                         # company_email,
                         # company_bio,
                         group_memberships,
+                        company_membership,
                         role,
                         role_id,
                         create_date,
@@ -1272,6 +1321,7 @@ class MemberContactDA(object):
                         # "company_email": company_email,
                         # "company_bio": company_bio,
                         "group_memberships": group_memberships,
+                        "company_membership": company_membership,
                         "role": role,
                         "role_id": role_id,
                         "create_date": create_date,
@@ -1456,7 +1506,41 @@ class MemberContactDA(object):
                     member.company_name as company,
                     job_title.name as title,
                     contact.contact_member_id as contact_member_id,
-                    file_storage_engine.storage_engine_id as s3_avatar_url
+                    file_storage_engine.storage_engine_id as s3_avatar_url,
+                   -- company membership
+                    (
+                        SELECT row_to_json(row) AS company_membership
+                        FROM (
+                            SELECT 
+                                company.*,
+                                ls.company_role,
+                                ls.company_department_id,
+                                ls.department_name,
+                                ls.department_id,
+                                ls.department_status,
+                                ls.update_date AS status_update_date
+                            FROM company_member
+                            LEFT JOIN (
+                                SELECT DISTINCT ON (company_member_id)
+                                    company_member_id,
+                                    company_role,
+                                    company_status,
+                                    company_department_id,
+                                    department.name AS department_name,
+                                    department.id AS department_id,
+                                    department_status,
+                                    company_member_status.update_date
+                                FROM company_member_status
+                                LEFT JOIN company_department ON company_department.id = company_member_status.company_department_id
+                                LEFT JOIN department ON department.id = company_department.department_id
+                                ORDER BY company_member_id, update_date DESC
+                            ) AS ls ON ls.company_member_id = company_member.id
+                            LEFT JOIN company ON company.id = company_member.company_id
+                            WHERE company_member.member_id = member.id
+                            ORDER BY company_member.create_date DESC
+                            LIMIT 1
+                        ) AS row
+                    )
                 FROM member
                 LEFT JOIN contact ON (member.id = contact.contact_member_id AND contact.member_id = %s)
                 LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
@@ -1496,7 +1580,8 @@ class MemberContactDA(object):
                     company,
                     title,
                     contact_member_id,
-                    s3_avatar_url
+                    s3_avatar_url,
+                    company_membership
             ) in cls.source.cursor:
                 member = {
                     "id": id,
@@ -1507,7 +1592,8 @@ class MemberContactDA(object):
                     "company": company,
                     "title": title,
                     "contact_member_id": contact_member_id,
-                    "amera_avatar_url": amerize_url(s3_avatar_url)
+                    "amera_avatar_url": amerize_url(s3_avatar_url),
+                    "company_membership": company_membership
                 }
                 members.append(member)
         return {
@@ -1964,7 +2050,7 @@ class MemberContactDA(object):
                         country_code,
                         achievement_information,
                         skills_information,
-                        workhistory_information, 
+                        workhistory_information,
                         education_information,
                         certificate_information,
                         biography,
@@ -1995,7 +2081,7 @@ class MemberContactDA(object):
                         "country_code": country_code,
                         "achievement_information": achievement_information,
                         "skills_information": skills_information,
-                        "workhistory_information": workhistory_information, 
+                        "workhistory_information": workhistory_information,
                         "education_information": education_information,
                         "certificate_information": certificate_information,
                         "biography": biography,
@@ -2040,6 +2126,41 @@ class MemberInfoDA(object):
                 member.last_name as last_name,
                 member.email as email,
                 member.company_name as company,
+                -- company membership
+                (
+                    SELECT row_to_json(row) AS company_membership
+                    FROM (
+                        SELECT 
+                            company.name AS company_name,
+                            company_member.company_id,
+                            ls.company_role,
+                            ls.company_department_id,
+                            ls.department_name,
+                            ls.department_id,
+                            ls.department_status,
+                            ls.update_date AS status_update_date
+                        FROM company_member
+                        LEFT JOIN (
+                            SELECT DISTINCT ON (company_member_id)
+                                company_member_id,
+                                company_role,
+                                company_status,
+                                company_department_id,
+                                department.name AS department_name,
+                                department.id AS department_id,
+                                department_status,
+                                company_member_status.update_date
+                            FROM company_member_status
+                            LEFT JOIN company_department ON company_department.id = company_member_status.company_department_id
+                            LEFT JOIN department ON department.id = company_department.department_id
+                            ORDER BY company_member_id, update_date DESC
+                        ) AS ls ON ls.company_member_id = company_member.id
+                        LEFT JOIN company ON company.id = company_member.company_id
+                        WHERE company_member.member_id = member.id
+                        ORDER BY company_member.create_date DESC
+                        LIMIT 1
+                    ) AS row
+                ),
                 member.job_title_id as job_title_id,
                 job_title.name as job_title,
                 member.department_id as department_id,
@@ -2061,15 +2182,15 @@ class MemberInfoDA(object):
                 member_rate.currency_code_id,
                 currency_code.currency_code
             FROM member
-                LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
-                LEFT OUTER JOIN member_location ON member_location.member_id = member.id
-                LEFT OUTER JOIN member_contact ON member_contact.member_id = member.id
-                LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = member.id
-                LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
-                LEFT OUTER JOIN member_achievement ON member_achievement.member_id = member.id
-                LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id
-                LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
-                LEFT OUTER JOIN member_security_preferences ON member.id = member_security_preferences.member_id
+                LEFT JOIN job_title ON member.job_title_id = job_title.id
+                LEFT JOIN member_location ON member_location.member_id = member.id
+                LEFT JOIN member_contact ON member_contact.member_id = member.id
+                LEFT JOIN member_contact_2 ON member_contact_2.member_id = member.id
+                LEFT JOIN country_code ON member_contact_2.device_country = country_code.id
+                LEFT JOIN member_achievement ON member_achievement.member_id = member.id
+                LEFT JOIN member_profile ON member.id = member_profile.member_id
+                LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+                LEFT JOIN member_security_preferences ON member.id = member_security_preferences.member_id
                 LEFT JOIN member_rate ON member.id = member_rate.member_id
                 LEFT JOIN member_skill ON member_skill.member_id = member.id
                 LEFT JOIN profile_skill ON profile_skill.id = member_skill.profile_skill_id
@@ -2108,6 +2229,7 @@ class MemberInfoDA(object):
                     last_name,
                     email,
                     company,
+                    company_membership,
                     job_title_id,
                     job_title,
                     department_id,
@@ -2136,6 +2258,7 @@ class MemberInfoDA(object):
                     "last_name": last_name,
                     "email": email,
                     "company_name": company,
+                    "company_membership": company_membership,
                     "job_title_id": job_title_id,
                     "job_title": job_title,
                     "department_id": department_id,
