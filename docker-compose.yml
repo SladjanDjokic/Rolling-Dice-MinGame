@@ -448,6 +448,7 @@ services:
       - ../web-api/datasource/postgresql/schema-updates-2021-04-19_stream_media-duration-and-thumbnail.sql:/docker-entrypoint-initdb.d/t-2-stream_media-duration-and-thumbnail.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-04-21_page_settings-type.sql:/docker-entrypoint-initdb.d/t-3-page_settings-type.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-04-22_drop_company_department_status.sql:/docker-entrypoint-initdb.d/t-4-schema-updates-2021-04-22-22_drop_company_department_status.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-04-22_member_contact_2.sql:/docker-entrypoint-initdb.d/t-u-schema-updates-2021-04-22_member_contact_2.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-04-23_company.sql:/docker-entrypoint-initdb.d/t-5-company.sql
       # Test data
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql

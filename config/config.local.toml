@@ -45,6 +45,12 @@ secret_access_key = "${AWS_SECRET_ACCESS_KEY}"
 [services.twilio]
 totp_length = 6
 totp_lifetime_seconds=60
+outgoing_caller_callback_url = "/api/twilio/outgoing-caller"
+account_sid="${ACCOUNT_SID}"
+auth_token="${AUTH_TOKEN}"
+api_key="${API_KEY}"
+api_secret="${API_SECRET}"
+twiml_application_sid="${TWIML_APPLICATION_SID}"
 [services.github]
 # Github OAuth
 callback_url = "/api/github/oauth"

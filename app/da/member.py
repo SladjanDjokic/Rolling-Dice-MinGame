@@ -2849,6 +2849,36 @@ class MemberSettingDA(object):
             pass
 
 
+    @classmethod
+    def update_outgoing_contact(cls, member_id, contact_id):
+
+        try:
+            reset_query = ("""
+                UPDATE member_contact_2
+                SET
+                    outgoing_caller = false
+                WHERE member_id = %s;
+            """)
+            cls.source.execute(reset_query, (member_id,))
+            cls.source.commit()
+
+            set_query = ("""
+                UPDATE member_contact_2
+                SET
+                    outgoing_caller = true
+                WHERE id = %s;
+            """)
+            logger.debug(f"outgoing_caller_contact_idxx: {contact_id}")
+
+            cls.source.execute(set_query, (contact_id,))
+            cls.source.commit()
+
+        except Exception as e:
+            logger.debug("iss+++++xx {}".format(e))
+            pass
+
+
+
 class MemberNotificationsSettingDA(object):
     source = source
 

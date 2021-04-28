@@ -25,3 +25,4 @@ class BaseTwilioClient:
             return message.sid
         except TwilioRestException as e:
             logger.exception(e)
+            raise e

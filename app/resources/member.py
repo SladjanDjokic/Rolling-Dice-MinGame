@@ -879,13 +879,14 @@ class MemberSettingResource(object):
     def on_put(self, req, resp):
         member_id = req.context.auth["session"]["member_id"]
 
-        (member_profile, member_location) = request.get_json_or_form(
-            "member_profile", "member_location", req=req)
+        (member_profile, member_location, outgoing_caller_contact_id) = request.get_json_or_form(
+            "member_profile", "member_location", "outgoingCallerContact", req=req)
 
         logger.debug("member_profile_x: {}".format(member_profile))
         updated = MemberSettingDA().update_member_setting(
             member_id, member_profile, member_location)
-
+        if outgoing_caller_contact_id:
+            MemberSettingDA().update_outgoing_contact(member_id, outgoing_caller_contact_id)
         if updated:
             member_info = MemberSettingDA().get_member_setting(member_id)
             resp.body = json.dumps({

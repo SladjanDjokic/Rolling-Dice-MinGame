@@ -69,7 +69,7 @@ from app.resources.o365Resource import O365OAuthResource
 
 from app.resources.trelloResource import TrelloLoginResource
 from app.resources.trelloResource import TrelloOAuthResource
-
+from app.resources.twilioResource import TwilioResource
 
 from app.resources.newsfeeds import NewsFeedsResource
 from app.resources.password import PasswordResource
@@ -217,9 +217,12 @@ def _setup_routes(app):
     app.add_route("/member/register/skills", MemberSkills())
     app.add_route("/member/register/industries", MemberIndustry())
     # 2FA of cell during registration
+
+    verify_cell_resource = VerifyCell()
     app.add_route("/member/register/verification", Verification())
-    app.add_route("/member/register/verify-cell", VerifyCell())
+    app.add_route("/member/register/verify-cell", verify_cell_resource)
     app.add_route("/member/register/promo-code", PromoCodes())
+    app.add_route("/member/register/verify-outgoing-cell", verify_cell_resource, suffix="outgoing")
 
     # This route is commneted out to prevent any registrations someone may be sniffing out
     # This will be enabled later on
@@ -573,3 +576,12 @@ def _setup_routes(app):
 
     stream_type_resource = StreamTypeResource()
     app.add_route("/streaming/types", stream_type_resource)
+
+    # twilio
+    app.add_route("/twilio/outgoing-caller/{contact_id}", verify_cell_resource, suffix="verified")
+    # app.add_route("/twilio/message")
+    # app.add_route("/twilio/message/status")
+    twilio_resource = TwilioResource()
+    app.add_route("/twilio/voice", twilio_resource, suffix="voice")
+    # app.add_route("/twilio/voice/status", twilio_resource, suffix="voice_status")
+    app.add_route("/twilio/get-token", twilio_resource, suffix="token")

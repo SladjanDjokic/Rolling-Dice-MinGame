@@ -133,7 +133,7 @@ class GroupDA(object):
         return None
 
     @classmethod
-    def get_groups_by_group_leader_id(cls, group_leader_id, sort_params=None, search_key=None, group_type='contact', group_status='active',):
+    def get_groups_by_group_leader_id(cls, group_leader_id, sort_params=None, search_key=None, page_size=None, page_number=None, group_type='contact', group_status='active',):
         sort_columns_string = 'group_name ASC'
         if sort_params:
             group_dict = {
@@ -153,35 +153,37 @@ class GroupDA(object):
                 sort_params, group_dict) or sort_columns_string
 
         search_query = ("""
-        AND (
-            member_group.group_name ILIKE %s
-            OR concat_ws(' ', member.first_name, member.last_name) ILIKE %s
-            OR member.email ILIKE %s
-            OR concat('create year ', EXTRACT(YEAR FROM member_group.create_date)) LIKE %s
-            OR concat('create month ', EXTRACT(MONTH FROM member_group.create_date)) LIKE %s
-            OR concat('create month ', to_char(member_group.create_date, 'month')) LIKE %s
-            OR concat('create day ', EXTRACT(DAY FROM member_group.create_date)) LIKE %s
-            OR concat('create day ', to_char(member_group.create_date, 'day')) LIKE %s
-            OR concat('update year ', EXTRACT(YEAR FROM member_group.update_date)) LIKE %s
-            OR concat('update month ', EXTRACT(MONTH FROM member_group.update_date)) LIKE %s
-            OR concat('update month ', to_char(member_group.update_date, 'month')) LIKE %s
-            OR concat('update day ', EXTRACT(DAY FROM member_group.update_date)) LIKE %s
-            OR concat('update day ', to_char(member_group.update_date, 'day')) LIKE %s
-        )
-        """)
-        query = (f"""
-            WITH online_sessions AS (
-                SELECT
-                    member_session.member_id,
-                    CASE WHEN bool_or(member_session.status = 'online' AND member_session.status is not null) = true THEN 'online' ELSE 'offline' END as online_status
-                FROM  member_session 
-                WHERE
-                    member_session.status IN ('online', 'disconnected') AND
-                    member_session.expiration_date >= current_timestamp
-                GROUP BY
-                    member_session.member_id
+            AND (
+                member_group.group_name ILIKE %s
+                OR concat_ws(' ', member.first_name, member.last_name) ILIKE %s
+                OR member.email ILIKE %s
+                OR concat('create year ', EXTRACT(YEAR FROM member_group.create_date)) LIKE %s
+                OR concat('create month ', EXTRACT(MONTH FROM member_group.create_date)) LIKE %s
+                OR concat('create month ', to_char(member_group.create_date, 'month')) LIKE %s
+                OR concat('create day ', EXTRACT(DAY FROM member_group.create_date)) LIKE %s
+                OR concat('create day ', to_char(member_group.create_date, 'day')) LIKE %s
+                OR concat('update year ', EXTRACT(YEAR FROM member_group.update_date)) LIKE %s
+                OR concat('update month ', EXTRACT(MONTH FROM member_group.update_date)) LIKE %s
+                OR concat('update month ', to_char(member_group.update_date, 'month')) LIKE %s
+                OR concat('update day ', EXTRACT(DAY FROM member_group.update_date)) LIKE %s
+                OR concat('update day ', to_char(member_group.update_date, 'day')) LIKE %s
             )
+        """)
+        member_sessions_query = f"""
+            WITH online_sessions AS (
+                    SELECT
+                        member_session.member_id,
+                        CASE WHEN bool_or(member_session.status = 'online' AND member_session.status is not null) = true THEN 'online' ELSE 'offline' END as online_status
+                    FROM  member_session 
+                    WHERE
+                        member_session.status IN ('online', 'disconnected') AND
+                        member_session.expiration_date >= current_timestamp
+                    GROUP BY
+                        member_session.member_id
+                )
+        """
 
+        groups_base_query = f"""
             SELECT
                 member_group.id AS group_id,
                 member_group_membership.member_id AS group_leader_id,
@@ -258,16 +260,46 @@ class GroupDA(object):
                     member.last_name,
                     member.email
             ORDER BY {sort_columns_string}
+        """
+        groups_query = (f"""
+            {member_sessions_query}
+            
+            {groups_base_query}
         """)
-
-        group_list = list()
-
+        
         params = (group_leader_id, group_type, group_status)
 
         if search_key:
             like_search_key = f"%{search_key}%"
             params = params + tuple(13 * [like_search_key])
-        cls.source.execute(query, params)
+    
+        groups_count_query = (f"""
+            {member_sessions_query}
+
+            SELECT COUNT(*)
+                FROM
+                    (
+                        {groups_query}
+                    ) src;
+        """)
+
+        count = 0
+        cls.source.execute(groups_count_query, params)
+        
+        if cls.source.has_results():
+            result = cls.source.cursor.fetchone()
+            (count, ) = result
+
+        if count > 0:
+            if page_size and page_number >= 0:
+                groups_query += """LIMIT %s OFFSET %s"""
+                offset = 0
+                if page_number > 0:
+                    offset = page_number * page_size
+                params = params + (page_size, offset)
+
+        group_list = list()
+        cls.source.execute(groups_query, params)
         if cls.source.has_results():
             all_group = cls.source.cursor.fetchall()
             for row in all_group:
@@ -293,10 +325,13 @@ class GroupDA(object):
                 }
                 group_list.append(group)
 
-        return group_list
+        return {
+            "groups" : group_list,
+            "count": count
+            }
 
     @classmethod
-    def get_all_groups_by_member_id(cls, member_id, sort_params, member_only=False, search_key=None, group_type='contact', group_status='active'):
+    def get_all_groups_by_member_id(cls, member_id, member_only=False, sort_params=None, search_key=None, page_size=None, page_number=None, group_type='contact', group_status='active'):
         sort_columns_string = 'member_group.group_name ASC'
         if sort_params:
             entity_dict = {
@@ -336,7 +371,7 @@ class GroupDA(object):
         )
         """)
 
-        query = (f"""
+        member_sessions_query = f"""
             WITH online_sessions AS (
                 SELECT
                     member_session.member_id,
@@ -348,7 +383,9 @@ class GroupDA(object):
                 GROUP BY
                     member_session.member_id
             )
+        """
 
+        groups_base_query = (f"""
             SELECT
                 member_group.id as group_id,
                 gl.id AS group_leader_id,
@@ -430,19 +467,43 @@ class GroupDA(object):
             ORDER BY {sort_columns_string}
         """)
 
-        group_list = list()
-        if not search_key:
-            search_key = ""
-
-        like_search_key = f"%{search_key}%"
+        groups_query = (f"""
+            {member_sessions_query}
+            
+            {groups_base_query}
+        """)
         params = (member_id, group_type, group_status)
 
         if search_key:
             like_search_key = f"%{search_key}%"
-            params = params + \
-                tuple(13 * [like_search_key])
+            params = params + tuple(13 * [like_search_key])
+    
+        groups_count_query = (f"""
+            {member_sessions_query}
 
-        cls.source.execute(query, params)
+            SELECT COUNT(*)
+                FROM
+                    (
+                        {groups_query}
+                    ) src;
+        """)
+        count = 0
+        cls.source.execute(groups_count_query, params)
+        
+        if cls.source.has_results():
+            result = cls.source.cursor.fetchone()
+            (count, ) = result
+
+        if count > 0:
+            if page_size and page_number >= 0:
+                groups_query += """LIMIT %s OFFSET %s"""
+                offset = 0
+                if page_number > 0:
+                    offset = page_number * page_size
+                params = params + (page_size, offset)
+
+        group_list = list()
+        cls.source.execute(groups_query, params)
 
         if cls.source.has_results():
             all_group = cls.source.cursor.fetchall()
@@ -468,7 +529,10 @@ class GroupDA(object):
                 }
                 group_list.append(group)
 
-        return group_list
+        return {
+            "groups": group_list,
+            "count": count
+        }
 
 
     @classmethod

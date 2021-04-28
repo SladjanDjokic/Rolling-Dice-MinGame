@@ -102,19 +102,22 @@ class MemberGroupResource(object):
         )
         # sort_params = '-member_group.group_name' names in descending order
         sort_params = req.get_param('sort')
-        search_key = req.get_param('search_key')
-
-        logger.debug(f"Get groups: {get_all}")
+        search_key = req.get_param('searchKey')
+        page_size = req.get_param_as_int('pageSize')
+        page_number = req.get_param_as_int('pageNumber')
 
         if get_all:
-            resp_list = GroupDA.get_all_groups_by_member_id(
-                member_id, sort_params)
+            result = GroupDA.get_all_groups_by_member_id(
+                member_id, sort_params=sort_params, search_key=search_key, 
+                page_size=page_size, page_number=page_number)
         else:
-            resp_list = GroupDA.get_groups_by_group_leader_id(
-                group_leader_id=member_id, sort_params=sort_params, search_key=search_key)
+            result = GroupDA.get_groups_by_group_leader_id(
+                group_leader_id=member_id, sort_params=sort_params, search_key=search_key, 
+                page_size=page_size, page_number=page_number)
 
         resp.body = json.dumps({
-            "data": resp_list,
+            "data": result["groups"],
+            "count": result["count"],
             "success": True
         }, default_parser=json.parser)
 
@@ -289,11 +292,16 @@ class GroupMembershipResource(object):
         # sort_params = '-member_group.group_name' names in descending order
         sort_params = req.get_param('sort')
         search_key = req.get_param('search_key')
+        page_size = req.get_param_as_int('pageSize')
+        page_number = req.get_param_as_int('pageNumber')
 
-        group_list = GroupDA().get_all_groups_by_member_id(
-            member_id=member_id, sort_params=sort_params, member_only=True, search_key=search_key)
+        result = GroupDA().get_all_groups_by_member_id(
+            member_id=member_id, member_only=True, sort_params=sort_params, 
+            search_key=search_key, page_size=page_size, page_number=page_number)
+
         resp.body = json.dumps({
-            "data": group_list,
+            "data": result['groups'],
+            "count": result['count'],
             "message": "All Group",
             "status": "success",
             "success": True

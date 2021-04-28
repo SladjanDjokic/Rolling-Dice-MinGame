@@ -1,4 +1,4 @@
-from twilio.rest import Client
+from app.clients.twilio import BaseTwilioClient
 from twilio.base.exceptions import TwilioRestException
 import os
 import time
@@ -14,15 +14,13 @@ from app.exceptions.data import DuplicateKeyError, DataMissingError, Relationshi
 import logging
 logger = logging.getLogger(__name__)
 
-
 class VerificationDA(object):
     source = source
 
     @classmethod
     def get_twilio_client(cls):
-        account_sid = os.environ["AMERA_API_SERVICES.TWILIO.ACCOUNT_SID"]
-        auth_token = os.environ["AMERA_API_SERVICES.TWILIO.AUTH_TOKEN"]
-        return Client(account_sid, auth_token)
+        client = BaseTwilioClient()
+        return client.client
 
     @classmethod
     def get_totp(cls):
@@ -173,7 +171,7 @@ class VerificationDA(object):
         try:
             message = client.messages.create(
                 to=f"+{cell}",
-                from_=os.environ["AMERA_API_SERVICES.TWILIO.SENDER_NUMBER"],
+                from_=settings.get('services.twilio.sender_number'),
                 body="Your AMERA Share verification code is: " + token)
             return (message.sid, token, token_time)
         except TwilioRestException as e:
@@ -195,3 +193,18 @@ class VerificationDA(object):
         except sendmail.EmailAuthError:
             logger.exception('Deleting invite due to unable \
                              to auth to email system')
+
+    @classmethod
+    def add_outgoing_caller(cls, member_id, username, contact_id, phone_number, callback_url):
+        try:
+            client = cls.get_twilio_client()
+            # phone_number = "+15005550006"
+            validation_request = client.validation_requests.create(
+                    friendly_name=f"{member_id}_{username}",
+                    phone_number=phone_number,
+                    status_callback=callback_url
+                )
+            return validation_request
+        except TwilioRestException as e:
+            logger.exception(e)
+            raise e
