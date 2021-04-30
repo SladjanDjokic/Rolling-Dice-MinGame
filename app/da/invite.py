@@ -257,13 +257,15 @@ class InviteDA(object):
             registered_member.create_date as registered_date,
             member_location.city AS remote_city_name,
             CASE WHEN member_location.province IS NOT NULL THEN member_location.province ELSE member_location.state END as remote_region_name,
-            member_location.country AS remote_country_name,
+            COALESCE(country_code.name, (SELECT name FROM country_code WHERE id = 840)) AS remote_country_name,
             registered_member.status AS member_status
         FROM invite
             LEFT JOIN member on invite.inviter_member_id = member.id
-            LEFT OUTER JOIN member_group on invite.group_id = member_group.id
-            LEFT OUTER JOIN member AS registered_member on invite.registered_member_id = registered_member.id
-            LEFT OUTER JOIN member_location on member_location.member_id = registered_member.id AND member_location.location_type = 'home'
+            LEFT JOIN member_group on invite.group_id = member_group.id
+            LEFT JOIN member AS registered_member on invite.registered_member_id = registered_member.id
+            LEFT JOIN member_location on member_location.member_id = registered_member.id AND member_location.location_type = 'home'
+            LEFT JOIN location ON location.id  = member_location.location_id
+            LEFT JOIN country_code ON country_code.id = location.country_code_id
         WHERE
             {f'inviter_member_id = %s AND' if not get_all else ''}
             ( invite.email LIKE %s
@@ -366,4 +368,3 @@ class InviteDA(object):
                 invites.append(invite)
 
         return {"activities": invites, "count": count}
-

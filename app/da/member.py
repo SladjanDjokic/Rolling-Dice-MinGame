@@ -1,4 +1,5 @@
 from app.util.security import SECURITY_EXCHANGE_OPTIONS
+import app.util.json as json
 import logging
 # import datetime
 from urllib import parse
@@ -6,6 +7,7 @@ from urllib import parse
 from app.util.db import source, formatSortingParams
 from app.util.config import settings
 from app.util.filestorage import amerize_url
+from app.da.location import LocationDA
 
 from app.exceptions.data import DataMissingError, RelationshipReferenceError
 # from app.exceptions.member import ForgotDuplicateDataError
@@ -465,12 +467,6 @@ class MemberDA(object):
          device_confirm_date, method_type, display_order, primary_contact)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """)
-        query_member_location = ("""
-        INSERT INTO member_location
-        (member_id, city, state, province, postal,
-         country, country_code_id, location_type)
-        VALUES (%s, %s, %s, %s, %s, (SELECT name FROM country_code WHERE id = %s), %s, 'home')
-        """)
 
         query_member_profile = ("""
         INSERT INTO member_profile (member_id, profile_picture_storage_id)
@@ -514,15 +510,6 @@ class MemberDA(object):
                 id, "Cell phone", phone_number.lstrip(phone_code), "cell", country, cell_confrimation_ts, "voice", 1, True)
             cls.source.execute(query_member_contact_2,
                                params_cell_member_contact_2)
-        if postal:
-            # store member location info
-            city = None if city == 'null' else city
-            state = None if state == 'null' else state
-            province = None if province == 'null' else province
-            params_member_location = (
-                id, city, state, province, postal, country, country)
-            # FIXME: We need to store only the country_id and pull everything else from the country_code table
-            cls.source.execute(query_member_location, params_member_location)
 
         # When registering a new member, the uploaded photo is set as both profile and security picture. Profile picture can be changed later on.
         params_member_profile = (id, avatar_storage_id)
@@ -550,14 +537,17 @@ class MemberDA(object):
                 member.first_name as first_name,
                 member.middle_name as middle_name,
                 member.last_name as last_name,
-                member_location.country as country,
+                COALESCE(location.country_code_id, 840) AS country_code_id,
+                COALESCE(country_code.name, (SELECT name FROM country_code WHERE id = 840)) as country,
                 member_contact.phone_number as cell_phone,
                 contact.company_name as company_name,
                 contact.role_id as role_id
             FROM member
             LEFT JOIN member_contact ON member.id = member_contact.member_id
             LEFT JOIN member_location ON member.id = member_location.member_id
+            LEFT JOIN location ON location.id = member_location.location_id
             LEFT JOIN contact ON member.id = contact.member_id
+            LEFT JOIN country_code ON country_code.id = location.country_code_id
             WHERE member.id = %s
             """)
 
@@ -570,6 +560,7 @@ class MemberDA(object):
                     middle_name,
                     last_name,
                     country,
+                    country_code_id,
                     cell_phone,
                     company_name,
                     role_id
@@ -580,6 +571,7 @@ class MemberDA(object):
                     "middle_name": middle_name,
                     "last_name": last_name,
                     "country": country,
+                    "country_code_id": country_code_id,
                     "cell_phone": cell_phone,
                     "company_name": company_name,
                     "role_id": role_id
@@ -1002,7 +994,7 @@ class MemberContactDA(object):
             # 'personal_email': 'contact.personal_email',
             'company': 'member.company_name',
             'title': 'job_title.name',
-            'country_code_id': 'member_location.country_code_id',
+            'country_code_id': 'location.country_code_id',
             'company_name': 'member.company_name',
             # 'company_phone': 'contact.company_phone',
             # 'company_web_site': 'contact.company_web_site',
@@ -1046,17 +1038,16 @@ class MemberContactDA(object):
         get_contacts_base_query = (f"""
             FROM contact
                 LEFT JOIN member ON member.id = contact.contact_member_id
-                LEFT OUTER JOIN role ON contact.role_id = role.id
-                LEFT OUTER JOIN member_location ON member_location.member_id = contact.contact_member_id
-                -- LEFT OUTER JOIN member_contact ON member_contact.member_id = contact.contact_member_id
-                LEFT OUTER JOIN member_contact_2 ON member_contact_2.member_id = contact.contact_member_id
-                LEFT OUTER JOIN country_code ON member_contact_2.device_country = country_code.id
-                LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
+                LEFT JOIN role ON contact.role_id = role.id
+                LEFT JOIN member_location ON member_location.member_id = contact.contact_member_id
+                LEFT JOIN member_contact_2 ON member_contact_2.member_id = contact.contact_member_id
+                LEFT JOIN country_code ON member_contact_2.device_country = country_code.id
+                LEFT JOIN job_title ON member.job_title_id = job_title.id
                 LEFT JOIN department ON member.department_id = department.id
-                LEFT OUTER JOIN member_profile ON contact.contact_member_id = member_profile.member_id
-                LEFT OUTER JOIN member_achievement ON member_achievement.member_id = member.id
-                LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
-                LEFT OUTER JOIN online_sessions ON contact.contact_member_id  = online_sessions.member_id
+                LEFT JOIN member_profile ON contact.contact_member_id = member_profile.member_id
+                LEFT JOIN member_achievement ON member_achievement.member_id = member.id
+                LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
+                LEFT JOIN online_sessions ON contact.contact_member_id  = online_sessions.member_id
                 LEFT JOIN company_member ON company_member.member_id = member.id
                 LEFT JOIN company ON company.id = company_member.company_id
                 LEFT JOIN member_rate ON member_rate.member_id = member.id
@@ -1079,20 +1070,9 @@ class MemberContactDA(object):
                 member.last_name,
                 member_profile.biography,
                 member.email,
-                -- contact.cell_phone,
-                -- contact.office_phone,
-                -- contact.home_phone,
-                -- contact.email,
-                -- contact.personal_email,
                 member.company_name,
                 job_title.name,
                 department.name,
-                -- contact.company_name,
-                -- contact.company_phone,
-                -- contact.company_web_site,
-                -- contact.company_email,
-                -- contact.company_bio,
-                -- group_memberships,
                 role.name,
                 role.id,
                 contact.create_date,
@@ -1129,19 +1109,9 @@ class MemberContactDA(object):
                 member.last_name as last_name,
                 member_profile.biography as biography,
                 member.email as email,
-                -- contact.cell_phone as cell_phone,
-                -- contact.office_phone as office_phone,
-                -- contact.home_phone as home_phone,
-                -- contact.email as email,
-                -- contact.personal_email as personal_email,
                 member.company_name as company,
                 job_title.name as title,
                 department.name as department,
-                -- contact.company_name as company_name,
-                -- contact.company_phone as company_phone,
-                -- contact.company_web_site as company_web_site,
-                -- contact.company_email as company_email,
-                -- contact.company_bio as company_bio,
                 (
                     SELECT json_agg(rows) AS group_memberships
                     FROM (
@@ -1161,7 +1131,28 @@ class MemberContactDA(object):
                     SELECT row_to_json(row) AS company_membership
                     FROM (
                         SELECT 
-                            company.*,
+                            company.id,
+                            company.parent_company_id,
+                            company.name,
+                            company.country_code_id,
+                            company.main_phone,
+                            company.main_phone_ext,
+                            company.primary_url,
+                            company.logo_storage_id,
+                            company.email,
+                            company.location_id,
+                            location.admin_area_1,
+                            location.admin_area_2,
+                            location.locality,
+                            location.sub_locality,
+                            location.street_address_1,
+                            location.street_address_2,
+                            location.postal_code,
+                            location.latitude,
+                            location.longitude,
+                            location.map_vendor,
+                            location.map_link,
+                            location.place_id,
                             ls.company_role,
                             ls.company_department_id,
                             ls.department_name,
@@ -1185,6 +1176,7 @@ class MemberContactDA(object):
                             ORDER BY company_member_id, update_date DESC
                         ) AS ls ON ls.company_member_id = company_member.id
                         LEFT JOIN company ON company.id = company_member.company_id
+                        LEFT JOIN location ON location.id = company.location_id
                         WHERE company_member.member_id = member.id
                         ORDER BY company_member.create_date DESC
                         LIMIT 1
@@ -1194,7 +1186,34 @@ class MemberContactDA(object):
                 role.id as role_id,
                 contact.create_date as create_date,
                 contact.update_date as update_date,
-                COALESCE(json_agg(DISTINCT member_location.*) FILTER (WHERE member_location.id IS NOT NULL), '[]') AS location_information,
+                (
+                    SELECT COALESCE(json_agg(rows), '[]'::json) AS location_information
+                    FROM (
+                        SELECT 
+                            member_location.id,
+                            member_location.location_type,
+                            member_location.description,
+                            member_location.location_id,
+                            location.country_code_id,
+                            country_code.name AS country_name,
+                            location.admin_area_1,
+                            location.admin_area_2,
+                            location.locality,
+                            location.sub_locality,
+                            location.street_address_1,
+                            location.street_address_2,
+                            location.postal_code,
+                            location.latitude,
+                            location.longitude,
+                            location.map_vendor,
+                            location.map_link,
+                            location.place_id
+                        FROM member_location
+                        LEFT JOIN location ON location.id = member_location.location_id
+                        LEFT JOIN country_code ON country_code.id = location.country_code_id
+                        WHERE member_id = member.id
+                    ) AS rows
+                ),
                 COALESCE(json_agg(DISTINCT member_contact_2.*) FILTER (WHERE member_contact_2.id IS NOT NULL), '[]') AS contact_information,
                 COALESCE(json_agg(DISTINCT country_code.*) FILTER (WHERE country_code.id IS NOT NULL), '[]') AS country_code,
                 COALESCE(json_agg(DISTINCT member_achievement.*) FILTER (WHERE member_achievement.id IS NOT NULL), '[]') AS achievement_information,
@@ -1432,7 +1451,8 @@ class MemberContactDA(object):
             FROM
                 contact
                 INNER JOIN member_location ON (contact.contact_member_id = member_location.member_id)
-                INNER JOIN country_code ON (member_location.country_code_id = country_code.id)
+                INNER JOIN location ON member_location.location_id = location.id
+                INNER JOIN country_code ON (location.country_code_id = country_code.id)
             WHERE
                 contact.member_id = %s
             GROUP BY
@@ -1470,7 +1490,7 @@ class MemberContactDA(object):
             'title': 'job_title.name',
             'contact_member_id': 'contact.contact_member_id'
         }
-        
+
         if sort_params:
             sort_columns_string = formatSortingParams(
                 sort_params, member_dict) or sort_columns_string
@@ -1478,7 +1498,7 @@ class MemberContactDA(object):
         # (filter_conditions_query, filter_conditions_params) = cls.formatFilterConditions(
         #     filter_params, member_dict)
 
-        get_members_params = (member_id, member_id, ) 
+        get_members_params = (member_id, member_id, )
         # + filter_conditions_params
 
         get_members_search_query = ""
@@ -1552,7 +1572,7 @@ class MemberContactDA(object):
                     {get_members_search_query}
                 ORDER BY {sort_columns_string}
                 """)
-        
+
         countQuery = (f"SELECT COUNT(*) FROM ({get_members_query}) src;")
 
         count = 0
@@ -1567,7 +1587,6 @@ class MemberContactDA(object):
                 if page_number > 0:
                     offset = page_number * page_size
                 get_members_params = get_members_params + (page_size, offset)
-
 
         cls.source.execute(get_members_query, get_members_params)
         if cls.source.has_results():
@@ -2167,7 +2186,35 @@ class MemberInfoDA(object):
                 department.name as department_name,
                 member.create_date as create_date,
                 member.update_date as update_date,
-                COALESCE(json_agg(DISTINCT member_location.*) FILTER (WHERE member_location.id IS NOT NULL), '[]') AS location_information,
+                (
+                    SELECT COALESCE(json_agg(rows), '[]'::json) AS location_information
+                    FROM (
+                        SELECT 
+                            member_location.id,
+                            member_location.location_type,
+                            member_location.description,
+                            member_location.location_id,
+                            location.country_code_id,
+                            location.vendor_formatted_address,
+                            country_code.name AS country_name,
+                            location.admin_area_1,
+                            location.admin_area_2,
+                            location.locality,
+                            location.sub_locality,
+                            location.street_address_1,
+                            location.street_address_2,
+                            location.postal_code,
+                            location.latitude,
+                            location.longitude,
+                            location.map_vendor,
+                            location.map_link,
+                            location.place_id
+                        FROM member_location
+                        LEFT JOIN location ON location.id = member_location.location_id
+                        LEFT JOIN country_code ON country_code.id = location.country_code_id
+                        WHERE member_id = member.id
+                    ) AS rows
+                ),
                 COALESCE(json_agg(DISTINCT member_contact_2.*) FILTER (WHERE member_contact_2.id IS NOT NULL), '[]') AS contact_information,
                 COALESCE(json_agg(DISTINCT country_code.*) FILTER (WHERE country_code.id IS NOT NULL), '[]') AS country_code,
                 COALESCE(json_agg(DISTINCT member_achievement.*) FILTER (WHERE member_achievement.id IS NOT NULL), '[]') AS achievement_information,
@@ -2284,190 +2331,271 @@ class MemberInfoDA(object):
                 return member
 
     @classmethod
-    def update_member_info(cls, member_id, member, member_profile, member_achievement, member_contact_2, member_location):
+    def update_member_info(cls, member_id, member, member_profile, member_achievement, member_contact_2, member_locations):
+        #  Member table
+        first_name, middle_name, last_name, company_name, job_title_id, department_id = [
+            member[k] for k in ('first_name', 'middle_name', 'last_name', 'company_name', 'job_title_id', 'department_id')]
 
-        try:
-            # TODO: - PERFORMANCE CHECK
-            # Into member - first_name, middle_name, last_name, company_name, job_title_id, department_id,
-            # Into member_profile - biography,
-            # Into member_achievement - entity, description, display_order
-            # Into member_contact_2 -  description, device, device_type, device_country, device_confirm_date, method_type, display_order, primary_contact
-            # Into member_location - address_1, address_2, city, state, province, postal, country, country_code_id, location_type
+        member_query = ("""
+            UPDATE member
+            SET
+                first_name = %s,
+                middle_name = %s,
+                last_name = %s,
+                company_name = %s,
+                job_title_id = %s,
+                department_id = %s,
+                update_date = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """)
 
-            #  Member table
-            first_name, middle_name, last_name, company_name, job_title_id, department_id = [
-                member[k] for k in ('first_name', 'middle_name', 'last_name', 'company_name', 'job_title_id', 'department_id')]
+        member_params = (first_name, middle_name, last_name,
+                         company_name, job_title_id, department_id, member_id)
 
-            member_query = ("""
-                UPDATE member
-                SET
-                    first_name = %s,
-                    middle_name = %s,
-                    last_name = %s,
-                    company_name = %s,
-                    job_title_id = %s,
-                    department_id = %s,
-                    update_date = CURRENT_TIMESTAMP
-                WHERE id = %s
-            """)
+        cls.source.execute(member_query, member_params)
+        cls.source.commit()
 
-            member_params = (first_name, middle_name, last_name,
-                             company_name, job_title_id, department_id, member_id)
+        # Member_profile
+        member_profile_query = ("""
+            INSERT INTO member_profile (member_id, biography)
+            VALUES (%s, %s)
+            ON conflict(member_id) DO UPDATE
+            SET biography = %s, update_date = CURRENT_TIMESTAMP
+        """)
 
-            cls.source.execute(member_query, member_params)
-            cls.source.commit()
+        member_profile_params = (
+            member_id, member_profile["biography"], member_profile["biography"])
+        cls.source.execute(member_profile_query, member_profile_params)
+        cls.source.commit()
 
-            # Member_profile
-            member_profile_query = ("""
-                INSERT INTO member_profile (member_id, biography)
-                VALUES (%s, %s)
-                ON conflict(member_id) DO UPDATE
-                SET biography = %s, update_date = CURRENT_TIMESTAMP
-            """)
+        # Member achievements
+        member_achievement_update_query = ("""
+            UPDATE member_achievement
+            SET
+                entity = %s,
+                description = %s,
+                display_order = %s,
+                update_date = CURRENT_TIMESTAMP
+            WHERE id=%s AND member_id=%s;
+        """)
+        member_achievement_insert_query = ("""
+            INSERT INTO member_achievement (entity, description, display_order, member_id)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id;
+        """)
+        member_achievement_delete_query = ("""
+            DELETE FROM member_achievement
+            WHERE member_id = %s AND NOT id = ANY(%s);
+        """)
 
-            member_profile_params = (
-                member_id, member_profile["biography"], member_profile["biography"])
-            cls.source.execute(member_profile_query, member_profile_params)
-            cls.source.commit()
-
-            # Member achievements
-            member_achievement_update_query = ("""
-                UPDATE member_achievement
-                SET
-                    entity = %s,
-                    description = %s,
-                    display_order = %s,
-                    update_date = CURRENT_TIMESTAMP
-                WHERE id=%s AND member_id=%s;
-            """)
-            member_achievement_insert_query = ("""
-                INSERT INTO member_achievement (entity, description, display_order, member_id)
-                VALUES (%s, %s, %s, %s)
-                RETURNING id;
-            """)
-            member_achievement_delete_query = ("""
-                DELETE FROM member_achievement
-                WHERE member_id = %s AND NOT id = ANY(%s);
-            """)
-
-            if member_achievement:
-                achievement_ids_to_stay = list()
-                for achievement in member_achievement:
-                    if achievement:
-                        id_, entity, description, display_order = [
-                            achievement[k] for k in ('id', 'entity', 'description', 'display_order')]
-                        if type(id_) == int:
-                            cls.source.execute(
-                                member_achievement_update_query, (entity, description, display_order, id_, member_id))
-                            achievement_ids_to_stay.append(id_)
-                        else:
-                            cls.source.execute(
-                                member_achievement_insert_query, (entity, description, display_order, member_id))
-                            achievement_ids_to_stay.append(
-                                cls.source.get_last_row_id())
-                        cls.source.commit()
-                # Track what was deleted in the UI and kill it in db as well
-                cls.source.execute(member_achievement_delete_query,
-                                   (member_id, achievement_ids_to_stay))
-                cls.source.commit()
-
-            # Member contact 2
-            member_contact_2_update_query = ("""
-                UPDATE member_contact_2
-                SET
-                    description = %s,
-                    device_type = %s,
-                    device_country = %s,
-                    device = %s,
-                    method_type = %s,
-                    display_order = %s,
-                    primary_contact = %s,
-                    device_confirm_date = CURRENT_TIMESTAMP,
-                    update_date = CURRENT_TIMESTAMP
-                WHERE id = %s AND member_id = %s;
-            """)
-            member_contact_2_insert_query = ("""
-                INSERT INTO member_contact_2 (description, device_type, device_country, device, method_type, display_order, primary_contact, device_confirm_date, member_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, %s)
-                RETURNING id;
-            """)
-            member_contact_2_delete_query = ("""
-                DELETE FROM member_contact_2
-                WHERE member_id = %s AND NOT id = ANY(%s);
-            """)
-
-            if member_contact_2:
-                contact_ids_to_stay = list()
-                for contact in member_contact_2:
-                    if contact:
-                        id_, description, device_type, device_country, device, method_type, display_order, primary_contact = [
-                            contact[k] for k in ('id', 'description', 'device_type', 'device_country', 'device', 'method_type', 'display_order', 'primary_contact')]
-                        if (type(id_) == int):
-                            cls.source.execute(
-                                member_contact_2_update_query, (description, device_type, device_country, device, method_type, display_order, primary_contact, id_, member_id))
-                            contact_ids_to_stay.append(id_)
-                        else:
-                            cls.source.execute(
-                                member_contact_2_insert_query, (description, device_type, device_country, device, method_type, display_order, primary_contact, member_id))
-                            contact_ids_to_stay.append(
-                                cls.source.get_last_row_id())
-                        cls.source.commit()
-                # Track what was deleted in the UI and kill it in db as well
-                cls.source.execute(member_contact_2_delete_query,
-                                   (member_id, contact_ids_to_stay))
-                cls.source.commit()
-
-            # Member location
-            member_location_update_query = ("""
-                UPDATE member_location
-                SET
-                    address_1 = %s,
-                    street = %s,
-                    address_2 = %s,
-                    city = %s,
-                    state = %s,
-                    province = %s,
-                    postal = %s,
-                    country = %s,
-                    country_code_id = %s,
-                    location_type = %s,
-                    update_date = CURRENT_TIMESTAMP
-                WHERE id=%s AND member_id = %s;
-            """)
-            member_location_insert_query = ("""
-                INSERT INTO member_location (address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, member_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id;
-            """)
-            member_location_delete_query = ("""
-                DELETE FROM member_location
-                WHERE member_id = %s AND NOT id = ANY(%s);
-            """)
-
-            if member_location:
-                location_ids_to_stay = list()
-                for location in member_location:
-                    if location:
-                        id_, street, address_1, address_2, city, state, province, postal, country, country_code_id, location_type = [
-                            location[k] for k in ('id', 'street', 'address_1', 'address_2', 'city', 'state', 'province', 'postal', 'country', 'country_code_id', 'location_type')]
-
+        if member_achievement:
+            achievement_ids_to_stay = list()
+            for achievement in member_achievement:
+                if achievement:
+                    id_, entity, description, display_order = [
+                        achievement[k] for k in ('id', 'entity', 'description', 'display_order')]
                     if type(id_) == int:
                         cls.source.execute(
-                            member_location_update_query, (address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, id_, member_id))
-                        location_ids_to_stay.append(id_)
+                            member_achievement_update_query, (entity, description, display_order, id_, member_id))
+                        achievement_ids_to_stay.append(id_)
                     else:
                         cls.source.execute(
-                            member_location_insert_query, (address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, member_id))
-                        location_ids_to_stay.append(
+                            member_achievement_insert_query, (entity, description, display_order, member_id))
+                        achievement_ids_to_stay.append(
                             cls.source.get_last_row_id())
                     cls.source.commit()
-                # Track what was deleted in the UI and kill it in db as well
-                cls.source.execute(member_location_delete_query,
-                                   (member_id, location_ids_to_stay))
-                cls.source.commit()
-            return True
-        except:
-            pass
+            # Track what was deleted in the UI and kill it in db as well
+            cls.source.execute(member_achievement_delete_query,
+                               (member_id, achievement_ids_to_stay))
+            cls.source.commit()
+
+        # Member contact 2
+        member_contact_2_update_query = ("""
+            UPDATE member_contact_2
+            SET
+                description = %s,
+                device_type = %s,
+                device_country = %s,
+                device = %s,
+                method_type = %s,
+                display_order = %s,
+                primary_contact = %s,
+                device_confirm_date = CURRENT_TIMESTAMP,
+                update_date = CURRENT_TIMESTAMP
+            WHERE id = %s AND member_id = %s;
+        """)
+        member_contact_2_insert_query = ("""
+            INSERT INTO member_contact_2 (description, device_type, device_country, device, method_type, display_order, primary_contact, device_confirm_date, member_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, %s)
+            RETURNING id;
+        """)
+        member_contact_2_delete_query = ("""
+            DELETE FROM member_contact_2
+            WHERE member_id = %s AND NOT id = ANY(%s);
+        """)
+
+        if member_contact_2:
+            contact_ids_to_stay = list()
+            for contact in member_contact_2:
+                if contact:
+                    id_, description, device_type, device_country, device, method_type, display_order, primary_contact = [
+                        contact[k] for k in ('id', 'description', 'device_type', 'device_country', 'device', 'method_type', 'display_order', 'primary_contact')]
+                    if (type(id_) == int):
+                        cls.source.execute(
+                            member_contact_2_update_query, (description, device_type, device_country, device, method_type, display_order, primary_contact, id_, member_id))
+                        contact_ids_to_stay.append(id_)
+                    else:
+                        cls.source.execute(
+                            member_contact_2_insert_query, (description, device_type, device_country, device, method_type, display_order, primary_contact, member_id))
+                        contact_ids_to_stay.append(
+                            cls.source.get_last_row_id())
+                    cls.source.commit()
+            # Track what was deleted in the UI and kill it in db as well
+            cls.source.execute(member_contact_2_delete_query,
+                               (member_id, contact_ids_to_stay))
+            cls.source.commit()
+
+        # Member location
+        logger.debug(f"member locations {member_locations}")
+        cls.handle_member_locations(member_locations, member_id)
+        # if member_locations:
+        #     location_ids_to_stay = list()
+        #     for member_location in member_locations:
+        #         logger.debug(f"item {member_location}")
+        #         if member_location:
+        #             id_, country_code_id, location_type, admin_area_1, admin_area_2, locality, sub_locality, street_address_1, street_address_2, postal_code, latitude, longitude, map_vendor, map_link, place_id, vendor_formatted_address, description = [
+        #                 member_location[k] for k in ('id', 'country_code_id', 'location_type', 'admin_area_1', 'admin_area_2', 'locality', 'sub_locality', 'street_address_1', 'street_address_2', 'postal_code', 'latitude', 'longitude', 'map_vendor', 'map_link', 'place_id', 'vendor_formatted_address', 'description')]
+
+        #             location_params = {"country_code_id": country_code_id,
+        #                                "admin_area_1": json.convert_null(admin_area_1),
+        #                                "admin_area_2": json.convert_null(admin_area_2),
+        #                                "locality": json.convert_null(locality),
+        #                                "sub_locality": json.convert_null(sub_locality),
+        #                                "street_address_1": json.convert_null(street_address_1),
+        #                                "street_address_2": json.convert_null(street_address_2),
+        #                                "postal_code": json.convert_null(postal_code),
+        #                                "latitude": json.convert_null(latitude),
+        #                                "longitude": json.convert_null(longitude),
+        #                                "map_vendor": json.convert_null(map_vendor),
+        #                                "map_link": json.convert_null(map_link),
+        #                                "place_id": json.convert_null(place_id),
+        #                                "vendor_formatted_address": json.convert_null(vendor_formatted_address)}
+        #             location_id = LocationDA.insert_location(
+        #                 location_params)
+
+        #             if (type(id_) == int):
+        #                 logger.info(f"Will update member_location {id_}")
+        #                 cls.update_member_location({
+        #                     "location_type": location_type,
+        #                     "member_location_id": id_,
+        #                     "location_id": location_id,
+        #                     "member_id": member_id,
+        #                     "description": description
+        #                 })
+        #                 location_ids_to_stay.append(id_)
+        #             else:
+        #                 logger.info(f"Will insert member_location {id_}")
+        #                 inserted = cls.create_member_location({
+        #                     "location_type": location_type,
+        #                     "member_id": member_id,
+        #                     "location_id": location_id,
+        #                     "description": description
+        #                 })
+        #                 location_ids_to_stay.append(inserted)
+        #     # Track what was deleted in the UI and kill it in db as well
+        #     cls.delete_member_location(member_id, location_ids_to_stay)
+        # return True
+
+    @classmethod
+    def create_member_location(cls, params, commit=True):
+        query = ("""
+            INSERT INTO member_location (location_type, member_id, location_id, description)
+            VALUES ( %(location_type)s, %(member_id)s, %(location_id)s, %(description)s)
+            RETURNING id;
+        """)
+        cls.source.execute(query, params)
+
+        if commit:
+            cls.source.commit()
+        id = cls.source.get_last_row_id()
+        if id:
+            return id
+        else:
+            return None
+
+    @classmethod
+    def update_member_location(cls, params, commit=True):
+        query = ("""
+            UPDATE member_location
+            SET
+                location_type = %(location_type)s,
+                location_id = %(location_id)s,
+                description = %(description)s
+            WHERE id=%(member_location_id)s AND member_id = %(member_id)s;
+        """)
+        cls.source.execute(query, params)
+        if commit:
+            cls.source.commit()
+
+    @classmethod
+    def delete_member_location(cls, member_id, location_ids_to_stay, commit=True):
+        query = ("""
+            DELETE FROM member_location
+            WHERE member_id = %s AND NOT id = ANY(%s);
+        """)
+        cls.source.execute(query, (member_id, location_ids_to_stay))
+        if commit:
+            cls.source.commit()
+
+    @classmethod
+    def handle_member_locations(cls, member_locations, member_id, commit=True):
+        if member_locations:
+            location_ids_to_stay = list()
+            for member_location in member_locations:
+                logger.debug(f"item {member_location}")
+                if member_location:
+                    id_, country_code_id, location_type, admin_area_1, admin_area_2, locality, sub_locality, street_address_1, street_address_2, postal_code, latitude, longitude, map_vendor, map_link, place_id, vendor_formatted_address, description = [
+                        member_location[k] for k in ('id', 'country_code_id', 'location_type', 'admin_area_1', 'admin_area_2', 'locality', 'sub_locality', 'street_address_1', 'street_address_2', 'postal_code', 'latitude', 'longitude', 'map_vendor', 'map_link', 'place_id', 'vendor_formatted_address', 'description')]
+
+                    location_params = {"country_code_id": country_code_id,
+                                       "admin_area_1": json.convert_null(admin_area_1),
+                                       "admin_area_2": json.convert_null(admin_area_2),
+                                       "locality": json.convert_null(locality),
+                                       "sub_locality": json.convert_null(sub_locality),
+                                       "street_address_1": json.convert_null(street_address_1),
+                                       "street_address_2": json.convert_null(street_address_2),
+                                       "postal_code": json.convert_null(postal_code),
+                                       "latitude": json.convert_null(latitude),
+                                       "longitude": json.convert_null(longitude),
+                                       "map_vendor": json.convert_null(map_vendor),
+                                       "map_link": json.convert_null(map_link),
+                                       "place_id": json.convert_null(place_id),
+                                       "vendor_formatted_address": json.convert_null(vendor_formatted_address)}
+                    location_id = LocationDA.insert_location(
+                        location_params)
+
+                    if (type(id_) == int):
+                        logger.info(f"Will update member_location {id_}")
+                        cls.update_member_location({
+                            "location_type": location_type,
+                            "member_location_id": id_,
+                            "location_id": location_id,
+                            "member_id": member_id,
+                            "description": description
+                        })
+                        location_ids_to_stay.append(id_)
+                    else:
+                        logger.info(f"Will insert member_location {id_}")
+                        inserted = cls.create_member_location({
+                            "location_type": location_type,
+                            "member_id": member_id,
+                            "location_id": location_id,
+                            "description": description
+                        })
+                        location_ids_to_stay.append(inserted)
+            # Track what was deleted in the UI and kill it in db as well
+            cls.delete_member_location(member_id, location_ids_to_stay)
+        return True
 
     @classmethod
     def get_member_skills(cls, member_id):
@@ -2646,7 +2774,35 @@ class MemberSettingDA(object):
     def get_member_setting(cls, member_id):
         get_member_setting_query = ("""
             SELECT
-                COALESCE(json_agg(DISTINCT member_location.*) FILTER (WHERE member_location.id IS NOT NULL), '[]') AS location_information,
+                (
+                    SELECT COALESCE(json_agg(rows), '[]'::json) AS location_information
+                    FROM (
+                        SELECT 
+                            member_location.id,
+                            member_location.location_type,
+                            member_location.description,
+                            member_location.location_id,
+                            location.country_code_id,
+                            location.vendor_formatted_address,
+                            country_code.name AS country_name,
+                            location.admin_area_1,
+                            location.admin_area_2,
+                            location.locality,
+                            location.sub_locality,
+                            location.street_address_1,
+                            location.street_address_2,
+                            location.postal_code,
+                            location.latitude,
+                            location.longitude,
+                            location.map_vendor,
+                            location.map_link,
+                            location.place_id
+                        FROM member_location
+                        LEFT JOIN location ON location.id = member_location.location_id
+                        LEFT JOIN country_code ON country_code.id = location.country_code_id
+                        WHERE member_id = member_profile.member_id
+                    ) AS rows
+                ),
                 member_profile.online_status,
                 member_profile.view_profile,
                 member_profile.add_contact,
@@ -2658,7 +2814,7 @@ class MemberSettingDA(object):
                 member_profile.time_format,
                 member_profile.start_day
             FROM member_profile
-                LEFT OUTER JOIN member_location ON member_location.member_id = member_profile.member_id
+                LEFT JOIN member_location ON member_location.member_id = member_profile.member_id
             WHERE member_profile.member_id = %s
             GROUP BY member_profile.member_id
             """)
@@ -2695,158 +2851,55 @@ class MemberSettingDA(object):
                 return member
 
     @classmethod
-    def update_member_setting(cls, member_id, member_profile, member_location):
+    def update_member_setting(cls, member_id, member_profile, member_locations):
+        # TODO: - PERFORMANCE CHECK
+        # Member_profile
+        member_profile_query = ("""
+            INSERT INTO member_profile (
+                member_id,
+                online_status,
+                view_profile,
+                add_contact,
+                join_date,
+                login_location,
+                unit_of_measure,
+                timezone_id,
+                date_format,
+                time_format,
+                start_day )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON conflict(member_id) DO UPDATE
+            SET online_status = %s,
+                view_profile = %s,
+                add_contact = %s,
+                join_date = %s,
+                login_location = %s,
+                unit_of_measure = %s,
+                timezone_id = %s,
+                date_format = %s,
+                time_format = %s,
+                start_day = %s
+        """)
 
-        try:
-            # TODO: - PERFORMANCE CHECK
+        member_profile_params = (
+            member_id,) + tuple(2 * [member_profile["online_status"], member_profile["view_profile"],
+                                    member_profile["add_contact"], member_profile["join_date"], member_profile["login_location"],
+                                    member_profile["unit_of_measure"], member_profile["timezone_id"], member_profile["date_format"],
+                                    member_profile["time_format"], member_profile["start_day"]])
 
-            # Member_profile
-            member_profile_query = ("""
-                INSERT INTO member_profile (
-                    member_id,
-                    online_status,
-                    view_profile,
-                    add_contact,
-                    join_date,
-                    login_location,
-                    unit_of_measure,
-                    timezone_id,
-                    date_format,
-                    time_format,
-                    start_day )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON conflict(member_id) DO UPDATE
-                SET online_status = %s,
-                    view_profile = %s,
-                    add_contact = %s,
-                    join_date = %s,
-                    login_location = %s,
-                    unit_of_measure = %s,
-                    timezone_id = %s,
-                    date_format = %s,
-                    time_format = %s,
-                    start_day = %s
-            """)
+        cls.source.execute(member_profile_query, member_profile_params)
+        cls.source.commit()
 
-            member_profile_params = (
-                member_id,) + tuple(2 * [member_profile["online_status"], member_profile["view_profile"],
-                                         member_profile["add_contact"], member_profile["join_date"], member_profile["login_location"],
-                                         member_profile["unit_of_measure"], member_profile["timezone_id"], member_profile["date_format"],
-                                         member_profile["time_format"], member_profile["start_day"]])
-
-            cls.source.execute(member_profile_query, member_profile_params)
-            cls.source.commit()
-
-            # Member location
-            member_location_update_query = ("""
-                UPDATE member_location
-                SET
-                    description = %s,
-                    address_1 = %s,
-                    street = %s,
-                    address_2 = %s,
-                    city = %s,
-                    state = %s,
-                    province = %s,
-                    postal = %s,
-                    country = %s,
-                    country_code_id = %s,
-                    location_type = %s
-                WHERE id=%s AND member_id = %s;
-            """)
-            member_location_insert_query = ("""
-                INSERT INTO member_location (description, address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, member_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id;
-            """)
-            member_location_delete_query = ("""
-                DELETE FROM member_location
-                WHERE member_id = %s AND NOT id = ANY(%s) AND location_type IN ('other', 'billing');
-            """)
-
-            if member_location:
-                location_ids_to_stay = list()
-                for location in member_location:
-                    if location:
-                        id_, description, street, address_1, address_2, city, state, province, postal, country, country_code_id, location_type = [
-                            location[k] for k in ('id', 'description', 'street', 'address_1', 'address_2', 'city', 'state', 'province', 'postal', 'country', 'country_code_id', 'location_type')]
-
-                    if type(id_) == int:
-                        cls.source.execute(
-                            member_location_update_query, (description, address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, id_, member_id))
-                        location_ids_to_stay.append(id_)
-                    else:
-                        cls.source.execute(
-                            member_location_insert_query, (description, address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, member_id))
-                        location_ids_to_stay.append(
-                            cls.source.get_last_row_id())
-                    cls.source.commit()
-                # Track what was deleted in the UI and kill it in db as well
-                cls.source.execute(member_location_delete_query,
-                                   (member_id, location_ids_to_stay))
-                cls.source.commit()
-            return True
-        except Exception as e:
-            logger.debug("iss+++++ {}".format(e))
-            pass
+        updated = MemberInfoDA.handle_member_locations(
+            member_locations, member_id)
+        return updated
 
     @classmethod
-    def update_member_payment_setting(cls, member_id, member_location):
-
-        try:
-
-            # Member location
-            member_location_update_query = ("""
-                UPDATE member_location
-                SET
-                    description = %s,
-                    address_1 = %s,
-                    street = %s,
-                    address_2 = %s,
-                    city = %s,
-                    state = %s,
-                    province = %s,
-                    postal = %s,
-                    country = %s,
-                    country_code_id = %s,
-                    location_type = %s
-                WHERE id=%s AND member_id = %s;
-            """)
-            member_location_insert_query = ("""
-                INSERT INTO member_location (description, address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, member_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id;
-            """)
-            member_location_delete_query = ("""
-                DELETE FROM member_location
-                WHERE member_id = %s AND NOT id = ANY(%s) AND location_type IN ('home', 'billing');
-            """)
-
-            if member_location:
-                location_ids_to_stay = list()
-                for location in member_location:
-                    if location:
-                        id_, description, street, address_1, address_2, city, state, province, postal, country, country_code_id, location_type = [
-                            location[k] for k in ('id', 'description', 'street', 'address_1', 'address_2', 'city', 'state', 'province', 'postal', 'country', 'country_code_id', 'location_type')]
-
-                    if type(id_) == int:
-                        cls.source.execute(
-                            member_location_update_query, (description, address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, id_, member_id))
-                        location_ids_to_stay.append(id_)
-                    else:
-                        cls.source.execute(
-                            member_location_insert_query, (description, address_1, street, address_2, city, state, province, postal, country, country_code_id, location_type, member_id))
-                        location_ids_to_stay.append(
-                            cls.source.get_last_row_id())
-                    cls.source.commit()
-                # Track what was deleted in the UI and kill it in db as well
-                cls.source.execute(member_location_delete_query,
-                                   (member_id, location_ids_to_stay))
-                cls.source.commit()
-            return True
-        except Exception as e:
-            logger.debug("iss+++++ {}".format(e))
-            pass
+    def update_member_payment_setting(cls, member_id, member_locations):
+        # Member location
+        updated = MemberInfoDA.handle_member_locations(
+            member_locations, member_id)
+        return updated
 
 
     @classmethod

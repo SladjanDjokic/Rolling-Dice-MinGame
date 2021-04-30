@@ -258,7 +258,7 @@ class MemberFileCloud(object):
                  level,
                  iv
                  ) = itemgetter('node_temp_id', 'name', 'isDir', 'size', 'parentId', 'level', 'iv')(node)
-
+                logger.debug(f'Filesize: {size}')
                 file_entry_id = None
                 if not isDir:
                     # upload and insert file first

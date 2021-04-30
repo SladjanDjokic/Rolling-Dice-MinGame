@@ -3,13 +3,13 @@ INSERT INTO file_storage_engine (storage_engine_id, storage_engine, status) VALU
     ('https://file-testing.s3.us-east-2.amazonaws.com/hq2.jpg', 'S3', 'available');
 
 
-INSERT INTO company (logo_storage_id, email, parent_company_id,name, place_id, address_1,address_2, city, state_code_id, postal, country_code_id, main_phone, primary_url)
+INSERT INTO company (logo_storage_id, email, parent_company_id,name, country_code_id, main_phone, primary_url)
 VALUES 
-    (8,'info@megachips.com', null, 'Megachips Corporation', NULL, '1-1-1 Miyahara, Yodogawa-ku', NULL, 'Osaka',NULL,NULL, 392, '663992884', 'www.coriander.com' ),
-    (9,'info@ameraiot.com',1, 'Amera IoT Inc.', NULL, '4150 Belt Line Road', NULL, 'Addison',NULL,'75001', 840, '8177980012', 'Ameraiot.com' ),
-    (8,'info@jetsilk.org',null, 'Jetsilk', 'ChIJVYBZP-Oxj4ARls-qJ_G3tgM', '1600 Amphitheatre Parkway', 'Suite 616', 'Mountain View',06,94043, 840, '6667777777', 'www.jetsilk.com' ),
-    (8,'mark@facebook.com',null, 'Facebook', 'ChIJNcejdWOAhYARhxkvgwjkUx8', '81 Fremont St, San Francisco, CA 94105, United States', 'Suite 2', 'San Franscisco',13,94105, 840, '61982828888', 'www.facebook.com' ),
-    (8,'arigato@sony.jp',null, 'Sony', 'ChIJ5776ik-KGGARFq5gxQtNSWw', '1 Chome-7-1 Konan, Minato City, Tokyo, Japan', '24 Sony Street', 'Minato City, Tokyo',null,'108-0075', 392, '12345678', 'www.sony.jp' );
+    (8,'info@megachips.com', null, 'Megachips Corporation',  392, '663992884', 'www.coriander.com' ),
+    (9,'info@ameraiot.com',1, 'Amera IoT Inc.', 840, '8177980012', 'Ameraiot.com' ),
+    (8,'info@jetsilk.org',null, 'Jetsilk',  840, '6667777777', 'www.jetsilk.com' ),
+    (8,'mark@facebook.com',null, 'Facebook', 840, '61982828888', 'www.facebook.com' ),
+    (8,'arigato@sony.jp',null, 'Sony', 392, '12345678', 'www.sony.jp' );
 
 INSERT INTO company_department (company_id, department_id) VALUES
     (1, 11),

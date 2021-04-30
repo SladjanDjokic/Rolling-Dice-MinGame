@@ -18,9 +18,8 @@ class CompanyDA(object):
                 SELECT
                     company.id,
                     company.name,
-                    company.place_id,
                     parent_company.id AS parent_company_id,
-	                parent_company.name AS parent_company_name,
+                    parent_company.name AS parent_company_name,
                     -- industries
                     (
                         SELECT COALESCE(json_agg(rows), '[]'::json) as company_industries
@@ -104,15 +103,21 @@ class CompanyDA(object):
                             WHERE ch.parent_company_id = company.id
                         ) AS rows
                     ),
-                    company.address_1,
-                    company.address_2,
-                    company.city,
-                    company.state,
-                    company.postal,
-                    company.province,
+                    location.id AS location_id,
+                    location.admin_area_1,
+                    location.admin_area_2,
+                    location.locality,
+                    location.sub_locality,
+                    location.street_address_1,
+                    location.street_address_2,
+                    location.postal_code,
+                    location.latitude,
+                    location.longitude,
+                    location.map_vendor,
+                    location.map_link,
+                    location.place_id,
                     company.country_code_id,
-                    country_code.name as country,
-                    country_code.alpha3,
+                    country_code.name as country_name,
                     currency_code.id AS currency_code_id,
                     currency_code.currency_code,
                     currency_code.currency_name,
@@ -123,6 +128,7 @@ class CompanyDA(object):
                     file_path(file_storage_engine.storage_engine_id, '/member/file') as logo_url,
                     company.create_date
                 FROM company
+                LEFT JOIN location ON location.id = company.location_id
                 LEFT JOIN country_code ON country_code.id = company.country_code_id
                 LEFT JOIN currency_code ON currency_code.id = country_code.currency_code_id
                 LEFT JOIN file_storage_engine ON file_storage_engine.id = company.logo_storage_id
@@ -143,11 +149,6 @@ class CompanyDA(object):
         sort_columns_string = 'company.name ASC'
         company_dict = {
             'company_name': 'company.name',
-            'address_1': 'company.address_1',
-            'address_2': 'company.address_2',
-            'city': 'company.city',
-            'state': 'company.state',
-            'postal': 'company.postal',
             'country_code_id': 'company.country_code_id',
             'country': 'country_code.name',
             'main_phone': 'company.main_phone',
@@ -166,7 +167,6 @@ class CompanyDA(object):
                 SELECT
                     company.id,
                     company.name,
-                    company.place_id,
                     parent_company.id AS parent_company_id,
 	                parent_company.name AS parent_company_name,
                     -- industries
@@ -252,15 +252,20 @@ class CompanyDA(object):
                             WHERE ch.parent_company_id = company.id
                         ) AS rows
                     ),
-                    company.address_1,
-                    company.address_2,
-                    company.city,
-                    company.state,
-                    company.postal,
-                    company.province,
+                    location.admin_area_1,
+                    location.admin_area_2,
+                    location.locality,
+                    location.sub_locality,
+                    location.street_address_1,
+                    location.street_address_2,
+                    location.postal_code,
+                    location.latitude,
+                    location.longitude,
+                    location.map_vendor,
+                    location.map_link,
+                    location.place_id,
                     company.country_code_id,
                     country_code.name as country,
-                    country_code.alpha3,
                     currency_code.id AS currency_code_id,
                     currency_code.currency_code,
                     currency_code.currency_name,
@@ -271,6 +276,7 @@ class CompanyDA(object):
                     file_path(file_storage_engine.storage_engine_id, '/member/file') as logo_url,
                     company.create_date
                 FROM company
+                LEFT JOIN location ON location.id = company.location_id
                 LEFT JOIN country_code ON country_code.id = company.country_code_id
                 LEFT JOIN currency_code ON currency_code.id = country_code.currency_code_id
                 LEFT JOIN file_storage_engine ON file_storage_engine.id = company.logo_storage_id
@@ -330,16 +336,15 @@ class CompanyDA(object):
         }
 
     @classmethod
-    def create_company(cls, name, place_id = None, address_1 = None, address_2 = None, city = None, state = None , postal =None, country_code_id = None, main_phone = None, primary_url = None, logo_storage_id = None , commit=True):
+    def create_company(cls, name, country_code_id=None, main_phone=None, primary_url=None, logo_storage_id=None, commit=True):
         query = ("""
-            INSERT INTO company (name, place_id, address_1, address_2, city, state, postal, country_code_id, main_phone, primary_url, logo_storage_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO company (name,  country_code_id, main_phone, primary_url, logo_storage_id)
+            VALUES (%s, %s, %s, %s, %s)
             RETURNING id
         """)
 
-        params = (name, place_id, address_1, address_2, city,
-                  state, postal, country_code_id,
-                  main_phone, primary_url, logo_storage_id)
+        params = (name, country_code_id, main_phone,
+                  primary_url, logo_storage_id)
         cls.source.execute(query, params)
         id = cls.source.get_last_row_id()
 
@@ -400,13 +405,7 @@ class CompanyDA(object):
                 primary_url = %(primary_url)s,
                 main_phone = %(main_phone)s,
                 country_code_id = %(country_code_id)s,
-                place_id = %(place_id)s,
-                address_1 = %(address_1)s,
-                address_2 = %(address_2)s,
-                city = %(city)s,
-                state = %(state)s,
-                postal = %(postal)s,
-                province = %(province)s
+                location_id = %(location_id)s
             WHERE id = %(company_id)s
             RETURNING id
         """)
@@ -519,7 +518,7 @@ class CompanyDA(object):
                 WHERE company_id = %s AND member_id = %s
             ) AS row
         """)
-        params =(company_id, member_id)
+        params = (company_id, member_id)
         cls.source.execute(query, params)
         if cls.source.has_results():
             return cls.source.cursor.fetchone()[0]

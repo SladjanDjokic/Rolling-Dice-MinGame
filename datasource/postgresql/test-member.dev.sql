@@ -192,18 +192,17 @@ INSERT INTO invite
 
 
 INSERT INTO member_location
-        (member_id, location_type, street, city, state, postal, country, address_1, address_2, country_code_id)
+        (member_id, location_type)
         VALUES 
-            (1, 'billing', '171 Wilson Street', 'Eggertsville', 'AS', '22110', 'United States of America', '171 Wilson Street', 'Apt #153', 840),
-            (2, 'work', '814 Pine Street', 'Crown', 'KS', '37986', 'United States of America', '814 Pine Street', 'Apt #121', 840),
-            (3, 'other', '713 Vandervoort Place', 'Spokane', 'MS', '35390', 'United States of America','713 Vandervoort Place', 'Apt #175', 840),
-            (4, 'billing', '305 Prospect Place', 'Wakarusa', 'LA', '64896', 'United States of America', '305 Prospect Place', 'Apt #160', 840),
-            (5, 'home', '913 Moore Place', 'Elizaville', 'SD', '28714', 'United States of America', '913 Moore Place', 'Apt #118', 840),
-            (6, 'home', '100 Hamilton Avenue', 'Dotsero', 'KY', '13730', 'United States of America', '100 Hamilton Avenue', 'Apt #181', 840),
-            
-            (7, 'billing', '4, Wallenhorst', 'Harwerth', 'AS', '49134', 'Germany', '4, Wallenhorst', 'Apt #15', 49),
-            (8, 'home', 'Melle', 'Ochsenweg', 'OS', '49324', 'Germany', 'Melle', 'Apt #16', 49),
-            (9, 'home', 'faizabad Terminal', 'Rawalpindi', 'RW', '12345', 'Pakistan', 'Faisal Movers Bus Terminal', 'Apt #2', 92);
+            (1, 'billing'),
+            (2, 'work'),
+            (3, 'other'),
+            (4, 'billing'),
+            (5, 'home'),
+            (6, 'home'),
+            (7, 'billing'),
+            (8, 'home'),
+            (9, 'home');
 
 -- INSERT INTO member_contact_2
 --         (member_id, description, device, device_type, device_country, method_type, display_order, primary_contact)

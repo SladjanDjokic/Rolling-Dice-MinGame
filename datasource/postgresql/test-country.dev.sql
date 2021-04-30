@@ -669,3 +669,11 @@ UPDATE country_code SET display_order = 2 WHERE id = 392;    -- Japan
 
 UPDATE country_code SET display_order = 3 WHERE id IN ( 124, 484, 276, 410 );
                                           -- Canada, Mexico, Germany, Korea
+
+
+
+INSERT INTO location_data_labels ( country_code_id, admin_area_1, admin_area_2, locality,
+                                   sub_locality, street_address_1, street_address_2, postal_code )
+  VALUES
+    ( 840, 'State', 'County', 'City', NULL, 'Address 1', 'Address 2', 'Zip Code' ),
+    ( 392, 'Prefecture', 'Municipality/City', 'District', 'Town/Village', 'Address 1', 'Address 2', 'Postal Code' );

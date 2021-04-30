@@ -248,27 +248,27 @@ services:
       timeout: 1s
       retries: 1000
 
-  # amera-signaling:
-  #   container_name: amera-signaling
-  #   image: amera-signaling:latest
-  #   restart: always
-  #   logging:
-  #     options:
-  #       max-size: "500k"
-  #       max-file: "1"
-  #   build:
-  #     context: ../web-signaling/
-  #     dockerfile: Dockerfile
-  #   networks:
-  #     - amera-net
-  #   ports:
-  #     - 8080:8080
-  #   expose:
-  #     - 8080
-  #   volumes:
-  #     - ../web-signaling:/app
-  #     - demo-signaling-python-packages:/root/.local/share
-  #   command: ["pipenv", "run", "docker"]
+  amera-signaling:
+    container_name: amera-signaling
+    image: amera-signaling:latest
+    restart: always
+    logging:
+      options:
+        max-size: "500k"
+        max-file: "1"
+    build:
+      context: ../web-signaling/
+      dockerfile: Dockerfile
+    networks:
+      - amera-net
+    ports:
+      - 8080:8080
+    expose:
+      - 8080
+    volumes:
+      - ../web-signaling:/app
+      - demo-signaling-python-packages:/root/.local/share
+    command: ["pipenv", "run", "docker"]
 
   amera-eventserver:
     container_name: amera-eventserver
@@ -448,8 +448,10 @@ services:
       - ../web-api/datasource/postgresql/schema-updates-2021-04-19_stream_media-duration-and-thumbnail.sql:/docker-entrypoint-initdb.d/t-2-stream_media-duration-and-thumbnail.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-04-21_page_settings-type.sql:/docker-entrypoint-initdb.d/t-3-page_settings-type.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-04-22_drop_company_department_status.sql:/docker-entrypoint-initdb.d/t-4-schema-updates-2021-04-22-22_drop_company_department_status.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-04-22_member_contact_2.sql:/docker-entrypoint-initdb.d/t-u-schema-updates-2021-04-22_member_contact_2.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-04-23_company.sql:/docker-entrypoint-initdb.d/t-5-company.sql
+      - ../web-api/datasource/postgresql/locations.sql:/docker-entrypoint-initdb.d/t-5-locations.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-04-26_locations_member_company.sql:/docker-entrypoint-initdb.d/t-7-company-member-location.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-04-23_company.sql:/docker-entrypoint-initdb.d/t-6-company.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-04-22_member_contact_2.sql:/docker-entrypoint-initdb.d/t-7-schema-updates-2021-04-22_member_contact_2.sql
       # Test data
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql

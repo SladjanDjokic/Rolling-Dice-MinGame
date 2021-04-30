@@ -12,6 +12,7 @@ from app.da.invite import InviteDA
 from app.da.group import GroupMembershipDA, GroupDA
 from app.da.promo_codes import PromoCodesDA
 from app.da.member import MemberInfoDA
+from app.da.location import LocationDA
 from app.da.company import CompanyDA
 from app.util.session import get_session_cookie, validate_session
 from app.exceptions.member import MemberExistsError, MemberNotFound, MemberDataMissing, MemberExists, MemberContactExists, MemberPasswordMismatch
@@ -22,6 +23,7 @@ from app.da.mail import MailServiceDA
 from app.da.project import ProjectDA
 import app.util.email as sendmail
 from app.util.filestorage import amerize_url
+from operator import itemgetter
 
 logger = logging.getLogger(__name__)
 
@@ -112,10 +114,10 @@ class MemberRegisterResource(object):
 
         (city, state, province, pin, email, password, confirm_password, first_name, last_name, date_of_birth,
          phone_number, country, postal, company, job_title_id, profilePicture,
-         cell_confrimation_ts, email_confrimation_ts, promo_code_id, department_id, ) = request.get_json_or_form(
+         cell_confrimation_ts, email_confrimation_ts, promo_code_id, department_id, location) = request.get_json_or_form(
             "city", "state", "province", "pin", "email", "password", "confirm_password", "first_name", "last_name", "dob",
             "cell", "country", "postal_code", "company", "job_title_id", "profilePicture",
-            "cellConfirmationTS", "emailConfirmationTS", "activatedPromoCode", "department_id", req=req)
+            "cellConfirmationTS", "emailConfirmationTS", "activatedPromoCode", "department_id", "location", req=req)
         try:
             # We store the key in hex format in the database
 
@@ -130,6 +132,8 @@ class MemberRegisterResource(object):
             company = json.loads(company)
             company_name = company["name"]
             company_id = company["id"]
+
+            location = json.loads(location)
 
             if (not email or not password or
                     not first_name or not last_name):  # or
@@ -216,6 +220,28 @@ class MemberRegisterResource(object):
                         "department_status": "standard",
                         "author_id": member_id
                     })
+
+            # Insert location
+            if location:
+                location_params = {"country_code_id": country,
+                                   "admin_area_1": location["adminArea1"],
+                                   "admin_area_2": location["adminArea2"],
+                                   "locality": location["locality"],
+                                   "sub_locality": location["sublocality"],
+                                   "street_address_1": location["streetAddress1"],
+                                   "street_address_2": location["streetAddress2"],
+                                   "postal_code": location["postal"],
+                                   "latitude": location["latitude"],
+                                   "longitude": location["latitude"],
+                                   "map_vendor": location["map_vendor"],
+                                   "map_link": location["map_link"],
+                                   "place_id": location["placeId"],
+                                   "vendor_formatted_address": location["vendor_formatted_address"]}
+                location_id = LocationDA.insert_location(location_params)
+                MemberInfoDA.create_member_location({"location_type": "home",
+                                                     "member_id": member_id,
+                                                     "location_id": location_id,
+                                                     "description": None})
 
             if member_id:
                 group = None
@@ -690,11 +716,11 @@ class MemberInfoResource(object):
     def on_put(self, req, resp):
         member_id = req.context.auth["session"]["member_id"]
 
-        (member, company, member_profile, member_achievement, member_contact_2, member_location, member_rate, work, educations, certificates, skills) = request.get_json_or_form(
+        (member, company, member_profile, member_achievement, member_contact_2, member_locations, member_rate, work, educations, certificates, skills) = request.get_json_or_form(
             "member", "company", "member_profile", "member_achievement", "member_contact_2", "member_location", "member_rate", "work", "educations", "certificates", "skills", req=req)
 
-        updated = MemberInfoDA().update_member_info(member_id,
-                                                    member, member_profile, member_achievement, member_contact_2, member_location)
+        updated = MemberInfoDA().update_member_info(member_id=member_id,
+                                                    member=member, member_profile=member_profile, member_achievement=member_achievement, member_contact_2=member_contact_2, member_locations=member_locations)
 
         updated = ProjectDA().update_member_default_rate(member_id=member_id,
                                                          pay_rate=member_rate["pay_rate"], currency_code_id=member_rate["currency_code_id"])
@@ -897,8 +923,10 @@ class MemberSettingResource(object):
     @check_session
     def on_put_payment(self, req, resp):
         member_id = req.context.auth["session"]["member_id"]
-        (member_location, ) = request.get_json_or_form("member_location", req=req)
-        updated = MemberSettingDA().update_member_payment_setting(member_id, member_location)
+        (member_locations, ) = request.get_json_or_form(
+            "member_location", req=req)
+        updated = MemberSettingDA().update_member_payment_setting(
+            member_id, member_locations)
         if updated:
             member_info = MemberSettingDA().get_member_setting(member_id)
             resp.body = json.dumps({

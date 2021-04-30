@@ -48,6 +48,9 @@ class FileStorageDA(object):
         # logger.debug(f"Value: {file.value}")
         logger.debug(f"Type: {file.type}")
         logger.debug(f"Disposition: {file.disposition}")
+        logger.debug(f"File Size Bytes: {file_size_bytes}")
+        logger.debug(file.file)
+        logger.debug(file.file.fileno)
 
         if not file_size_bytes:
             file_size_bytes = os.fstat(file.file.fileno()).st_size

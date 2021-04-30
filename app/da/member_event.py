@@ -448,7 +448,7 @@ class MemberEventDA(object):
                         repeat_weekdays,
                         end_date_datetime,
                         location_mode,
-                        location_id,
+                        event_2.location_id,
                         location_address,
                         (
                             SELECT json_agg(files) as attachments
@@ -550,7 +550,7 @@ class MemberEventDA(object):
                             repeat_weekdays,
                             end_date_datetime,
                             location_mode,
-                            location_id,
+                            event_2.location_id,
                             location_address,
                             (
                                 SELECT json_agg(files) as attachments
@@ -662,7 +662,7 @@ class MemberEventDA(object):
                             repeat_weekdays,
                             end_date_datetime,
                             location_mode,
-                            location_id,
+                            events.location_id,
                             location_address,
                             (
                                 SELECT json_agg(files) as attachments
@@ -854,7 +854,7 @@ class MemberEventDA(object):
                             repeat_weekdays,
                             end_date_datetime,
                             location_mode,
-                            location_id,
+                            events.location_id,
                             location_address,
                             member.first_name as first_name,
                             member.last_name as last_name,
@@ -981,7 +981,7 @@ class MemberEventDA(object):
                     repeat_weekdays,
                     end_date_datetime,
                     location_mode,
-                    location_id,
+                    event_2.location_id,
                     location_address,
                     member.first_name as first_name,
                     member.last_name as last_name,

@@ -248,15 +248,8 @@ class SessionDA(object):
             member.company_name as company,
             job_title.name as title,
             member_contact.phone_number as cell_phone,
-            member_location.street as street,
-            member_location.city as city,
-            member_location.state as state,
-            member_location.province as province,
-            member_location.postal as postal,
-            member_location.country as country,
             file_storage_engine.storage_engine_id as s3_avatar_url,
             member.user_type as user_type
-
         FROM member_session
         LEFT JOIN member ON member_session.member_id = member.id
         LEFT JOIN member_location ON member_session.member_id = member_location.member_id
@@ -287,12 +280,6 @@ class SessionDA(object):
                 company,
                 title,
                 cell_phone,
-                street,
-                city,
-                state,
-                province,
-                postal,
-                country,
                 s3_avatar_url,
                 user_type
             ) = cls.source.cursor.fetchone()
@@ -314,12 +301,6 @@ class SessionDA(object):
                 "company": company,
                 "title": title,
                 "cell_phone": cell_phone,
-                "street": street,
-                "city": city,
-                "state": state,
-                "province": province,
-                "postal": postal,
-                "country": country,
                 "amera_avatar_url": amerize_url(s3_avatar_url),
                 "user_type": user_type
             }
@@ -1010,4 +991,3 @@ class SessionDA(object):
                 cls.source.commit()
         except Exception as err:
             raise err
-
