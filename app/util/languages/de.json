@@ -177,5 +177,6 @@
   "app.facerecognition.lookUp": "Nachschlagen",
   "app.facerecognition.lookLeft": "Guck nach links",
   "app.facerecognition.lookDown": "Schau runter",
-  "app.facerecognition.lookRight": "schau richtig"
+  "app.facerecognition.lookRight": "schau richtig",
+  "app.facerecognition.faceRegistered": "Ihr Gesicht wurde erfolgreich registriert"
 }

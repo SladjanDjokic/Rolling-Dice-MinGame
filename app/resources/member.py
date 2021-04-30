@@ -367,27 +367,12 @@ class ContactMembersResource(object):
         for contact_member_id in contact_member_id_list:
             contact_member = MemberDA().get_contact_member(contact_member_id)
 
-            contact_member_params = {
-                "member_id": member_id,
-                "contact_member_id": contact_member_id,
-                "status": "requested",
-                "first_name": contact_member['first_name'],
-                "last_name": contact_member['last_name'],
-                "country": contact_member['country'],
-                "cell_phone": contact_member['cell_phone'],
-                "office_phone": '',
-                "home_phone": '',
-                "email": contact_member['email'],
-                "personal_email": '',
-                "company_name": '',
-                "company_phone": '',
-                "company_web_site": '',
-                "company_email": '',
-                "company_bio": '',
-                "contact_role": '',
-                "role_id": None
-            }
-            contact_id = MemberContactDA().create_member_contact(**contact_member_params)
+            contact_id = MemberContactDA().create_member_contact(
+                member_id=member_id,
+                contact_member_id=contact_member_id,
+                status="requested",
+                role_id=None
+            )
             logger.debug("New created contact_id: {}".format(contact_id))
             contact = {}
             if contact_id:
@@ -396,28 +381,12 @@ class ContactMembersResource(object):
 
             contact_member = MemberDA().get_contact_member(member_id)
 
-            contact_member_params = {
-                "member_id": contact_member_id,
-                "contact_member_id": member_id,
-                "status": "pending",
-                "first_name": contact_member['first_name'],
-                "last_name": contact_member['last_name'],
-                "country": contact_member['country'],
-                "cell_phone": contact_member['cell_phone'],
-                "office_phone": '',
-                "home_phone": '',
-                "email": contact_member['email'],
-                "personal_email": '',
-                "company_name": '',
-                "company_phone": '',
-                "company_web_site": '',
-                "company_email": '',
-                "company_bio": '',
-                "contact_role": '',
-                "role_id": None
-            }
-
-            contact_id = MemberContactDA().create_member_contact(**contact_member_params)
+            contact_id = MemberContactDA().create_member_contact(
+                member_id=contact_member_id,
+                contact_member_id=member_id,
+                status="pending",
+                role_id=None
+            )
             logger.debug("New created contact_id: {}".format(contact_id))
 
         contacts = MemberContactDA().get_member_contacts(

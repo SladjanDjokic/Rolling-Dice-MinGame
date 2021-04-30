@@ -1791,11 +1791,13 @@ class MemberContactDA(object):
         return None
 
     @classmethod
-    def create_member_contact(cls, member_id, contact_member_id, status, first_name,
-                              last_name, country, cell_phone, office_phone,
-                              home_phone, email, personal_email, company_name,
-                              company_phone, company_web_site, company_email,
-                              company_bio, contact_role, role_id, commit=True):
+    def create_member_contact(cls, member_id, contact_member_id, status, role_id=None,
+                              first_name=None, last_name=None, country=None, 
+                              cell_phone=None, office_phone=None, home_phone=None,
+                              email=None, personal_email=None, company_name=None,
+                              company_phone=None, company_web_site=None,
+                              company_email=None, company_bio=None, contact_role=None,
+                              commit=True):
         create_member_contact_query = ("""
                     INSERT INTO contact
                         (member_id, contact_member_id, status, first_name, last_name,

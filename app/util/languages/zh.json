@@ -178,5 +178,6 @@
   "app.facerecognition.lookUp": "抬头",
   "app.facerecognition.lookLeft": "看左边",
   "app.facerecognition.lookDown": "向下看",
-  "app.facerecognition.lookRight": "向右看"
+  "app.facerecognition.lookRight": "向右看",
+  "app.facerecognition.faceRegistered": "您的臉孔已成功註冊"
 }

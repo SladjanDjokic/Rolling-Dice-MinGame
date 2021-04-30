@@ -179,5 +179,6 @@
   "app.facerecognition.lookUp": "Look up",
   "app.facerecognition.lookLeft": "Look left",
   "app.facerecognition.lookDown": "Look down",
-  "app.facerecognition.lookRight": "Look right"
+  "app.facerecognition.lookRight": "Look right",
+  "app.facerecognition.faceRegistered": "Your face was registered successfully"
 }

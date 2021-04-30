@@ -63,7 +63,6 @@ def build_url_from_request(req, path="", query="", fragment=""):
         query,
         fragment
     )
-
     logger.debug(f'URL Parts: {parts}')
     return urlunsplit(parts)
 

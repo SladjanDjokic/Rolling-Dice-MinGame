@@ -178,5 +178,6 @@
   "app.facerecognition.lookUp": "올려다 보기",
   "app.facerecognition.lookLeft": "왼쪽을 보기",
   "app.facerecognition.lookDown": "아래를 보기",
-  "app.facerecognition.lookRight": "오른쪽 보기"
+  "app.facerecognition.lookRight": "오른쪽 보기",
+  "app.facerecognition.faceRegistered": "얼굴이 성공적으로 등록되었습니다"
 }

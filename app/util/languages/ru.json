@@ -179,5 +179,6 @@
   "app.facerecognition.lookUp": "смотреть вверх",
   "app.facerecognition.lookLeft": "посмотри налево",
   "app.facerecognition.lookDown": "смотреть вниз",
-  "app.facerecognition.lookRight": "смотреть прямо"
+  "app.facerecognition.lookRight": "смотреть прямо",
+  "app.facerecognition.faceRegistered": "Ваше лицо было успешно зарегистрировано"
 }

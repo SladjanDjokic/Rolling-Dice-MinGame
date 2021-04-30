@@ -208,3 +208,65 @@ class VerificationDA(object):
         except TwilioRestException as e:
             logger.exception(e)
             raise e
+
+    @classmethod
+    def update_outgoing_caller(cls, contact_id, verification_status):
+        try:
+            query = ("""
+                UPDATE member_contact_2
+                SET
+                    outgoing_caller_verification = %s
+                WHERE id = %s;
+            """)
+            
+            cls.source.execute(query, (verification_status, contact_id ))
+            cls.source.commit()
+        except Exception as e:
+            raise e
+
+    @classmethod
+    def create_twilio_verification(cls, session_id, member_id, contact_id):
+        try:
+            query = ("""
+                INSERT INTO twilio_verification
+                    (session_id, member_id, member_contact_id)
+                VALUES (%s, %s, %s)
+                RETURNING id;
+            """)
+            
+            cls.source.execute(query, (session_id, member_id, contact_id ))
+            twilio_verify_id = cls.source.get_last_row_id()
+            cls.source.commit()
+
+            return twilio_verify_id
+        except Exception as e:
+            raise e
+
+    @classmethod
+    def get_twilio_verification(cls, twilio_verify_id):
+        
+        query = ("""
+            SELECT
+                session_id,
+                member_id,
+                member_contact_id
+            FROM twilio_verification
+            WHERE id = %s
+        """)
+        cls.source.execute(query, (twilio_verify_id, ))
+        if cls.source.has_results():
+            (
+                session_id,
+                member_id,
+                contact_id
+            ) = cls.source.cursor.fetchone()
+
+            session = {
+                "session_id": session_id,
+                "member_id": member_id,
+                "contact_id": contact_id
+            }
+
+            return session
+
+        return None

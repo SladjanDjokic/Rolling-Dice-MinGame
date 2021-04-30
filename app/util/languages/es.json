@@ -180,5 +180,6 @@
   "app.facerecognition.lookUp": "mirar para arriba",
   "app.facerecognition.lookLeft": "mira a la izquierda",
   "app.facerecognition.lookDown": "mira abajo",
-  "app.facerecognition.lookRight": "mira a la derecha"
+  "app.facerecognition.lookRight": "mira a la derecha",
+  "app.facerecognition.faceRegistered": "Tu rostro se registró correctamente"
 }

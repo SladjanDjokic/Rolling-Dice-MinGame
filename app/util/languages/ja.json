@@ -178,5 +178,6 @@
   "app.facerecognition.lookUp": "見上げる",
   "app.facerecognition.lookLeft": "左を見てください",
   "app.facerecognition.lookDown": "見下ろす",
-  "app.facerecognition.lookRight": "右に見て"
+  "app.facerecognition.lookRight": "右に見て",
+  "app.facerecognition.faceRegistered": "あなたの顔は正常に登録されました"
 }

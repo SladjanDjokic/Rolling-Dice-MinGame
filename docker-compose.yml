@@ -448,10 +448,13 @@ services:
       - ../web-api/datasource/postgresql/schema-updates-2021-04-19_stream_media-duration-and-thumbnail.sql:/docker-entrypoint-initdb.d/t-2-stream_media-duration-and-thumbnail.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-04-21_page_settings-type.sql:/docker-entrypoint-initdb.d/t-3-page_settings-type.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-04-22_drop_company_department_status.sql:/docker-entrypoint-initdb.d/t-4-schema-updates-2021-04-22-22_drop_company_department_status.sql
-      - ../web-api/datasource/postgresql/locations.sql:/docker-entrypoint-initdb.d/t-5-locations.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-04-26_locations_member_company.sql:/docker-entrypoint-initdb.d/t-7-company-member-location.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-04-22_member_contact_2.sql:/docker-entrypoint-initdb.d/t-5-schema-updates-2021-04-22_member_contact_2.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-04-23_company.sql:/docker-entrypoint-initdb.d/t-6-company.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-04-22_member_contact_2.sql:/docker-entrypoint-initdb.d/t-7-schema-updates-2021-04-22_member_contact_2.sql
+      - ../web-api/datasource/postgresql/twilio_verification.sql:/docker-entrypoint-initdb.d/u-twilio-verification.sql
+      - ../web-api/datasource/postgresql/locations.sql:/docker-entrypoint-initdb.d/u-0-locations.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-04-26_locations_member_company.sql:/docker-entrypoint-initdb.d/u-1-company-member-location.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-04-30_member_contact_2-outgoing.sql:/docker-entrypoint-initdb.d/u-2-member_contact_2-outgoing.sql
+      
       # Test data
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql

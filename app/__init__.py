@@ -578,7 +578,7 @@ def _setup_routes(app):
     app.add_route("/streaming/types", stream_type_resource)
 
     # twilio
-    app.add_route("/twilio/outgoing-caller/{contact_id}", verify_cell_resource, suffix="verified")
+    app.add_route("/twilio/outgoing-caller/{twilio_verify_id}", verify_cell_resource, suffix="verified")
     # app.add_route("/twilio/message")
     # app.add_route("/twilio/message/status")
     twilio_resource = TwilioResource()
