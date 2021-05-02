@@ -1135,6 +1135,7 @@ class MemberContactDA(object):
                             company.parent_company_id,
                             company.name,
                             company.country_code_id,
+                            country_code.name AS country_name,
                             company.main_phone,
                             company.main_phone_ext,
                             company.primary_url,
@@ -1177,6 +1178,7 @@ class MemberContactDA(object):
                         ) AS ls ON ls.company_member_id = company_member.id
                         LEFT JOIN company ON company.id = company_member.company_id
                         LEFT JOIN location ON location.id = company.location_id
+                        LEFT JOIN country_code ON country_code.id = company.country_code_id
                         WHERE company_member.member_id = member.id
                         ORDER BY company_member.create_date DESC
                         LIMIT 1
@@ -2885,9 +2887,9 @@ class MemberSettingDA(object):
 
         member_profile_params = (
             member_id,) + tuple(2 * [member_profile["online_status"], member_profile["view_profile"],
-                                    member_profile["add_contact"], member_profile["join_date"], member_profile["login_location"],
-                                    member_profile["unit_of_measure"], member_profile["timezone_id"], member_profile["date_format"],
-                                    member_profile["time_format"], member_profile["start_day"]])
+                                     member_profile["add_contact"], member_profile["join_date"], member_profile["login_location"],
+                                     member_profile["unit_of_measure"], member_profile["timezone_id"], member_profile["date_format"],
+                                     member_profile["time_format"], member_profile["start_day"]])
 
         cls.source.execute(member_profile_query, member_profile_params)
         cls.source.commit()
@@ -2902,7 +2904,6 @@ class MemberSettingDA(object):
         updated = MemberInfoDA.handle_member_locations(
             member_locations, member_id)
         return updated
-
 
     @classmethod
     def update_outgoing_contact(cls, member_id, contact_id):
@@ -2931,7 +2932,6 @@ class MemberSettingDA(object):
         except Exception as e:
             logger.debug("iss+++++xx {}".format(e))
             pass
-
 
 
 class MemberNotificationsSettingDA(object):
