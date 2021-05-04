@@ -42,7 +42,7 @@ from app.resources.system import SystemMemberResource
 from app.resources.language import LanguageResource
 from app.resources.member_scheduler_setting import MemberSchedulerSettingResource
 from app.resources.member_schedule_event import MemberScheduleEventResource, MemberScheduleEventColors, \
-    EventAttachmentResorce, MemberUpcomingEvents, MemberEventInvitations, MemberEventDirections
+    EventAttachmentResorce, MemberUpcomingEvents, MemberEventInvitations, MemberEventDirections, MemberEventGoogleMapPhoto
 from app.resources.member_schedule_holiday import MemberScheduleHolidayResource
 from app.resources.member_schedule_event_invite import MemberScheduleEventInviteResource, \
     MemberScheduleEventInviteSetStatusResource
@@ -297,6 +297,8 @@ def _setup_routes(app):
     app.add_route("/member/schedule/attach", EventAttachmentResorce())
     app.add_route("/member/schedule/holiday", MemberScheduleHolidayResource())
     app.add_route("/member/schedule/event/directions", MemberEventDirections())
+    # Google Map place photo
+    app.add_route("/member/schedule/event/google-map-photo", MemberEventGoogleMapPhoto())
 
     # app.add_route("/member/schedule/event-invite/add-single", MemberScheduleEventInviteAddSingleResource())
     app.add_route("/member/schedule/event-invite",

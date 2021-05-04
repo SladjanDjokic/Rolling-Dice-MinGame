@@ -1,4 +1,8 @@
 import logging
+import requests
+import os
+import io
+import cgi
 
 import app.util.json as json
 import app.util.request as request
@@ -653,6 +657,51 @@ class MemberEventDirections(object):
             resp.body = json.dumps({
                 "success": success,
             }, default_parser=json.parser)
+        except Exception as err:
+            logger.exception(err)
+            raise err
+
+
+class MemberEventGoogleMapPhoto(object):
+    @check_session
+    def on_post(self, req, resp):
+        try:
+            member = req.context.auth["session"]
+            member_id = member["member_id"]
+            url = req.get_param("url")
+            
+            image_data = requests.get(url, stream=True)
+            file = io.BytesIO(image_data.content)
+            file_size_bytes = image_data.headers["Content-Length"]
+            mime_type = image_data.headers["Content-Type"]
+            file_name = image_data.headers["Content-Disposition"]
+            file_name = cgi.parse_header(image_data.headers['Content-Disposition'])[-1]['filename']
+
+            storage_file_id = FileStorageDA().put_file_content_to_storage(
+            file, file_name, file_size_bytes, mime_type)
+
+            member_file_id = FileTreeDA().create_member_file_entry(
+                file_id=storage_file_id,
+                file_name=file_name,
+                member_id=member_id,
+                status="available",
+                file_size_bytes=file_size_bytes)
+            if not member_file_id:
+                raise FileUploadCreateException
+
+            file_data = FileStorageDA().get_member_file(
+                member, storage_file_id)
+
+            if file_data:
+                resp.body = json.dumps({
+                    "data": file_data,
+                    "success": True
+                }, default_parser=json.parser)
+            else:
+                resp.body = json.dumps({
+                    "description": "Could not save google map photo",
+                    "success": False
+                }, default_parser=json.parser)
         except Exception as err:
             logger.exception(err)
             raise err

@@ -81,6 +81,20 @@ class FileStorageDA(object):
         return file_id
 
     @classmethod
+    def put_file_content_to_storage(cls, file, file_name, file_size_bytes, mime_type, member_id=None):
+        s3_location = settings.get("storage.s3.file_location_host")
+        uniquestr = str(uuid.uuid4())[:8]
+        (dirname, true_filename) = os.path.split(file_name)
+        s3_key = f"{member_id}/{uniquestr}_{true_filename}" if member_id else f"{uniquestr}_{true_filename}"
+
+        uploaded = cls.stream_to_aws(file, s3_key)
+        storage_url = urljoin(s3_location, s3_key)
+
+        file_id = cls.create_file_storage_entry(
+            storage_url, 's3', "available", file_size_bytes, mime_type)
+        return file_id
+
+    @classmethod
     def stream_to_aws(cls, file, key):
         try:
             s3 = cls.aws_s3_client()

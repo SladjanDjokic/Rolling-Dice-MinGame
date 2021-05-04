@@ -455,6 +455,7 @@ services:
       - ../web-api/datasource/postgresql/schema-updates-2021-04-26_locations_member_company.sql:/docker-entrypoint-initdb.d/u-1-company-member-location.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-04-30_member_contact_2-outgoing.sql:/docker-entrypoint-initdb.d/u-2-member_contact_2-outgoing.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-04-30_new_member_location_types.sql:/docker-entrypoint-initdb.d/u-3-new_location_types.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-04-30_invite_company.sql:/docker-entrypoint-initdb.d/u-4-invite_company.sql
 
       # Test data
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
