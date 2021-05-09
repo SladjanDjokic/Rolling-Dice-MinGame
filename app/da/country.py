@@ -159,3 +159,15 @@ class CountryCodeDA(object):
                 }
                 country_list.append(country)
         return country_list
+
+    @classmethod
+    def get_id_by_alpha2(cls, alpha2):
+        query = ("""
+            SELECT COALESCE(id, (SELECT id FROM country_code WHERE alpha2 = 'US'))
+            FROM country_code
+            WHERE alpha2 = %s
+        """)
+        cls.source.execute(query, (alpha2,))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        return None

@@ -259,20 +259,20 @@ class MemberEventDA(object):
     @classmethod
     def add_2(cls, sequence_id, event_color_id, event_name, event_description, host_member_id,
               is_full_day, event_tz, start_datetime, end_datetime, event_type, event_recurrence_freq,
-              end_condition, repeat_weekdays, end_date_datetime, location_mode, location_id, location_address, repeat_times, cover_attachment_id, group_id=None):
+              end_condition, repeat_weekdays, end_date_datetime, location_mode, location_id, member_location_id, event_url, repeat_times, cover_attachment_id, group_id=None):
         try:
             query = (
                 """ INSERT INTO event_2
                     (sequence_id, event_color_id, event_name, event_description, host_member_id,
                     is_full_day, event_tz, start_datetime, end_datetime, event_type,
                     event_recurrence_freq, end_condition, repeat_weekdays, end_date_datetime, location_mode,
-                    location_id, location_address, repeat_times, group_id, cover_attachment_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    location_id, member_location_id, event_url, repeat_times, group_id, cover_attachment_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 """)
             params = (sequence_id, event_color_id, event_name, event_description, host_member_id,
                       is_full_day, event_tz, start_datetime, end_datetime, event_type, event_recurrence_freq,
-                      end_condition, json.dumps(repeat_weekdays), end_date_datetime, location_mode, location_id, location_address, repeat_times, group_id, cover_attachment_id)
+                      end_condition, json.dumps(repeat_weekdays), end_date_datetime, location_mode, location_id, member_location_id, event_url, repeat_times, group_id, cover_attachment_id)
             cls.source.execute(query, params)
             id = None
             if cls.source.has_results():
@@ -407,7 +407,7 @@ class MemberEventDA(object):
             SELECT row_to_json(row)
             FROM (
                     SELECT
-                        id as event_id,
+                        event_2.id as event_id,
                         sequence_id,
                         (
                             SELECT row_to_json(group_data) as group_info
@@ -448,8 +448,26 @@ class MemberEventDA(object):
                         repeat_weekdays,
                         end_date_datetime,
                         location_mode,
-                        event_2.location_id,
-                        location_address,
+                        event_url,
+                        json_build_object(
+                            'member_location_id', event_2.member_location_id,
+                            'location_id',event_2.location_id,    
+                            'country_code_id',location.country_code_id,
+                            'vendor_formatted_address',location.vendor_formatted_address,
+                            'country_name', country_code.name,
+                            'admin_area_1',location.admin_area_1,
+                            'admin_area_2',location.admin_area_2,
+                            'locality',location.locality,
+                            'sub_locality',location.sub_locality,
+                            'street_address_1',location.street_address_1,
+                            'street_address_2',location.street_address_2,
+                            'postal_code',location.postal_code,
+                            'latitude',location.latitude,
+                            'longitude',location.longitude,
+                            'map_vendor',location.map_vendor,
+                            'map_link',location.map_link,
+                            'place_id',location.place_id
+                    ) AS event_location,
                         (
                             SELECT json_agg(files) as attachments
                             FROM (
@@ -493,6 +511,8 @@ class MemberEventDA(object):
                             ) AS invitees
                         )
                     FROM event_2
+                    LEFT JOIN location ON location.id = event_2.location_id
+                    LEFT JOIN country_code ON country_code.id = location.country_code_id
                     WHERE event_2.id = %s AND event_status != 'Cancel'
                 ) AS row
         """)
@@ -506,10 +526,10 @@ class MemberEventDA(object):
     @classmethod
     def get_event_sequence_by_id(cls, sequence_id):
         query = ("""
-                SELECT json_agg(sequence) as sequence
+                SELECT COALESCE(json_agg(sequence), '[]'::json) as sequence
                     FROM (
                         SELECT
-                            id as event_id,
+                            event_2.id as event_id,
                             sequence_id,
                             (
                                 SELECT row_to_json(group_data) as group_info
@@ -550,8 +570,26 @@ class MemberEventDA(object):
                             repeat_weekdays,
                             end_date_datetime,
                             location_mode,
-                            event_2.location_id,
-                            location_address,
+                            event_url,
+                            json_build_object(
+                                'member_location_id', event_2.member_location_id,
+                                'location_id',event_2.location_id,    
+                                'country_code_id',location.country_code_id,
+                                'vendor_formatted_address',location.vendor_formatted_address,
+                                'country_name', country_code.name,
+                                'admin_area_1',location.admin_area_1,
+                                'admin_area_2',location.admin_area_2,
+                                'locality',location.locality,
+                                'sub_locality',location.sub_locality,
+                                'street_address_1',location.street_address_1,
+                                'street_address_2',location.street_address_2,
+                                'postal_code',location.postal_code,
+                                'latitude',location.latitude,
+                                'longitude',location.longitude,
+                                'map_vendor',location.map_vendor,
+                                'map_link',location.map_link,
+                                'place_id',location.place_id
+                            ) AS event_location,
                             (
                                 SELECT json_agg(files) as attachments
                                 FROM (
@@ -595,6 +633,8 @@ class MemberEventDA(object):
                                 ) AS invitees
                             )
                         FROM event_2
+                        LEFT JOIN location ON location.id = event_2.location_id
+                        LEFT JOIN country_code ON country_code.id = location.country_code_id
                         WHERE sequence_id = %s AND event_status != 'Cancel'
                     ) AS sequence
                 """)
@@ -618,10 +658,10 @@ class MemberEventDA(object):
                 AND """.format(str_time_start=search_time_start, str_time_end=search_time_end))
 
         query = ("""
-             SELECT json_agg(sequence) as data
+             SELECT COALESCE(json_agg(sequence), '[]'::json) as data
                     FROM (
                         SELECT
-                            id as event_id,
+                            events.id as event_id,
                             sequence_id,
                             (
                                 SELECT row_to_json(group_data) as group_info
@@ -662,8 +702,26 @@ class MemberEventDA(object):
                             repeat_weekdays,
                             end_date_datetime,
                             location_mode,
-                            events.location_id,
-                            location_address,
+                            event_url,
+                            json_build_object(
+                                'member_location_id', events.member_location_id,
+                                'location_id',events.location_id,    
+                                'country_code_id',location.country_code_id,
+                                'vendor_formatted_address',location.vendor_formatted_address,
+                                'country_name', country_code.name,
+                                'admin_area_1',location.admin_area_1,
+                                'admin_area_2',location.admin_area_2,
+                                'locality',location.locality,
+                                'sub_locality',location.sub_locality,
+                                'street_address_1',location.street_address_1,
+                                'street_address_2',location.street_address_2,
+                                'postal_code',location.postal_code,
+                                'latitude',location.latitude,
+                                'longitude',location.longitude,
+                                'map_vendor',location.map_vendor,
+                                'map_link',location.map_link,
+                                'place_id',location.place_id
+                            ) AS event_location,
                             (
                                 SELECT json_agg(files) as attachments
                                 FROM (
@@ -722,6 +780,8 @@ class MemberEventDA(object):
                                 event_2.event_status='Active' AND
                                 event_invite_2.invite_status='Accepted'
                         ) as events
+                        LEFT JOIN location ON location.id = events.location_id
+                        LEFT JOIN country_code ON country_code.id = location.country_code_id
                     ) AS sequence
         """.format(query_date, query_date))
         params = (event_host_member_id, event_host_member_id)
@@ -810,7 +870,7 @@ class MemberEventDA(object):
     @classmethod
     def get_upcoming_events(cls, member_id, current, limit):
         query = ("""
-            SELECT json_agg(sequence) as data
+            SELECT COALESCE(json_agg(sequence), '[]'::json) as data
                     FROM (
                         SELECT
                             events.id as event_id,
@@ -854,8 +914,26 @@ class MemberEventDA(object):
                             repeat_weekdays,
                             end_date_datetime,
                             location_mode,
-                            events.location_id,
-                            location_address,
+                            event_url,
+                            json_build_object(
+                                'member_location_id', events.member_location_id,
+                                'location_id',events.location_id,    
+                                'country_code_id',location.country_code_id,
+                                'vendor_formatted_address',location.vendor_formatted_address,
+                                'country_name', country_code.name,
+                                'admin_area_1',location.admin_area_1,
+                                'admin_area_2',location.admin_area_2,
+                                'locality',location.locality,
+                                'sub_locality',location.sub_locality,
+                                'street_address_1',location.street_address_1,
+                                'street_address_2',location.street_address_2,
+                                'postal_code',location.postal_code,
+                                'latitude',location.latitude,
+                                'longitude',location.longitude,
+                                'map_vendor',location.map_vendor,
+                                'map_link',location.map_link,
+                                'place_id',location.place_id
+                            ) AS event_location,
                             member.first_name as first_name,
                             member.last_name as last_name,
                             file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url,
@@ -911,6 +989,8 @@ class MemberEventDA(object):
                             INNER JOIN event_invite_2 ON event_2.id=event_invite_2.event_id
                             WHERE event_invite_2.invite_member_id = %s and event_2.event_status='Active' and event_invite_2.invite_status='Accepted'
                         ) as events
+                        LEFT JOIN location ON location.id = events.location_id
+                        LEFT JOIN country_code ON country_code.id = location.country_code_id
                         LEFT JOIN member ON member.id = events.host_member_id
                         LEFT JOIN member_profile ON member.id = member_profile.member_id
                         LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
@@ -938,7 +1018,26 @@ class MemberEventDA(object):
             FROM
             (SELECT event_invite_2.id as id,
                     event_2.id AS event_id,
-                    row_to_json(member_location) as event_location,
+                    event_2.event_url,
+                            json_build_object(
+                                'member_location_id', event_2.member_location_id,
+                                'location_id',event_2.location_id,    
+                                'country_code_id',location.country_code_id,
+                                'vendor_formatted_address',location.vendor_formatted_address,
+                                'country_name', country_code.name,
+                                'admin_area_1',location.admin_area_1,
+                                'admin_area_2',location.admin_area_2,
+                                'locality',location.locality,
+                                'sub_locality',location.sub_locality,
+                                'street_address_1',location.street_address_1,
+                                'street_address_2',location.street_address_2,
+                                'postal_code',location.postal_code,
+                                'latitude',location.latitude,
+                                'longitude',location.longitude,
+                                'map_vendor',location.map_vendor,
+                                'map_link',location.map_link,
+                                'place_id',location.place_id
+                            ) AS event_location,
                     sequence_id,
                     event_invite_2.create_date,
                     'event_invitation' as invitation_type,
@@ -981,8 +1080,6 @@ class MemberEventDA(object):
                     repeat_weekdays,
                     end_date_datetime,
                     location_mode,
-                    event_2.location_id,
-                    location_address,
                     member.first_name as first_name,
                     member.last_name as last_name,
                     file_path(file_storage_engine.storage_engine_id, '/member/file') as amera_avatar_url,
@@ -1026,7 +1123,8 @@ class MemberEventDA(object):
                      ) AS invitees)
             FROM event_2
             INNER JOIN event_invite_2 ON event_invite_2.event_id = event_2.id
-            LEFT JOIN member_location ON event_2.location_id = member_location.id
+            LEFT JOIN location ON location.id = event_2.location_id
+            LEFT JOIN country_code ON country_code.id = location.country_code_id
             LEFT JOIN member ON member.id = event_2.host_member_id
             LEFT JOIN member_profile ON member.id = member_profile.member_id
             LEFT JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id

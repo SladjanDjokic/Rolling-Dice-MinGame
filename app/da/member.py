@@ -1794,7 +1794,7 @@ class MemberContactDA(object):
 
     @classmethod
     def create_member_contact(cls, member_id, contact_member_id, status, role_id=None,
-                              first_name=None, last_name=None, country=None, 
+                              first_name=None, last_name=None, country=None,
                               cell_phone=None, office_phone=None, home_phone=None,
                               email=None, personal_email=None, company_name=None,
                               company_phone=None, company_web_site=None,
@@ -2600,6 +2600,16 @@ class MemberInfoDA(object):
             # Track what was deleted in the UI and kill it in db as well
             cls.delete_member_location(member_id, location_ids_to_stay)
         return True
+
+    @classmethod
+    def get_location_id_for_member_location(cls, member_location_id):
+        query = ("""
+            SELECT location_id FROM member_location WHERE id = %s
+        """)
+        cls.source.execute(query, (member_location_id,))
+        if cls.source.has_results():
+            return cls.source.cursor.fetchone()[0]
+        return None
 
     @classmethod
     def get_member_skills(cls, member_id):

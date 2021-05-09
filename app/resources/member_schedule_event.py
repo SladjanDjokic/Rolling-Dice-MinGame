@@ -11,8 +11,10 @@ from app.util.session import get_session_cookie, validate_session
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 from app.da.member_event import MemberEventDA
 from app.da.member_schedule_event import MemberScheduleEventDA
-from app.da.member import MemberDA, MemberContactDA, MemberVideoMailDA
+from app.da.member import MemberDA, MemberContactDA, MemberVideoMailDA, MemberInfoDA
 from app.da.group import GroupDA
+from app.da.country import CountryCodeDA
+from app.da.location import LocationDA
 from app.da.file_sharing import FileStorageDA, FileTreeDA
 from app.da.member_schedule_event_invite import MemberScheduleEventInviteDA
 from app.da.file_sharing import FileStorageDA
@@ -96,7 +98,9 @@ class MemberScheduleEventResource(object):
             end_date_datetime,
             repeat_times,  # int
             location_mode,  # enum
-            location_data,  # is either and id of memeber location or a string
+            member_location_id,  # id or none
+            location,  # object or none
+            event_url,  # string
             attachments,  # [member_file ids]
             recurringCopies,  # [{start: utc, end: utc}] of obj
             cover_attachment_id  # member_file_id
@@ -116,7 +120,9 @@ class MemberScheduleEventResource(object):
                         'endDate',
                         'repeatTimes',
                         'locationMode',
-                        'locationData',
+                        'memberLocationId',
+                        "location",
+                        "eventUrl",
                         'attachments',
                         'recurringCopies',
                         'coverAttachmentId'
@@ -125,14 +131,40 @@ class MemberScheduleEventResource(object):
         # logger.debug(f'event name is {event_name}')
         sequence_id = MemberEventDA().add_sequence(sequence_name=event_name)
 
-        location_id = location_data if (
-            location_mode == 'my_locations' and location_data != '' and (event_type == 'Meeting' or event_type == 'Personal')) else None
-        location_address = location_data if (
-            location_mode == 'lookup' or location_mode == 'url') else None
+        '''
+            If saved location mode => store both member_location_id and location_id
+            If new location, make sure to detect country at first
+        '''
+
+        location_id = None
+        if location_mode == 'lookup' and location:
+            country_code_id = CountryCodeDA.get_id_by_alpha2(
+                location["country_alpha2"])
+            location_params = {"country_code_id": country_code_id,
+                               "admin_area_1": location["admin_area_1"],
+                               "admin_area_2": location["admin_area_2"],
+                               "locality": location["locality"],
+                               "sub_locality": location["sub_locality"],
+                               "street_address_1": location["street_address_1"],
+                               "street_address_2": location["street_address_2"],
+                               "postal_code": location["postal_code"],
+                               "latitude": location["latitude"],
+                               "longitude": location["longitude"],
+                               "map_vendor": location["map_vendor"],
+                               "map_link": location["map_link"],
+                               "place_id": location["place_id"],
+                               "vendor_formatted_address": location["vendor_formatted_address"]}
+
+            location_id = LocationDA.insert_location(location_params)
+        elif location_mode == 'my_locations' and member_location_id:
+            location_id = MemberInfoDA.get_location_id_for_member_location(
+                member_location_id)
+
         cover_attachment_id = cover_attachment_id if (
             cover_attachment_id != 'null') else None
 
         # This is the first event id
+
         main_event_id = MemberEventDA().add_2(
             sequence_id=sequence_id,
             event_color_id=color_id,
@@ -150,7 +182,8 @@ class MemberScheduleEventResource(object):
             end_date_datetime=end_date_datetime,
             location_mode=location_mode,
             location_id=location_id,
-            location_address=location_address,
+            member_location_id=member_location_id,
+            event_url=event_url,
             repeat_times=repeat_times,
             cover_attachment_id=cover_attachment_id,
             group_id=invited_group
@@ -179,7 +212,8 @@ class MemberScheduleEventResource(object):
                         end_date_datetime=end_date_datetime,
                         location_mode=location_mode,
                         location_id=location_id,
-                        location_address=location_address,
+                        member_location_id=member_location_id,
+                        event_url=event_url,
                         repeat_times=repeat_times,
                         cover_attachment_id=cover_attachment_id,
                         group_id=invited_group
@@ -260,9 +294,11 @@ class MemberScheduleEventResource(object):
             event_end_utc = contents['end']
             isFullDay = contents['isFullDay']
             event_type = contents['type']
+            event_url = contents['eventUrl']
             event_tz = contents['eventTimeZone']
             location_mode = contents['locationMode']
-            location_data = contents['locationData']
+            member_location_id = contents['memberLocationId']
+            location = contents['location']
             sequence_id = contents['sequence_id']
             event_recurrence_freq = contents['recurrence']
             end_condition = contents['endCondition']
@@ -282,10 +318,28 @@ class MemberScheduleEventResource(object):
             cover_attachment_id = contents['coverAttachmentId'] if (
                 ('coverAttachmentId' in contents.keys()) and (contents['coverAttachmentId'] != 'null')) else None
 
-            location_id = location_data if (
-                location_mode == 'my_locations' and location_data != '' and (event_type == 'Meeting' or event_type == 'Personal')) else None
-            location_address = location_data if (
-                location_mode == 'lookup' or location_mode == 'url') else None
+            location_id = None
+            if location_mode == 'lookup' and location:
+                country_code_id = CountryCodeDA.get_id_by_alpha2(
+                    location["country_alpha2"])
+                location_params = {"country_code_id": country_code_id,
+                                   "admin_area_1": location["admin_area_1"],
+                                   "admin_area_2": location["admin_area_2"],
+                                   "locality": location["locality"],
+                                   "sub_locality": location["sub_locality"],
+                                   "street_address_1": location["street_address_1"],
+                                   "street_address_2": location["street_address_2"],
+                                   "postal_code": location["postal_code"],
+                                   "latitude": location["latitude"],
+                                   "longitude": location["longitude"],
+                                   "map_vendor": location["map_vendor"],
+                                   "map_link": location["map_link"],
+                                   "place_id": location["place_id"],
+                                   "vendor_formatted_address": location["vendor_formatted_address"]}
+                location_id = LocationDA.insert_location(location_params)
+            elif location_mode == 'my_locations' and member_location_id:
+                location_id = MemberInfoDA.get_location_id_for_member_location(
+                    member_location_id)
 
             if hasattr(invitedGroup, 'group_id'):
                 group_id = invitedGroup.group_id
@@ -319,7 +373,8 @@ class MemberScheduleEventResource(object):
                 end_date_datetime=end_date_datetime,
                 location_mode=location_mode,
                 location_id=location_id,
-                location_address=location_address,
+                member_location_id=member_location_id,
+                event_url=event_url,
                 repeat_times=repeat_times,
                 cover_attachment_id=cover_attachment_id,
                 group_id=None
@@ -348,7 +403,8 @@ class MemberScheduleEventResource(object):
                             end_date_datetime=end_date_datetime,
                             location_mode=location_mode,
                             location_id=location_id,
-                            location_address=location_address,
+                            member_location_id=member_location_id,
+                            event_url=event_url,
                             repeat_times=repeat_times,
                             cover_attachment_id=cover_attachment_id,
                             group_id=None
@@ -561,7 +617,7 @@ class MemberEventInvitations(object):
         # new media message
         new_media_messages = MemberVideoMailDA.get_all_media_mails(
             member_id)
-        
+
         # project contract invitations
         contract_invitations = ProjectDA.get_member_contract_invites(
             member_id)
