@@ -399,7 +399,7 @@ class GroupDA(object):
                 gl.first_name AS group_leader_first_name,
                 gl.last_name AS group_leader_last_name,
                 gl.email AS group_leader_email,
-                COUNT(DISTINCT(member_group_membership.member_id)) AS total_member,
+                COUNT(DISTINCT(membership_members.id)) AS total_member,
                 COALESCE(
                     json_agg(
                         json_build_object(

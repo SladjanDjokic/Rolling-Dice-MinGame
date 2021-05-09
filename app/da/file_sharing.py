@@ -81,11 +81,15 @@ class FileStorageDA(object):
         return file_id
 
     @classmethod
-    def put_file_content_to_storage(cls, file, file_name, file_size_bytes, mime_type, member_id=None):
+    def put_file_content_to_storage(cls, file, file_name, file_size_bytes, mime_type, member_id=None, is_unique=False):
         s3_location = settings.get("storage.s3.file_location_host")
         uniquestr = str(uuid.uuid4())[:8]
         (dirname, true_filename) = os.path.split(file_name)
-        s3_key = f"{member_id}/{uniquestr}_{true_filename}" if member_id else f"{uniquestr}_{true_filename}"
+
+        if is_unique:
+            s3_key = true_filename
+        else:
+            s3_key = f"{member_id}/{uniquestr}_{true_filename}" if member_id else f"{uniquestr}_{true_filename}"
 
         uploaded = cls.stream_to_aws(file, s3_key)
         storage_url = urljoin(s3_location, s3_key)
@@ -411,6 +415,49 @@ class FileStorageDA(object):
         return None
 
     @classmethod
+    def get_file_storage_by_storage_engine_id(cls, storage_engine_id):
+        query = ("""
+            SELECT
+                file_storage_engine.id as file_id,
+                file_storage_engine.storage_engine_id as file_location,
+                file_storage_engine.storage_engine as storage_engine,
+                file_storage_engine.status as status,
+                file_storage_engine.create_date as created_date,
+                file_storage_engine.update_date as updated_date,
+                file_storage_engine.mime_type as mime_type,
+                file_storage_engine.file_size_bytes as file_size_bytes
+            FROM file_storage_engine
+            WHERE file_storage_engine.storage_engine_id = %s
+        """)
+        params = (storage_engine_id,)
+        cls.source.execute(query, params)
+
+        result = None
+        if cls.source.has_results():
+            (
+                file_id,
+                file_location,
+                storage_engine,
+                status,
+                created_date,
+                updated_date,
+                mime_type,
+                file_size_bytes
+            ) = cls.source.cursor.fetchone()
+            result = {
+                "file_id": file_id,
+                "file_location": file_location,
+                "storage_engine": storage_engine,
+                "status": status,
+                "created_date": created_date,
+                "updated_date": updated_date,
+                "mime_type": mime_type,
+                "file_size_bytes": file_size_bytes
+            }
+        
+        return result
+
+    @classmethod
     def get_file_detail_by_storage_engine_id(cls, member, storage_engine_id):
         query = ("""
             SELECT
@@ -628,15 +675,10 @@ class FileStorageDA(object):
         return url
 
     @classmethod
-    def get_storage_engine_id_from_key(cls, file_key, bucket=None):
-        if not bucket:
-            bucket = settings.get("storage.s3.bucket")
-
-        s3 = cls.aws_s3_client()
-        location = s3.get_bucket_location(Bucket=bucket)['LocationConstraint']
-        url = f"https://{bucket}.s3.{location}.amazonaws.com/{file_key}"
-        logger.debug(f"SE_ID: {url}")
-        return url
+    def get_storage_engine_id_from_key(cls, file_key):
+        s3_location = settings.get("storage.s3.file_location_host")
+        storage_url = urljoin(s3_location, file_key)
+        return storage_url
 
 
 class FileTreeDA(object):
@@ -681,6 +723,49 @@ class FileTreeDA(object):
             f"[create_member_file_entry] TRANSACTION IDENTIFIER: {id}")
 
         return id
+
+    @classmethod
+    def get_member_file_by_file_id(cls, member_id, file_id):
+        query = ("""
+            SELECT
+                member_file.id,
+                member_file.file_id,
+                member_file.file_name,
+                member_file.status,
+                member_file.member_id,
+                member_file.categories,
+                member_file.file_ivalue,
+                member_file.file_size_bytes
+            FROM member_file
+            WHERE member_file.member_id = %s AND member_file.file_id = %s
+        """)
+        params = (member_id, file_id,)
+        cls.source.execute(query, params)
+
+        result = None
+        if cls.source.has_results():
+            (
+                id,
+                file_id,
+                file_name,
+                status,
+                member_id,
+                categories,
+                file_ivalue,
+                file_size_bytes
+            ) = cls.source.cursor.fetchone()
+            result = {
+                "id": id,
+                "file_id": file_id,
+                "file_name": file_name,
+                "status": status,
+                "member_id": member_id,
+                "categories": categories,
+                "file_ivalue": file_ivalue,
+                "file_size_bytes": file_size_bytes
+            }
+        
+        return result
 
     @classmethod
     def get_tree(cls, member, tree_type):

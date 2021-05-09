@@ -669,25 +669,37 @@ class MemberEventGoogleMapPhoto(object):
             member = req.context.auth["session"]
             member_id = member["member_id"]
             url = req.get_param("url")
-            
-            image_data = requests.get(url, stream=True)
-            file = io.BytesIO(image_data.content)
-            file_size_bytes = image_data.headers["Content-Length"]
-            mime_type = image_data.headers["Content-Type"]
-            file_name = image_data.headers["Content-Disposition"]
-            file_name = cgi.parse_header(image_data.headers['Content-Disposition'])[-1]['filename']
+            place_id = req.get_param("place_id")
+            mime_type = "image/jpeg"
+            file_name = f"{place_id}.jpg"
 
-            storage_file_id = FileStorageDA().put_file_content_to_storage(
-            file, file_name, file_size_bytes, mime_type)
+            # check if exist storage by place id
+            storage_engine_id = FileStorageDA().get_storage_engine_id_from_key(file_name)
+            file_storage_engine = FileStorageDA().get_file_storage_by_storage_engine_id(storage_engine_id)
 
-            member_file_id = FileTreeDA().create_member_file_entry(
-                file_id=storage_file_id,
-                file_name=file_name,
-                member_id=member_id,
-                status="available",
-                file_size_bytes=file_size_bytes)
-            if not member_file_id:
-                raise FileUploadCreateException
+            if file_storage_engine:
+                storage_file_id = file_storage_engine["file_id"]
+                file_size_bytes = file_storage_engine["file_size_bytes"]
+            else:
+                image_data = requests.get(url, stream=True)
+                file = io.BytesIO(image_data.content)
+                file_size_bytes = image_data.headers["Content-Length"]
+
+                storage_file_id = FileStorageDA().put_file_content_to_storage(
+                file, file_name, file_size_bytes, mime_type, None, True)
+
+            # check if exist member file by storage_file_id
+            member_file = FileTreeDA().get_member_file_by_file_id(member_id, storage_file_id)
+
+            if not member_file:
+                member_file_id = FileTreeDA().create_member_file_entry(
+                    file_id=storage_file_id,
+                    file_name=file_name,
+                    member_id=member_id,
+                    status="available",
+                    file_size_bytes=file_size_bytes)
+                if not member_file_id:
+                    raise FileUploadCreateException
 
             file_data = FileStorageDA().get_member_file(
                 member, storage_file_id)
