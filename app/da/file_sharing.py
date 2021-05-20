@@ -2,6 +2,7 @@ import os
 import uuid
 import datetime
 import mimetypes
+import warnings
 from operator import itemgetter
 
 from urllib.parse import urlparse, urljoin
@@ -17,7 +18,7 @@ from app.config import settings
 from app.util.filestorage import safe_open, s3fy_filekey
 from app.da.password import PasswordDA
 import app.util.password as password
-from app.exceptions.file_sharing import FileStorageUploadError
+from app.exceptions.file_sharing import FileStorageNotFoundError, FileStorageUnauthorizedError, FileStorageUnknownError, FileStorageUploadError
 
 logger = logging.getLogger(__name__)
 
@@ -30,94 +31,99 @@ class FileStorageDA(object):
         This new method will ignore filepaths and instead will stack files under member_id folders i.e.
         "/1/filenamex.ext"
     '''
+
     @classmethod
-    def put_file_to_storage(cls, file, file_size_bytes=None, mime_type=None, member_id=None):
+    def save_to_storage(cls, file, filename, size, mime_type, member_id=None):
+        return cls.save_to_s3_storage(
+            file=file,
+            filename=filename,
+            size=size,
+            mime_type=mime_type,
+            member_id=member_id)
+
+    @classmethod
+    def save_to_s3_storage(cls, file, filename, size, mime_type, member_id=None):
+
         s3_location = settings.get("storage.s3.file_location_host")
         uniquestr = str(uuid.uuid4())[:8]
-        (dirname, true_filename) = os.path.split(file.filename)
+        (dirname, true_filename) = os.path.split(filename)
         s3_key = f"{member_id}/{uniquestr}_{true_filename}" if member_id else f"{uniquestr}_{true_filename}"
-        # logger.debug('file type', type(file),
-        #  'type file.file', type(file.file))
 
+        try:
+            s3 = cls.aws_s3_client()
+            bucket = settings.get("storage.s3.bucket")
+            upload = s3.upload_fileobj(file, bucket, s3_key)
+            uploaded = s3.head_object(Bucket=bucket, Key=s3_key)
+        except ClientError as e:
+            logger.error(f"Key doesn't exist {s3_key}")
+            logger.exception(e)
+            raise FileStorageUploadError
+        except FileNotFoundError as e:
+            logger.error("The file was not found")
+            logger.exception(e)
+            raise FileStorageNotFoundError
+        except NoCredentialsError as e:
+            logger.error("Credentials not available")
+            logger.exception(e)
+            raise FileStorageUnauthorizedError
+        except Exception as e:
+            logger.error("Unknown internal server error not caught")
+            logger.exception(e)
+            raise FileStorageUnknownError
+
+        logger.debug(f"Upload: {upload}")
+        logger.debug(f"Uploaded: {uploaded}")
+
+        storage_url = urljoin(s3_location, s3_key)
+        mime_types = [
+            mime_type,
+            mimetypes.MimeTypes().guess_type(true_filename)[0],
+            uploaded["ContentType"]
+        ]
+
+        mime_types = [mime for mime in mime_types if mime]
+        mime_type = next(iter(mime_types), None)
+
+        file_id = cls.create_file_storage_entry(
+            storage_url, 's3', "available", size, mime_type)
+        return file_id
+
+    @classmethod
+    def put_file_to_storage(cls, file, file_size_bytes=None, mime_type=None, member_id=None, filename=None):
+        warnings.warn(
+            '`put_file_to_storage` will be deprecated, use instead the explicit `save_to_storage`',
+            DeprecationWarning
+        )
         # https://github.com/yohanboniface/falcon-multipart#dealing-with-files
         # filename: the filename, if given
         # value: the file content in bytes
         # type: the content-type, or None if not specified
         # disposition: content-disposition, or None if not specified
         logger.debug(f"Filename: {file.filename}")
-        # logger.debug(f"Value: {file.value}")
         logger.debug(f"Type: {file.type}")
         logger.debug(f"Disposition: {file.disposition}")
+        logger.debug(f"File Size Value: {len(file.value)}")
         logger.debug(f"File Size Bytes: {file_size_bytes}")
-        logger.debug(file.file)
-        logger.debug(file.file.fileno)
 
         if not file_size_bytes:
-            file_size_bytes = os.fstat(file.file.fileno()).st_size
+            file_size_bytes = len(file.value)
 
-        mime_types = [
-            file.type,
-            mimetypes.MimeTypes().guess_type(file.filename)[0]
-        ]
+        logger.debug(f"File Size Bytes: {file_size_bytes}")
 
-        logger.debug(f"Mime Types Part 1: {mime_types}")
-
-        uploaded = cls.stream_to_aws(file.file, s3_key)
-        storage_url = urljoin(s3_location, s3_key)
-
-        mime_types.append(uploaded["ContentType"])
-
-        logger.debug(f"Mime Types Part 2: {mime_types}")
-
-        mime_types = [mime for mime in mime_types if mime]
-        mime_type = next(iter(mime_types or []), None)
+        # logger.debug(f"file.file: {file.file}")
+        # logger.debug(f"file.file.fileno: {file.file.fileno}")
+        # logger.debug(f"readline: {file.file.readline()}")
 
         logger.debug(f"Type: {mime_type}")
         logger.debug(f"Size: {file_size_bytes}")
 
-
-        file_id = cls.create_file_storage_entry(
-            storage_url, 's3', "available", file_size_bytes, mime_type)
-        return file_id
-
-    @classmethod
-    def put_file_content_to_storage(cls, file, file_name, file_size_bytes, mime_type, member_id=None, is_unique=False):
-        s3_location = settings.get("storage.s3.file_location_host")
-        uniquestr = str(uuid.uuid4())[:8]
-        (dirname, true_filename) = os.path.split(file_name)
-
-        if is_unique:
-            s3_key = true_filename
-        else:
-            s3_key = f"{member_id}/{uniquestr}_{true_filename}" if member_id else f"{uniquestr}_{true_filename}"
-
-        uploaded = cls.stream_to_aws(file, s3_key)
-        storage_url = urljoin(s3_location, s3_key)
-
-        file_id = cls.create_file_storage_entry(
-            storage_url, 's3', "available", file_size_bytes, mime_type)
-        return file_id
-
-    @classmethod
-    def stream_to_aws(cls, file, key):
-        try:
-            s3 = cls.aws_s3_client()
-            bucket = settings.get("storage.s3.bucket")
-            upload = s3.upload_fileobj(file, bucket, key)
-            exists = cls.check_if_key_exists(key)
-            if exists:
-                logger.debug("Upload Successful, Yoda")
-                return exists
-            else:
-                raise FileStorageUploadError
-                logger.debug("Key doesnt exist, Yoda")
-                return False
-        except FileNotFoundError:
-            print("The file was not found")
-            return False
-        except NoCredentialsError:
-            print("Credentials not available")
-            return False
+        return cls.save_to_storage(
+            file=file.file,
+            filename=filename or file.filename,
+            size=file_size_bytes,
+            mime_type=mime_type or file.type,
+            member_id=member_id
+        )
 
     @classmethod
     def put_favicon(cls, site_url=''):
@@ -173,34 +179,6 @@ class FileStorageDA(object):
             return s3_resp
         except Exception as e2:
             raise e2
-
-    @classmethod
-    def upload_to_aws(cls, local_file, bucket, s3_file):
-        s3 = cls.aws_s3_client()
-
-        try:
-            s3.upload_file(local_file, bucket, s3_file)
-            exists = cls.check_if_key_exists(s3_file)
-            if exists:
-                logger.debug("Upload Successful, Yoda")
-                return True
-            else:
-                return False
-        except FileNotFoundError:
-            print("The file was not found")
-            return False
-        except NoCredentialsError:
-            print("Credentials not available")
-            return False
-
-    @classmethod
-    def check_if_key_exists(cls, key):
-        bucket = settings.get("storage.s3.bucket")
-        s3 = cls.aws_s3_client()
-        try:
-            return s3.head_object(Bucket=bucket, Key=key)
-        except ClientError:
-            return False
 
     @classmethod
     def create_file_storage_entry(cls, file_path, storage_engine, status, file_size_bytes, mime_type,
@@ -649,6 +627,7 @@ class FileStorageDA(object):
     @classmethod
     def stream_s3_file(cls, s3_file_path):
         s3 = cls.aws_s3_client()
+        logger.debug(f"S3 File Key: {s3_file_path}")
         bucket = settings.get("storage.s3.bucket")
 
         try:

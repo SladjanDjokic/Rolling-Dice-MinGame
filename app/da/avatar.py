@@ -10,7 +10,7 @@ class AvatarDA(object):
     def get_avatar_url(cls, member_id):
         query = ("""
             SELECT
-                file_path(storage_engine_id, '')
+                storage_engine_id
             FROM
                 member_profile AS mp
                 LEFT OUTER JOIN file_storage_engine AS fse

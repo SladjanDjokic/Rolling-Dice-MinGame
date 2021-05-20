@@ -10,6 +10,18 @@ class FileStorageUploadError (Exception):
     pass
 
 
+class FileStorageNotFoundError (Exception):
+    pass
+
+
+class FileStorageUnauthorizedError (Exception):
+    pass
+
+
+class FileStorageUnknownError(Exception): 
+    pass
+
+
 # ------------
 # HTTP Errors
 # ------------

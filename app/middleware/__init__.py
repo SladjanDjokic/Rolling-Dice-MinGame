@@ -1,6 +1,7 @@
 import copy
 import logging
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 import falcon
 import uuid
@@ -43,8 +44,23 @@ copyreg.pickle(FieldStorage, pickle_field_storage)
 copyreg.pickle(Parser, pickle_field_storage)
 
 
+
+class HandleForwardSlashMiddleware(object):
+    def process_request(self, req, resp):
+        # This allows to have `/` inside of the `file_path` field name
+        logger.debug(f'request.path: {req.path}')
+        if "/member/file" in req.path:
+            file_path = req.path[13:]
+            logger.debug(f"quoting: {file_path}")
+            file_path = quote(file_path, safe='')
+            logger.debug(f"quoted: {file_path}")
+            logger.debug(f"rewrite: /member/file/{file_path}")
+            req.path = f"/member/file/{file_path}"
+
+
 class CrossDomain(object):
     def process_response(self, req, resp, resource, req_succeeded):
+        logger.debug(f'req.path: {req.path}')
         if req.path in ignore_routes:
             # logger.debug(f"Ignoring route: {req.path}")
             resp.complete = True

@@ -1,5 +1,6 @@
 import logging
 import pathlib
+from urllib.parse import unquote
 import falcon
 
 from app import settings
@@ -19,6 +20,7 @@ class FileDownloadResource():
 
     @check_session
     def on_get(self, req, resp, file_path):
+        file_path = unquote(file_path)
         logger.debug(f'Downloading file: {file_path}')
         # file_pathlib = pathlib.Path(file_path)
         # logger.debug(f"Filename: {file_pathlib.name}")

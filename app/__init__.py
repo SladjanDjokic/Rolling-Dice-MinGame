@@ -10,7 +10,7 @@ from falcon_multipart.middleware import MultipartMiddleware
 from app.calls.views import IncomingCallView
 from app.chat.views import ChatView
 from app.config import parser, settings
-from app.middleware import CrossDomain, KafkaProducerMiddleware  # , JSONTranslator
+from app.middleware import CrossDomain, HandleForwardSlashMiddleware, KafkaProducerMiddleware  # , JSONTranslator
 from app.resources.facial_recognition import FacialRecognitionResource
 from app.resources.github import GithubWebhooksResource, GithubRepoListResource, GithubLoginResource, \
     GithubOAuthResource
@@ -137,6 +137,7 @@ def create_app():
 
     app = falcon.API(
         middleware=[
+            HandleForwardSlashMiddleware(),
             CrossDomain(),
             # FalconAuthMiddleware(auth_backend),
             MultipartMiddleware(),

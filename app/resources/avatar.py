@@ -3,6 +3,7 @@ import os
 import falcon
 import app.util.json as json
 import mimetypes
+from app.config import settings
 from app.da.file_sharing import FileStorageDA
 from app.da.avatar import AvatarDA
 from app.exceptions.avatar import MemberAvatarNotFound, MemberAvatarNotFoundError
@@ -22,7 +23,9 @@ class MemberAvatarResource(object):
             if not file_path or file_path.strip() == '':
                 raise MemberAvatarNotFoundError()
 
-            file_path = os.path.basename(file_path)
+            s3_location = settings.get("storage.s3.file_location_host")
+            file_path = file_path.replace(f'{s3_location}/', '')
+            logger.debug(f"S3 File Key: {file_path}")
             logger.debug(f"File Basename: {file_path}")
 
             s3_object = FileStorageDA().stream_s3_file(file_path)

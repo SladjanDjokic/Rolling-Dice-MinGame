@@ -741,8 +741,13 @@ class MemberEventGoogleMapPhoto(object):
                 file = io.BytesIO(image_data.content)
                 file_size_bytes = image_data.headers["Content-Length"]
 
-                storage_file_id = FileStorageDA().put_file_content_to_storage(
-                file, file_name, file_size_bytes, mime_type, None, True)
+                storage_file_id = FileStorageDA().save_to_storage(
+                    file=file,
+                    filename=file_name,
+                    size=file_size_bytes,
+                    mime_type=mime_type,
+                    member_id=None
+                )
 
             # check if exist member file by storage_file_id
             member_file = FileTreeDA().get_member_file_by_file_id(member_id, storage_file_id)
