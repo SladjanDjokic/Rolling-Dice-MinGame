@@ -357,10 +357,10 @@ class GroupMemberInviteResource(MemberInviteResource):
 
         (email, first_name, last_name, group_id,
             country, country_code, phone_number, role, confirm_phone_required,
-            company_id) = request.get_json_or_form(
+            company_id, company_name) = request.get_json_or_form(
             "groupMemberEmail", "firstName", "lastName", "groupId",
             "country", "countryCode", "phoneNumber", "role", "confirmPhoneRequired",
-            "company_id", req=req
+            "company_id", "company_name", req=req
         )
         if not country_code and is_integer(country):
             country_code = country
@@ -386,7 +386,8 @@ class GroupMemberInviteResource(MemberInviteResource):
             "expiration": expiration,
             "role": role,
             "confirm_phone_required": confirm_phone_required,
-            "company_id": company_id
+            "company_id": company_id if company_id!='null' else None,
+            "company_name": company_name if company_name!='null' else None
         }
 
         try:

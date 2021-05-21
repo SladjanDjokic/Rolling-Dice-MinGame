@@ -57,7 +57,9 @@ INSERT INTO company_member (company_id, member_id) VALUES
     (2, 28),
     (3, 29),
     (3, 30),
-    (3, 31);
+    (3, 31),
+    (2, 1),
+    (3, 1);
 
 INSERT INTO company_member_status (company_member_id, company_role, company_department_id, department_status, update_date, update_by) VALUES
     (1, 'administrator', 1, 'standard', CURRENT_TIMESTAMP - INTERVAL '2 hours',1);

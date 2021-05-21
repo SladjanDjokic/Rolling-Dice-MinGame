@@ -89,7 +89,7 @@ class InviteDA(object):
         SELECT
             id, invite_key, email, group_id, expiration,
             first_name, last_name, country_code, phone_number, registered_member_id, confirm_phone_required,
-            company_id
+            company_id, company_name
         FROM invite
         WHERE invite_key = %s
         """)
@@ -100,7 +100,7 @@ class InviteDA(object):
             (
                 id, invite_key, email, group_id, expiration,
                 first_name, last_name, country, phone_number, registered_member_id, confirm_phone_required,
-                company_id
+                company_id, company_name
             ) = cls.source.cursor.fetchone()
             invite = {
                 "id": id,
@@ -114,7 +114,8 @@ class InviteDA(object):
                 "phone_number": phone_number,
                 "registered_member_id": registered_member_id,
                 "confirm_phone_required": confirm_phone_required,
-                "company_id": company_id
+                "company_id": company_id,
+                "company_name": company_name
             }
             return invite
 

@@ -1,0 +1,2 @@
+ALTER TABLE invite
+   ADD COLUMN company_name VARCHAR(100) NULL;
