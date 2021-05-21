@@ -49,7 +49,7 @@ class HandleForwardSlashMiddleware(object):
     def process_request(self, req, resp):
         # This allows to have `/` inside of the `file_path` field name
         logger.debug(f'request.path: {req.path}')
-        if "/member/file" in req.path:
+        if req.path.startswith("/member/file"):
             file_path = req.path[13:]
             logger.debug(f"quoting: {file_path}")
             file_path = quote(file_path, safe='')
