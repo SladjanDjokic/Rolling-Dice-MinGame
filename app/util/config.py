@@ -45,15 +45,17 @@ def setup_vyper(parser, overrides):
     v.automatic_env()
 
     env_name = v.get('env_name')
-    config_name = f"config.{env_name}".lower()
+    config_name = "config"
+    if env_name.lower() == "local":
+        config_name = f"config.local"
 
-    # print(f"VYPER ENV_NAME: {env_name}")
-    # print(f"VYPER CONFIG_NAME: {config_name}")
-
+    print(f"VYPER ENV_NAME: {env_name}")
+    print(f"VYPER CONFIG_NAME: {config_name}")
     logger.debug("VYPER ENV_NAME: {}".format(env_name))
     logger.debug("VYPER CONFIG_NAME: {}".format(config_name))
 
-    v.add_config_path("config")
+    v.add_config_path("config/local")
+    v.add_config_path("config/build")
     v.set_config_type("toml")
     v.set_config_name(config_name)
     v.read_in_config()

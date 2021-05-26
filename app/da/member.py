@@ -438,7 +438,8 @@ class MemberDA(object):
         return None
 
     @classmethod
-    def register(cls, city, state, province, pin, avatar_storage_id, email, username, password, first_name,
+    def register(cls, city, state, province, pin, security_picture_storage_id, profile_picture_storage_id,
+                 email, username, password, first_name,
                  last_name, company_name, job_title_id, date_of_birth, phone_number,
                  country, postal, cell_confrimation_ts, email_confrimation_ts, department_id, main_file_tree_id, bin_file_tree_id,
                  commit=True):
@@ -484,7 +485,7 @@ class MemberDA(object):
         # store member personal info
         params_member = (pin, email, username, password, first_name,
                          last_name, date_of_birth, company_name, job_title_id,
-                         avatar_storage_id, department_id, main_file_tree_id, bin_file_tree_id)
+                         security_picture_storage_id, department_id, main_file_tree_id, bin_file_tree_id)
         cls.source.execute(query_member, params_member)
         id = cls.source.get_last_row_id()
 
@@ -512,7 +513,7 @@ class MemberDA(object):
                                params_cell_member_contact_2)
 
         # When registering a new member, the uploaded photo is set as both profile and security picture. Profile picture can be changed later on.
-        params_member_profile = (id, avatar_storage_id)
+        params_member_profile = (id, profile_picture_storage_id)
         cls.source.execute(query_member_profile, params_member_profile)
 
         for key in page_settings:

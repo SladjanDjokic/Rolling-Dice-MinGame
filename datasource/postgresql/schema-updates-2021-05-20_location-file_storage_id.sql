@@ -1,0 +1,1 @@
+ALTER TABLE location ADD COLUMN location_profile_picture_id BIGINT REFERENCES file_storage_engine (id);

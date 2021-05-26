@@ -138,24 +138,48 @@ class MemberScheduleEventResource(object):
 
         location_id = None
         if location_mode == 'lookup' and location:
-            country_code_id = CountryCodeDA.get_id_by_alpha2(
-                location["country_alpha2"])
-            location_params = {"country_code_id": country_code_id,
-                               "admin_area_1": location["admin_area_1"],
-                               "admin_area_2": location["admin_area_2"],
-                               "locality": location["locality"],
-                               "sub_locality": location["sub_locality"],
-                               "street_address_1": location["street_address_1"],
-                               "street_address_2": location["street_address_2"],
-                               "postal_code": location["postal_code"],
-                               "latitude": location["latitude"],
-                               "longitude": location["longitude"],
-                               "map_vendor": location["map_vendor"],
-                               "map_link": location["map_link"],
-                               "place_id": location["place_id"],
-                               "vendor_formatted_address": location["vendor_formatted_address"]}
+            storage_file_id = None
+            # check if exist location by place_id
+            location_data = LocationDA().get_location_by_place_id(location['place_id'])
 
-            location_id = LocationDA.insert_location(location_params)
+            if not location_data:
+                # check if exist photo & save
+                if location['photo_url']:
+                    mime_type = "image/jpeg"
+                    file_name = f"{location['place_id']}.jpg"
+                    image_data = requests.get(location['photo_url'], stream=True)
+                    file = io.BytesIO(image_data.content)
+                    file_size_bytes = image_data.headers["Content-Length"]
+
+                    storage_file_id = FileStorageDA().save_to_storage(
+                        file=file,
+                        filename=file_name,
+                        size=file_size_bytes,
+                        mime_type=mime_type,
+                        member_id=None
+                    )
+
+                country_code_id = CountryCodeDA.get_id_by_alpha2(location["country_alpha2"])
+                location_params = {"country_code_id": country_code_id,
+                                   "admin_area_1": location["admin_area_1"],
+                                   "admin_area_2": location["admin_area_2"],
+                                   "locality": location["locality"],
+                                   "sub_locality": location["sub_locality"],
+                                   "street_address_1": location["street_address_1"],
+                                   "street_address_2": location["street_address_2"],
+                                   "postal_code": location["postal_code"],
+                                   "latitude": location["latitude"],
+                                   "longitude": location["longitude"],
+                                   "map_vendor": location["map_vendor"],
+                                   "map_link": location["map_link"],
+                                   "place_id": location["place_id"],
+                                   "vendor_formatted_address": location["vendor_formatted_address"],
+                                   "raw_response": json.dumps(location),
+                                   "location_profile_picture_id": storage_file_id
+                                   }
+                location_id = LocationDA.insert_location(location_params)
+            else:
+                location_id = location_data['id']
         elif location_mode == 'my_locations' and member_location_id:
             location_id = MemberInfoDA.get_location_id_for_member_location(
                 member_location_id)
@@ -320,23 +344,48 @@ class MemberScheduleEventResource(object):
 
             location_id = None
             if location_mode == 'lookup' and location:
-                country_code_id = CountryCodeDA.get_id_by_alpha2(
-                    location["country_alpha2"])
-                location_params = {"country_code_id": country_code_id,
-                                   "admin_area_1": location["admin_area_1"],
-                                   "admin_area_2": location["admin_area_2"],
-                                   "locality": location["locality"],
-                                   "sub_locality": location["sub_locality"],
-                                   "street_address_1": location["street_address_1"],
-                                   "street_address_2": location["street_address_2"],
-                                   "postal_code": location["postal_code"],
-                                   "latitude": location["latitude"],
-                                   "longitude": location["longitude"],
-                                   "map_vendor": location["map_vendor"],
-                                   "map_link": location["map_link"],
-                                   "place_id": location["place_id"],
-                                   "vendor_formatted_address": location["vendor_formatted_address"]}
-                location_id = LocationDA.insert_location(location_params)
+                storage_file_id = None
+                # check if exist location by place_id
+                location_data = LocationDA().get_location_by_place_id(location['place_id'])
+
+                if not location_data:
+                    # check if exist photo & save
+                    if location['photo_url']:
+                        mime_type = "image/jpeg"
+                        file_name = f"{location['place_id']}.jpg"
+                        image_data = requests.get(location['photo_url'], stream=True)
+                        file = io.BytesIO(image_data.content)
+                        file_size_bytes = image_data.headers["Content-Length"]
+
+                        storage_file_id = FileStorageDA().save_to_storage(
+                            file=file,
+                            filename=file_name,
+                            size=file_size_bytes,
+                            mime_type=mime_type,
+                            member_id=None
+                        )
+
+                    country_code_id = CountryCodeDA.get_id_by_alpha2(location["country_alpha2"])
+                    location_params = {"country_code_id": country_code_id,
+                                    "admin_area_1": location["admin_area_1"],
+                                    "admin_area_2": location["admin_area_2"],
+                                    "locality": location["locality"],
+                                    "sub_locality": location["sub_locality"],
+                                    "street_address_1": location["street_address_1"],
+                                    "street_address_2": location["street_address_2"],
+                                    "postal_code": location["postal_code"],
+                                    "latitude": location["latitude"],
+                                    "longitude": location["longitude"],
+                                    "map_vendor": location["map_vendor"],
+                                    "map_link": location["map_link"],
+                                    "place_id": location["place_id"],
+                                    "vendor_formatted_address": location["vendor_formatted_address"],
+                                    "raw_response": json.dumps(location),
+                                    "location_profile_picture_id": storage_file_id
+                                    }
+                    location_id = LocationDA.insert_location(location_params)
+                else:
+                    location_id = location_data['id']
             elif location_mode == 'my_locations' and member_location_id:
                 location_id = MemberInfoDA.get_location_id_for_member_location(
                     member_location_id)
@@ -713,68 +762,6 @@ class MemberEventDirections(object):
             resp.body = json.dumps({
                 "success": success,
             }, default_parser=json.parser)
-        except Exception as err:
-            logger.exception(err)
-            raise err
-
-
-class MemberEventGoogleMapPhoto(object):
-    @check_session
-    def on_post(self, req, resp):
-        try:
-            member = req.context.auth["session"]
-            member_id = member["member_id"]
-            url = req.get_param("url")
-            place_id = req.get_param("place_id")
-            mime_type = "image/jpeg"
-            file_name = f"{place_id}.jpg"
-
-            # check if exist storage by place id
-            storage_engine_id = FileStorageDA().get_storage_engine_id_from_key(file_name)
-            file_storage_engine = FileStorageDA().get_file_storage_by_storage_engine_id(storage_engine_id)
-
-            if file_storage_engine:
-                storage_file_id = file_storage_engine["file_id"]
-                file_size_bytes = file_storage_engine["file_size_bytes"]
-            else:
-                image_data = requests.get(url, stream=True)
-                file = io.BytesIO(image_data.content)
-                file_size_bytes = image_data.headers["Content-Length"]
-
-                storage_file_id = FileStorageDA().save_to_storage(
-                    file=file,
-                    filename=file_name,
-                    size=file_size_bytes,
-                    mime_type=mime_type,
-                    member_id=None
-                )
-
-            # check if exist member file by storage_file_id
-            member_file = FileTreeDA().get_member_file_by_file_id(member_id, storage_file_id)
-
-            if not member_file:
-                member_file_id = FileTreeDA().create_member_file_entry(
-                    file_id=storage_file_id,
-                    file_name=file_name,
-                    member_id=member_id,
-                    status="available",
-                    file_size_bytes=file_size_bytes)
-                if not member_file_id:
-                    raise FileUploadCreateException
-
-            file_data = FileStorageDA().get_member_file(
-                member, storage_file_id)
-
-            if file_data:
-                resp.body = json.dumps({
-                    "data": file_data,
-                    "success": True
-                }, default_parser=json.parser)
-            else:
-                resp.body = json.dumps({
-                    "description": "Could not save google map photo",
-                    "success": False
-                }, default_parser=json.parser)
         except Exception as err:
             logger.exception(err)
             raise err

@@ -1,3 +1,4 @@
+from app.exceptions.data import DuplicateKeyError
 import logging
 from datetime import timezone, datetime
 from uuid import UUID
@@ -15,7 +16,7 @@ from app.da.member import MemberInfoDA
 from app.da.location import LocationDA
 from app.da.company import CompanyDA
 from app.util.session import get_session_cookie, validate_session
-from app.exceptions.member import MemberExistsError, MemberNotFound, MemberDataMissing, MemberExists, MemberContactExists, MemberPasswordMismatch
+from app.exceptions.member import MemberExistsError, MemberNotFound, MemberDataMissing, MemberExists, MemberContactExists, MemberPasswordMismatch, MemberRegistrationServerError
 from app.exceptions.invite import InviteNotFound, InviteExpired
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 from app.da.member import MemberContactDA, MemberVideoMailDA
@@ -113,10 +114,10 @@ class MemberRegisterResource(object):
     def on_post(self, req, resp, invite_key=None):
 
         (city, state, province, pin, email, password, confirm_password, first_name, last_name, date_of_birth,
-         phone_number, country, postal, company, job_title_id, profilePicture,
+         phone_number, country, postal, company, job_title_id, originalPFP, croppedPFP,
          cell_confrimation_ts, email_confrimation_ts, promo_code_id, department_id, location) = request.get_json_or_form(
             "city", "state", "province", "pin", "email", "password", "confirm_password", "first_name", "last_name", "dob",
-            "cell", "country", "postal_code", "company", "job_title_id", "profilePicture",
+            "cell", "country", "postal_code", "company", "job_title_id", "originalPFP", "croppedPFP",
             "cellConfirmationTS", "emailConfirmationTS", "activatedPromoCode", "department_id", "location", req=req)
         try:
             # We store the key in hex format in the database
@@ -159,13 +160,16 @@ class MemberRegisterResource(object):
 
             # Upload image to aws and create an entry in db
             avatar_storage_id = None
-            # print(f"TYPE PICTURE {type(profilePicture)}")
-            # print(f"PICTURE {profilePicture}")
-            # print(f"PICTURE MATCH {type(profilePicture) == 'falcon_multipart.parser.Parser'}")
+            # print(f"TYPE PICTURE {type(croppedPFP)}")
+            # print(f"PICTURE {croppedPFP}")
+            # print(f"PICTURE MATCH {type(croppedPFP) == 'falcon_multipart.parser.Parser'}")
 
-            if profilePicture is not None:
-                avatar_storage_id = FileStorageDA().put_file_to_storage(profilePicture)
+            if originalPFP is not None:
+                security_picture_storage_id = FileStorageDA().put_file_to_storage(originalPFP)
 
+            if croppedPFP is not None:
+                profile_picture_storage_id = FileStorageDA().put_file_to_storage(croppedPFP)
+            
             # logger.debug(
                 # f"Job Title ID: {job_title_id} and {type(job_title_id)}")
 
@@ -187,7 +191,9 @@ class MemberRegisterResource(object):
                 )
 
             member_id = MemberDA.register(
-                city=city, state=state, province=province, pin=pin, avatar_storage_id=avatar_storage_id, email=email, username=email, password=password,
+                city=city, state=state, province=province, pin=pin, 
+                security_picture_storage_id=security_picture_storage_id, profile_picture_storage_id=profile_picture_storage_id,
+                email=email, username=email, password=password,
                 first_name=first_name, last_name=last_name, company_name=company_name, job_title_id=job_title_id,
                 date_of_birth=date_of_birth, phone_number=phone_number,
                 country=country, postal=postal, cell_confrimation_ts=cell_confrimation_ts, email_confrimation_ts=email_confrimation_ts,
@@ -199,16 +205,24 @@ class MemberRegisterResource(object):
                 company_id = CompanyDA.create_company(name=company_name)
 
             if company_id and member_id:
-                company_member_id = CompanyDA.create_company_membership(
-                    company_id, member_id)
+                company_member_id = None
+                try:
+                    company_member_id = CompanyDA.create_company_membership(
+                        company_id, member_id)
+                except DuplicateKeyError:
+                    company_membership = CompanyDA.get_membership_by_member_id(
+                        company_id=company_id,
+                        member_id=member_id)
+                    company_member_id = company_membership["company_member_id"]
+
                 if company_member_id and department_id:
 
-                    # Check if department already listed. Create if not
-                    listed_deps = CompanyDA.get_company_departments(company_id)
-
-                    if department_id not in listed_deps:
+                    #Create department, ignore duplicate key error as it already exists
+                    try:
                         CompanyDA.add_company_department(
                             company_id, department_id)
+                    except DuplicateKeyError:
+                        pass
 
                     department_name = MemberDA.get_department_name(
                         department_id)
@@ -236,6 +250,8 @@ class MemberRegisterResource(object):
                                    "map_vendor": location["map_vendor"],
                                    "map_link": location["map_link"],
                                    "place_id": location["placeId"],
+                                   "raw_response": None,
+                                   "location_profile_picture_id": None,
                                    "vendor_formatted_address": location["vendor_formatted_address"]}
                 location_id = LocationDA.insert_location(location_params)
                 MemberInfoDA.create_member_location({"location_type": "home",
@@ -310,10 +326,8 @@ class MemberRegisterResource(object):
         except Exception as err:
             logger.exception(f"Unknown exception creating member {email}")
             logger.error(f"Error Creating Member: {err}")
-            resp.body = json.dumps({
-                "description": "Something went wrong",
-                "success": False
-            }, default_parser=json.parser)
+            raise MemberRegistrationServerError(email, invite_key)
+            
 
     def _send_email(self, first_name, email, invite_email):
         sendmail.send_mail(

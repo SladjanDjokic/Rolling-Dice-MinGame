@@ -42,9 +42,8 @@ class MemberDisabled(falcon.HTTPForbidden):
         description = "Your account is disabled"
         super().__init__(title=title, description=description)
 
+
 # HTTP Response Error to throw when an invite is duplicate
-
-
 class MemberExists(falcon.HTTPConflict):
 
     def __init__(self, email):
@@ -59,6 +58,26 @@ class MemberExists(falcon.HTTPConflict):
         result["success"] = False
         result["exists"] = True
         result["email"] = self._email
+        return result
+
+
+# HTTP Response Error to throw when an invite is duplicate
+class MemberRegistrationServerError(falcon.HTTPInternalServerError):
+
+    def __init__(self, email, invite_key=None):
+        description = (
+            'An error occurred in the server, and registration can\'t be processed'
+        )
+        super().__init__(description=description)
+        self._email = email
+        self.invite_key = invite_key
+
+    def to_dict(self, obj_type=dict):
+        result = super().to_dict(obj_type)
+        result["success"] = False
+        result["exists"] = False
+        result["email"] = self._email
+        result["invite_key"] = self._invite_key
         return result
 
 

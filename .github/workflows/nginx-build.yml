@@ -1,0 +1,62 @@
+name: Nginx Build
+
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  # check:
+  #   name: Check files
+  #   outputs:
+  #     run_job: ${{ steps.check_files.outputs.run_job }}
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v2
+  #       with:
+  #         fetch-depth: 2
+
+  #     - name: check modified files
+  #       id: check_files
+  #       run: |
+  #         echo "=============== list modified files ==============="
+  #         git diff --name-only HEAD^ HEAD
+          
+  #         echo "========== check paths of modified files =========="
+  #         git diff --name-only HEAD^ HEAD > files.txt
+  #         while IFS= read -r file
+  #         do
+  #           echo $file
+  #           if [[ $file != config/build/*.conf ]]; then
+  #             echo "This modified file is not under the 'config/build' folder."
+  #             echo "::set-output name=run_job::false"
+  #             break
+  #           else
+  #             echo "::set-output name=run_job::true"
+  #           fi
+  #         done < files.txt
+  nginx-build:
+    runs-on: ubuntu-latest
+    # needs: check
+    steps:
+      - uses: actions/checkout@master
+        name: Master Branch Checkout
+      - name: Set output
+        id: vars
+        run: echo ::set-output name=tag::${GITHUB_REF#refs/*/}
+      - name: Check output
+        env:
+          RELEASE_VERSION: ${{ steps.vars.outputs.tag }}
+        run: |
+          echo $RELEASE_VERSION
+          echo ${{ steps.vars.outputs.tag }}
+      - uses: kciter/aws-ecr-action@master
+        with:
+          access_key_id: ${{ secrets.ECR_ACCESS_KEY }}
+          secret_access_key: ${{ secrets.ECR_SECRET_ACCESS_KEY }}
+          account_id: ${{ secrets.AWS_ACCOUNT }}
+          dockerfile: Dockerfile.nginx
+          repo: amera-nginx
+          region: us-east-2
+          tags: test,${{ steps.vars.outputs.tag }}

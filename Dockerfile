@@ -45,6 +45,6 @@ RUN echo "if [[ -z \"\${VIRTUAL_ENV}\" ]]; then" >> /root/.bashrc && \
 COPY scripts/ /opt/bin/
 COPY . /app
 
-EXPOSE 5000
+RUN pipenv --venv > /dev/null || pipenv install --skip-lock --dev --ignore-pipfile --python $(which python)
 
-ENTRYPOINT ["/opt/bin/docker-entrypoint.sh"]
+EXPOSE 5000

@@ -66,10 +66,8 @@ services:
           - amera-eventserver
           - host.docker.internal
     volumes:
-      - ../web:/app/main:ro
-      - ../web-share:/app/share:ro
-      - ../web-api/config/dev-nginx.conf:/etc/nginx/nginx.conf:ro
-      - ../web-api/config/dev-nginx-locations.conf:/etc/nginx/locations.conf:ro
+      - ../web-api/config/local/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../web-api/config/local/nginx.locations.conf:/etc/nginx/locations.conf:ro
       - ../web-api/certs/wildcard.dev.amera.local.crt:/certs/dev.crt:ro
       - ../web-api/certs/dev.amera.local.key:/certs/dev.key:ro
       - web-nginx-cache:/data/nginx/cache
@@ -221,6 +219,8 @@ services:
       - AMERA_API_ENV_NAME=LOCAL
       - AMERA_API_LOG_LEVEL=INFO
       - AMERA_API_DATABASE.LOG_LEVEL=INFO
+      - AMERA_API_DATABASE.HOST=amera-web-db
+      - AMERA_API_DATABASE.PASSWORD=amera
       - AMERA_API_WEB.SESSION_EXPIRATION=31536000
       # Application Kafka
       - AMERA_API_KAFKA.CALLS_TOPIC=calls
@@ -296,6 +296,8 @@ services:
       - AMERA_API_ENV_NAME=LOCAL
       - AMERA_API_LOG_LEVEL=INFO
       - AMERA_API_DATABASE.LOG_LEVEL=INFO
+      - AMERA_API_DATABASE.HOST=amera-web-db
+      - AMERA_API_DATABASE.PASSWORD=amera
       - AMERA_API_WEB.SESSION_EXPIRATION=31536000
       # Application Kafka
       - AMERA_API_KAFKA.CALLS_TOPIC=calls
@@ -458,6 +460,7 @@ services:
       - ../web-api/datasource/postgresql/schema-updates-2021-05-04_rename_location_types.sql:/docker-entrypoint-initdb.d/u-4-new_location_types_renamed.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-05-04_event_locations.sql:/docker-entrypoint-initdb.d/u-5-event-locations.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-04-30_invite_company.sql:/docker-entrypoint-initdb.d/u-6-invite_company.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-05-20_location-file_storage_id.sql:/docker-entrypoint-initdb.d/u-7-location-file_storage_id.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-05-19_invite_company.sql:/docker-entrypoint-initdb.d/u-7-invite_company.sql
 
       # Test data
@@ -554,6 +557,8 @@ services:
       - AMERA_API_ENV_NAME=LOCAL
       - AMERA_API_LOG_LEVEL=INFO
       - AMERA_API_DATABASE.LOG_LEVEL=INFO
+      - AMERA_API_DATABASE.HOST=amera-web-db
+      - AMERA_API_DATABASE.PASSWORD=amera
       - AMERA_API_WEB.SESSION_EXPIRATION=31536000
       # Application Kafka
       - AMERA_API_KAFKA.CALLS_TOPIC=calls
@@ -597,6 +602,8 @@ services:
       - AMERA_API_ENV_NAME=LOCAL
       - AMERA_API_LOG_LEVEL=INFO
       - AMERA_API_DATABASE.LOG_LEVEL=INFO
+      - AMERA_API_DATABASE.HOST=amera-web-db
+      - AMERA_API_DATABASE.PASSWORD=amera
       - AMERA_API_WEB.SESSION_EXPIRATION=31536000
       # Application Kafka
       - AMERA_API_KAFKA.CALLS_TOPIC=calls
@@ -642,6 +649,8 @@ services:
       - AMERA_API_ENV_NAME=LOCAL
       - AMERA_API_LOG_LEVEL=INFO
       - AMERA_API_DATABASE.LOG_LEVEL=INFO
+      - AMERA_API_DATABASE.HOST=amera-web-db
+      - AMERA_API_DATABASE.PASSWORD=amera
       - AMERA_API_WEB.SESSION_EXPIRATION=31536000
       # Application Kafka
       - AMERA_API_KAFKA.CALLS_TOPIC=calls

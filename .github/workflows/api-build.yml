@@ -1,4 +1,4 @@
-name: Docker Build
+name: API Build
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - v*
 
 jobs:
-  docker-build:
+  api-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
@@ -28,12 +28,3 @@ jobs:
           repo: amera-web-api
           region: us-east-2
           tags: test,${{ steps.vars.outputs.tag }}
-      # - uses: mr-smithers-excellent/docker-build-push@v4
-      #   name: Build & Push Web API Container
-      #   with:
-      #     image: amera-web-api
-      #     registry: 615749211894.dkr.ecr.us-east-2.amazonaws.com
-      #     dockerfile: Dockerfile
-      #   env:
-      #     AWS_ACCESS_KEY_ID: ${{ secrets.ECR_ACCESS_KEY }}
-      #     AWS_SECRET_ACCESS_KEY: ${{ secrets.ECR_SECRET_ACCESS_KEY }}
