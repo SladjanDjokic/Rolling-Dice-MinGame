@@ -6,7 +6,6 @@ ENV LC_ALL C.UTF-8
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONFAULTHANDLER 1
 ENV KAFKA_VERSION 1.6.0
-ENV ENTRYKIT_VERSION 0.4.0
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -28,13 +27,6 @@ RUN wget https://github.com/edenhill/librdkafka/archive/v${KAFKA_VERSION}.tar.gz
     && cd librdkafka-${KAFKA_VERSION}/ \
     && ./configure && make && make install && ldconfig
 
-# RUN wget https://github.com/progrium/entrykit/releases/download/v${ENTRYKIT_VERSION}/entrykit_${ENTRYKIT_VERSION}_Linux_x86_64.tgz \
-#     && tar -xvzf entrykit_${ENTRYKIT_VERSION}_Linux_x86_64.tgz \
-#     && rm entrykit_${ENTRYKIT_VERSION}_Linux_x86_64.tgz \
-#     && mv entrykit /bin/entrykit \
-#     && chmod +x /bin/entrykit \
-#     && entrykit --symlink
-
 WORKDIR /app
 
 RUN pip install --upgrade pip && pip install pipenv
@@ -45,6 +37,8 @@ RUN echo "if [[ -z \"\${VIRTUAL_ENV}\" ]]; then" >> /root/.bashrc && \
 COPY scripts/ /opt/bin/
 COPY . /app
 
-RUN pipenv --venv > /dev/null || pipenv install --skip-lock --dev --ignore-pipfile --python $(which python)
+RUN pipenv --venv > /dev/null || pipenv install --skip-lock --ignore-pipfile --python $(which python)
 
 EXPOSE 5000
+
+CMD ["pipenv", "run", "server"]

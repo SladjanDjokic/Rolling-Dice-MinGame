@@ -2,5 +2,7 @@ FROM nginx:alpine
 
 EXPOSE 9000
 
+RUN mkdir -p /data/nginx/cache/
+
 COPY config/build/nginx.conf /etc/nginx/nginx.conf
 COPY config/build/nginx.locations.conf /etc/nginx/locations.conf
