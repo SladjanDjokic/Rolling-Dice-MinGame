@@ -131,8 +131,11 @@ class MemberRegisterResource(object):
             job_title_id = None if job_title_id == 'not_applicable' else job_title_id
             department_id = None if department_id == 'not_applicable' else department_id
             company = json.loads(company)
-            company_name = company["name"]
-            company_id = company["id"]
+            company_name = None
+            company_id = None
+            if company:
+                company_name = company["name"]
+                company_id = company["id"]
 
             location = json.loads(location)
 
@@ -201,7 +204,7 @@ class MemberRegisterResource(object):
             logger.debug("New registered member_id: {}".format(member_id))
 
             # If not listed company - create one, then handle membership and deps
-            if not company_id:
+            if not company_id and company_name:
                 company_id = CompanyDA.create_company(name=company_name)
 
             if company_id and member_id:
@@ -237,22 +240,24 @@ class MemberRegisterResource(object):
 
             # Insert location
             if location:
-                location_params = {"country_code_id": country,
-                                   "admin_area_1": location["adminArea1"],
-                                   "admin_area_2": location["adminArea2"],
-                                   "locality": location["locality"],
-                                   "sub_locality": location["sublocality"],
-                                   "street_address_1": location["streetAddress1"],
-                                   "street_address_2": location["streetAddress2"],
-                                   "postal_code": location["postal"],
-                                   "latitude": location["latitude"],
-                                   "longitude": location["latitude"],
-                                   "map_vendor": location["map_vendor"],
-                                   "map_link": location["map_link"],
-                                   "place_id": location["placeId"],
-                                   "raw_response": None,
-                                   "location_profile_picture_id": None,
-                                   "vendor_formatted_address": location["vendor_formatted_address"]}
+                location_params = {
+                    "country_code_id": country,
+                    "admin_area_1": location.get('adminArea1'),
+                    "admin_area_2": location.get('adminArea2'),
+                    "locality": location.get('locality'),
+                    "sub_locality": location.get('sublocality'),
+                    "street_address_1": location.get('streetAddress1'),
+                    "street_address_2": location.get('streetAddress2'),
+                    "postal_code": location.get('postal'),
+                    "latitude": location.get('latitude'),
+                    "longitude": location.get('longitude'),
+                    "map_vendor": location.get('map_vendor'),
+                    "map_link": location.get('map_link'),
+                    "place_id": location.get('placeId'),
+                    "raw_response": None,
+                    "location_profile_picture_id": None,
+                    "vendor_formatted_address": location.get('vendor_formatted_address'),
+                }
                 location_id = LocationDA.insert_location(location_params)
                 MemberInfoDA.create_member_location({"location_type": "home",
                                                      "member_id": member_id,

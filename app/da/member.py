@@ -1155,6 +1155,7 @@ class MemberContactDA(object):
                             location.map_vendor,
                             location.map_link,
                             location.place_id,
+                            location.name,
                             ls.company_role,
                             ls.company_department_id,
                             ls.department_name,
@@ -1210,7 +1211,8 @@ class MemberContactDA(object):
                             location.longitude,
                             location.map_vendor,
                             location.map_link,
-                            location.place_id
+                            location.place_id,
+                            location.name
                         FROM member_location
                         LEFT JOIN location ON location.id = member_location.location_id
                         LEFT JOIN country_code ON country_code.id = location.country_code_id
@@ -2213,7 +2215,8 @@ class MemberInfoDA(object):
                             location.longitude,
                             location.map_vendor,
                             location.map_link,
-                            location.place_id
+                            location.place_id,
+                            location.name
                         FROM member_location
                         LEFT JOIN location ON location.id = member_location.location_id
                         LEFT JOIN country_code ON country_code.id = location.country_code_id

@@ -10,9 +10,9 @@ class LocationDA(object):
     @classmethod
     def insert_location(cls, params, commit=True):
         query = ("""
-            INSERT INTO location (vendor_formatted_address, country_code_id, admin_area_1,admin_area_2, locality, sub_locality, street_address_1,street_address_2, postal_code, latitude, longitude, map_vendor, map_link, place_id, raw_response, location_profile_picture_id)
+            INSERT INTO location (vendor_formatted_address, country_code_id, admin_area_1,admin_area_2, locality, sub_locality, street_address_1,street_address_2, postal_code, latitude, longitude, map_vendor, map_link, place_id, raw_response, location_profile_picture_id, name)
             VALUES 
-                (%(vendor_formatted_address)s, %(country_code_id)s, %(admin_area_1)s, %(admin_area_2)s, %(locality)s, %(sub_locality)s, %(street_address_1)s, %(street_address_2)s, %(postal_code)s, %(latitude)s, %(longitude)s, %(map_vendor)s, %(map_link)s, %(place_id)s, %(raw_response)s, %(location_profile_picture_id)s)
+                (%(vendor_formatted_address)s, %(country_code_id)s, %(admin_area_1)s, %(admin_area_2)s, %(locality)s, %(sub_locality)s, %(street_address_1)s, %(street_address_2)s, %(postal_code)s, %(latitude)s, %(longitude)s, %(map_vendor)s, %(map_link)s, %(place_id)s, %(raw_response)s, %(location_profile_picture_id)s, %(name)s)
             RETURNING id
         """)
         cls.source.execute(query, params)
@@ -44,7 +44,8 @@ class LocationDA(object):
                 location.create_date,
                 location.update_date,
                 location.location_profile_picture_id,
-                file_storage_engine.storage_engine_id
+                file_storage_engine.storage_engine_id,
+                location.name
             FROM location
             LEFT JOIN file_storage_engine ON location.location_profile_picture_id = file_storage_engine.id
             WHERE location.place_id = %s
@@ -73,7 +74,8 @@ class LocationDA(object):
                 create_date,
                 update_date,
                 location_profile_picture_id,
-                storage_engine_id
+                storage_engine_id,
+                name
             ) = cls.source.cursor.fetchone()
             result = {
                 "id": id,
@@ -94,7 +96,8 @@ class LocationDA(object):
                 "create_date": create_date,
                 "update_date": update_date,
                 "location_profile_picture_id": location_profile_picture_id,
-                "storage_engine_id": storage_engine_id
+                "storage_engine_id": storage_engine_id,
+                "name": name
             }
         
         return result

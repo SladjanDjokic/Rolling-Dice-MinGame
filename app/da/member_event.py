@@ -466,7 +466,8 @@ class MemberEventDA(object):
                             'longitude',location.longitude,
                             'map_vendor',location.map_vendor,
                             'map_link',location.map_link,
-                            'place_id',location.place_id
+                            'place_id',location.place_id,
+                            'name',location.name
                     ) AS event_location,
                         (
                             SELECT json_agg(files) as attachments
@@ -588,7 +589,8 @@ class MemberEventDA(object):
                                 'longitude',location.longitude,
                                 'map_vendor',location.map_vendor,
                                 'map_link',location.map_link,
-                                'place_id',location.place_id
+                                'place_id',location.place_id,
+                                'name',location.name
                             ) AS event_location,
                             (
                                 SELECT json_agg(files) as attachments
@@ -720,7 +722,8 @@ class MemberEventDA(object):
                                 'longitude',location.longitude,
                                 'map_vendor',location.map_vendor,
                                 'map_link',location.map_link,
-                                'place_id',location.place_id
+                                'place_id',location.place_id,
+                                'name',location.name
                             ) AS event_location,
                             (
                                 SELECT json_agg(files) as attachments
@@ -932,7 +935,8 @@ class MemberEventDA(object):
                                 'longitude',location.longitude,
                                 'map_vendor',location.map_vendor,
                                 'map_link',location.map_link,
-                                'place_id',location.place_id
+                                'place_id',location.place_id,
+                                'name',location.name
                             ) AS event_location,
                             member.first_name as first_name,
                             member.last_name as last_name,
@@ -1036,7 +1040,8 @@ class MemberEventDA(object):
                                 'longitude',location.longitude,
                                 'map_vendor',location.map_vendor,
                                 'map_link',location.map_link,
-                                'place_id',location.place_id
+                                'place_id',location.place_id,
+                                'name',location.name
                             ) AS event_location,
                     sequence_id,
                     event_invite_2.create_date,

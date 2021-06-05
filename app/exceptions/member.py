@@ -70,7 +70,7 @@ class MemberRegistrationServerError(falcon.HTTPInternalServerError):
         )
         super().__init__(description=description)
         self._email = email
-        self.invite_key = invite_key
+        self._invite_key = invite_key
 
     def to_dict(self, obj_type=dict):
         result = super().to_dict(obj_type)

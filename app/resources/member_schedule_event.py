@@ -4,6 +4,8 @@ import os
 import io
 import cgi
 
+from requests.models import HTTPError
+
 import app.util.json as json
 import app.util.request as request
 from app import settings
@@ -143,40 +145,33 @@ class MemberScheduleEventResource(object):
             location_data = LocationDA().get_location_by_place_id(location['place_id'])
 
             if not location_data:
+                logger.debug('Location not found in database')
                 # check if exist photo & save
-                if location['photo_url']:
-                    mime_type = "image/jpeg"
-                    file_name = f"{location['place_id']}.jpg"
-                    image_data = requests.get(location['photo_url'], stream=True)
-                    file = io.BytesIO(image_data.content)
-                    file_size_bytes = image_data.headers["Content-Length"]
-
-                    storage_file_id = FileStorageDA().save_to_storage(
-                        file=file,
-                        filename=file_name,
-                        size=file_size_bytes,
-                        mime_type=mime_type,
-                        member_id=None
-                    )
+                logger.debug(f'Check for photo URL: {location.get("photo_url")}')
+                if location.get('photo_url'):
+                    storage_file_id = self._fetch_location_photo_url(
+                        location.get('place_id'), location.get('photo_url'))
 
                 country_code_id = CountryCodeDA.get_id_by_alpha2(location["country_alpha2"])
-                location_params = {"country_code_id": country_code_id,
-                                   "admin_area_1": location["admin_area_1"],
-                                   "admin_area_2": location["admin_area_2"],
-                                   "locality": location["locality"],
-                                   "sub_locality": location["sub_locality"],
-                                   "street_address_1": location["street_address_1"],
-                                   "street_address_2": location["street_address_2"],
-                                   "postal_code": location["postal_code"],
-                                   "latitude": location["latitude"],
-                                   "longitude": location["longitude"],
-                                   "map_vendor": location["map_vendor"],
-                                   "map_link": location["map_link"],
-                                   "place_id": location["place_id"],
-                                   "vendor_formatted_address": location["vendor_formatted_address"],
-                                   "raw_response": json.dumps(location),
-                                   "location_profile_picture_id": storage_file_id
-                                   }
+                location_params = {
+                    "country_code_id": country_code_id,
+                    "admin_area_1": location.get("admin_area_1"),
+                    "admin_area_2": location.get("admin_area_2"),
+                    "locality": location.get("locality"),
+                    "sub_locality": location.get("sub_locality"),
+                    "street_address_1": location.get("street_address_1"),
+                    "street_address_2": location.get("street_address_2"),
+                    "postal_code": location.get("postal_code"),
+                    "latitude": location.get("latitude"),
+                    "longitude": location.get("longitude"),
+                    "map_vendor": location.get("map_vendor"),
+                    "map_link": location.get("map_link"),
+                    "place_id": location.get("place_id"),
+                    "vendor_formatted_address": location.get("vendor_formatted_address"),
+                    "raw_response": json.dumps(location),
+                    "location_profile_picture_id": storage_file_id,
+                    "name": location.get("name")
+                }
                 location_id = LocationDA.insert_location(location_params)
             else:
                 location_id = location_data['id']
@@ -287,6 +282,7 @@ class MemberScheduleEventResource(object):
                 "success": True
             }, default_parser=json.parser)
         else:
+            resp.status = 500
             resp.body = json.dumps({
                 "description": "Creating event sequence went wrong",
                 "success": False
@@ -303,86 +299,74 @@ class MemberScheduleEventResource(object):
         updated_event_id = None
 
         if mode == 'date':
-            event_id = contents['event_id']
-            event_start_utc = contents['start']
-            event_end_utc = contents['end']
+            event_id = contents.get('event_id')
+            event_start_utc = contents.get('start')
+            event_end_utc = contents.get('end')
 
             updated_event_id = MemberEventDA().change_event_date(
                 event_id=event_id, start=event_start_utc, end=event_end_utc)
 
         elif mode == 'full':
-            event_id = contents['event_id']
-            event_name = contents['name']
-            color_id = contents['colorId']
-            event_start_utc = contents['start']
-            event_end_utc = contents['end']
-            isFullDay = contents['isFullDay']
-            event_type = contents['type']
-            event_url = contents['eventUrl']
-            event_tz = contents['eventTimeZone']
-            location_mode = contents['locationMode']
-            member_location_id = contents['memberLocationId']
-            location = contents['location']
-            sequence_id = contents['sequence_id']
-            event_recurrence_freq = contents['recurrence']
-            end_condition = contents['endCondition']
-            repeat_weekdays = contents['repeatWeekDays']
-            end_date_datetime = contents['endDate']
-            repeat_times = contents['repeatTimes']
-            invitedGroup = contents['invitedGroup']
-            recurringCopies = contents['recurringCopies']
-            recurrenceUpdateOption = contents['recurrenceUpdateOption'] if 'recurrenceUpdateOption' in contents.keys(
-            ) else None
-            event_description = contents['description'] if 'description' in contents.keys(
-            ) else None
-            invitations = contents['invitations'] if 'invitations' in contents.keys(
-            ) else None
-            attachments = contents['attachments'] if 'attachments' in contents.keys(
-            ) else None
-            cover_attachment_id = contents['coverAttachmentId'] if (
-                ('coverAttachmentId' in contents.keys()) and (contents['coverAttachmentId'] != 'null')) else None
+            event_id = contents.get('event_id')
+            event_name = contents.get('name')
+            color_id = contents.get('colorId')
+            event_start_utc = contents.get('start')
+            event_end_utc = contents.get('end')
+            isFullDay = contents.get('isFullDay')
+            event_type = contents.get('type')
+            event_url = contents.get('eventUrl')
+            event_tz = contents.get('eventTimeZone')
+            location_mode = contents.get('locationMode')
+            member_location_id = contents.get('memberLocationId')
+            location = contents.get('location', {})
+            sequence_id = contents.get('sequence_id')
+            event_recurrence_freq = contents.get('recurrence')
+            end_condition = contents.get('endCondition')
+            repeat_weekdays = contents.get('repeatWeekDays')
+            end_date_datetime = contents.get('endDate')
+            repeat_times = contents.get('repeatTimes')
+            invitedGroup = contents.get('invitedGroup')
+            recurringCopies = contents.get('recurringCopies')
+            recurrenceUpdateOption = contents.get('recurrenceUpdateOption')
+            event_description = contents.get('description')
+            invitations = contents.get('invitations')
+            attachments = contents.get('attachments')
+            cover_attachment_id = contents.get('coverAttachmentId')
+            if cover_attachment_id == 'null':
+                cover_attachment_id = None
 
             location_id = None
             if location_mode == 'lookup' and location:
                 storage_file_id = None
                 # check if exist location by place_id
-                location_data = LocationDA().get_location_by_place_id(location['place_id'])
+                location_data = LocationDA().get_location_by_place_id(location.get('place_id'))
 
                 if not location_data:
                     # check if exist photo & save
-                    if location['photo_url']:
-                        mime_type = "image/jpeg"
-                        file_name = f"{location['place_id']}.jpg"
-                        image_data = requests.get(location['photo_url'], stream=True)
-                        file = io.BytesIO(image_data.content)
-                        file_size_bytes = image_data.headers["Content-Length"]
-
-                        storage_file_id = FileStorageDA().save_to_storage(
-                            file=file,
-                            filename=file_name,
-                            size=file_size_bytes,
-                            mime_type=mime_type,
-                            member_id=None
-                        )
+                    if location.get('photo_url'):
+                        storage_file_id = self._fetch_location_photo_url(
+                            location.get('place_id'), location.get('photo_url'))
 
                     country_code_id = CountryCodeDA.get_id_by_alpha2(location["country_alpha2"])
-                    location_params = {"country_code_id": country_code_id,
-                                    "admin_area_1": location["admin_area_1"],
-                                    "admin_area_2": location["admin_area_2"],
-                                    "locality": location["locality"],
-                                    "sub_locality": location["sub_locality"],
-                                    "street_address_1": location["street_address_1"],
-                                    "street_address_2": location["street_address_2"],
-                                    "postal_code": location["postal_code"],
-                                    "latitude": location["latitude"],
-                                    "longitude": location["longitude"],
-                                    "map_vendor": location["map_vendor"],
-                                    "map_link": location["map_link"],
-                                    "place_id": location["place_id"],
-                                    "vendor_formatted_address": location["vendor_formatted_address"],
-                                    "raw_response": json.dumps(location),
-                                    "location_profile_picture_id": storage_file_id
-                                    }
+                    location_params = {
+                        "country_code_id": country_code_id,
+                        "admin_area_1": location.get("admin_area_1"),
+                        "admin_area_2": location.get("admin_area_2"),
+                        "locality": location.get("locality"),
+                        "sub_locality": location.get("sub_locality"),
+                        "street_address_1": location.get("street_address_1"),
+                        "street_address_2": location.get("street_address_2"),
+                        "postal_code": location.get("postal_code"),
+                        "latitude": location.get("latitude"),
+                        "longitude": location.get("longitude"),
+                        "map_vendor": location.get("map_vendor"),
+                        "map_link": location.get("map_link"),
+                        "place_id": location.get("place_id"),
+                        "vendor_formatted_address": location.get("vendor_formatted_address"),
+                        "name": location.get("name"),
+                        "raw_response": json.dumps(location),
+                        "location_profile_picture_id": storage_file_id
+                    }
                     location_id = LocationDA.insert_location(location_params)
                 else:
                     location_id = location_data['id']
@@ -535,6 +519,35 @@ class MemberScheduleEventResource(object):
                 "description": "Cancelling events went wrong",
                 "success": False
             }, default_parser=json.parser)
+
+    def _fetch_location_photo_url(self, place_id, photo_url):
+        mime_type = "image/jpeg"
+        file_name = f"{place_id}.jpg"
+
+        logger.debug(f"Fetching place_id: {place_id} photo: {photo_url}")
+        try:
+            with requests.get(photo_url, stream=True) as photo_response:
+                logger.debug(
+                    f"Fetching result with http status of: {photo_response.status_code}, raising for status")
+                photo_response.raise_for_status()
+                # file = io.BytesIO(photo_response.content)
+                file_size_bytes = photo_response.headers["Content-Length"]
+                logger.debug(
+                    f"Fetch result with Content-Length of: {photo_response.headers['Content-Length']}, raising for status")
+
+                if photo_response.headers["Content-Length"] == 0:
+                    raise HTTPError
+                return FileStorageDA().save_to_storage(
+                    file=photo_response.raw,
+                    filename=file_name,
+                    size=file_size_bytes,
+                    mime_type=mime_type,
+                    member_id=None
+                )
+        except HTTPError:
+            logger.exception(f"Failed to fetch photo_url: {photo_url}, with place id of: {place_id}")
+
+        return None
 
 
 class MemberScheduleEventColors(object):
