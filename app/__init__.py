@@ -244,6 +244,7 @@ def _setup_routes(app):
                   ContactMembersTextMailsResource())
 
     app.add_route("/valid-session", ValidateSessionResource())
+    app.add_route("/valid-session/xmpp", ValidateSessionResource(), suffix="xmpp")
 
     # member drive
     app.add_route("/drive/member/files", MemberFileCloud())

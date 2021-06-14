@@ -112,3 +112,6 @@ ENV/
 kafka-docker
 # Kafka
 deployment/zk-single-kafka-single
+
+# Prosody
+config/prosody

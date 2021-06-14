@@ -265,7 +265,7 @@ class CompanyDA(object):
                     location.map_vendor,
                     location.map_link,
                     location.place_id,
-                    location.name,
+                    location.name AS location_name,
                     company.country_code_id,
                     country_code.name as country,
                     currency_code.id AS currency_code_id,

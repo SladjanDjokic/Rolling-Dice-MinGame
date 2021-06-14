@@ -19,7 +19,12 @@ services:
       - NET_ADMIN
     networks:
       - amera-net
-    # depends_on:
+    healthcheck:
+      test: ["CMD", "nc", "-zv", "localhost", "53"]
+      interval: "30s"
+      timeout: "1s"
+      retries: 1000
+      # depends_on:
     #   - socat
 
   # Unsure if we still need this
@@ -73,9 +78,14 @@ services:
       - web-nginx-cache:/data/nginx/cache
     depends_on:
       amera-dns:
-        condition: service_started
+        condition: service_healthy
       amera-web-api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nc", "-zv", "localhost", "9000"]
+      interval: "30s"
+      timeout: "1s"
+      retries: 1000
       # amera-eventserver:
       #   condition: service_healthy
       # amera-web-auth:
@@ -492,6 +502,81 @@ services:
       interval: 10s
       timeout: 5s
       retries: 15
+
+    # XMPP server
+  amera-prosody:
+      container_name: amera-prosody
+      image: jitsi/prosody:latest
+      build:
+        context: services/prosody-container/
+      restart: always
+      expose:
+          - '5222'
+          - '5347'
+          - '5280'
+      ports:
+          - '5280:5280'
+      volumes:
+          - ../web-api/config/prosody/config:/config:Z
+          - ../web-api/config/prosody/prosody-plugins-custom:/prosody-plugins-custom:Z
+      environment:
+          - AUTH_TYPE
+          - ENABLE_AUTH
+          - ENABLE_GUESTS
+          - ENABLE_LOBBY
+          - ENABLE_XMPP_WEBSOCKET=1
+          - GLOBAL_MODULES=
+          - GLOBAL_CONFIG=
+          - LDAP_URL
+          - LDAP_BASE
+          - LDAP_BINDDN
+          - LDAP_BINDPW
+          - LDAP_FILTER
+          - LDAP_AUTH_METHOD
+          - LDAP_VERSION
+          - LDAP_USE_TLS
+          - LDAP_TLS_CIPHERS
+          - LDAP_TLS_CHECK_PEER
+          - LDAP_TLS_CACERT_FILE
+          - LDAP_TLS_CACERT_DIR
+          - LDAP_START_TLS
+          - LOG_LEVEL=debug
+          - XMPP_SERVER=xmpp.share.dev.amera.local
+          - XMPP_DOMAIN=share.dev.amera.local
+          - XMPP_AUTH_DOMAIN=auth.share.dev.amera.local
+          - XMPP_GUEST_DOMAIN=guest.share.dev.amera.local
+          - XMPP_MUC_DOMAIN=muc.share.dev.amera.local
+          - XMPP_INTERNAL_MUC_DOMAIN=internal-muc.share.dev.amera.local
+          - XMPP_CROSS_DOMAIN=true
+          - XMPP_MODULES
+          - XMPP_MUC_MODULES
+          - XMPP_INTERNAL_MUC_MODULES
+          - XMPP_RECORDER_DOMAIN
+          - JICOFO_COMPONENT_SECRET
+          - JICOFO_AUTH_USER
+          - JICOFO_AUTH_PASSWORD=fdsafsdfsa
+          - JVB_AUTH_USER
+          - JVB_AUTH_PASSWORD=dfasfdf
+          - JWT_APP_ID
+          - JWT_APP_SECRET
+          - JWT_ACCEPTED_ISSUERS
+          - JWT_ACCEPTED_AUDIENCES
+          - JWT_ASAP_KEYSERVER
+          - JWT_ALLOW_EMPTY
+          - JWT_AUTH_TYPE
+          - JWT_TOKEN_AUTH_MODULE
+          - LOG_LEVEL
+          - PUBLIC_URL
+          - TZ
+      networks:
+        amera-net:
+          aliases:
+            - jitsi.share.dev.amera.local
+            - auth.jitsi.share.dev.amera.local
+            - xmpp.jitsi.share.dev.amera.local
+            - guest.jitsi.share.dev.amera.local
+            - muc.jitsi.share.dev.amera.local
+            - internal-muc.jitsi.share.dev.amera.local
 
   amera-web-notifications:
     container_name: amera-web-notifications

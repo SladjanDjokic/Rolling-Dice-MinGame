@@ -42,6 +42,23 @@ class ValidateSessionResource(object):
             raise UnauthorizedSession() from err
 
     @check_session
+    def on_get_xmpp(self, req, resp):
+
+        logger.debug('Request Cookies: {}'.format(req.cookies))
+        session = req.context.auth['session']
+        session_id = session['session_id']
+        logger.debug('Session ID: {}'.format(session_id))
+
+        try:
+            room = req.get_param('room')
+            self.__validate_session(session, room)
+
+            resp.set_header('X-Auth-Session', session_id)
+            resp.body = str(session.get('member_id'))
+        except InvalidSessionError as err:
+            raise UnauthorizedSession() from err
+
+    @check_session
     def on_put(self, req, resp):
 
         logger.debug('Request Cookies: {}'.format(req.cookies))

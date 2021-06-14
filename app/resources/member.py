@@ -257,6 +257,7 @@ class MemberRegisterResource(object):
                     "raw_response": None,
                     "location_profile_picture_id": None,
                     "vendor_formatted_address": location.get('vendor_formatted_address'),
+                    "name": location.get('name')
                 }
                 location_id = LocationDA.insert_location(location_params)
                 MemberInfoDA.create_member_location({"location_type": "home",

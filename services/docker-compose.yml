@@ -31,6 +31,8 @@ services:
     prosody:
         container_name: amera-jitsi-prosody
         image: jitsi/prosody:latest
+        build:
+            context: prosody-container/
         restart: ${RESTART_POLICY}
         expose:
             - '5222'
