@@ -10,7 +10,8 @@ from falcon_multipart.middleware import MultipartMiddleware
 from app.calls.views import IncomingCallView
 from app.chat.views import ChatView
 from app.config import parser, settings
-from app.middleware import CrossDomain, HandleForwardSlashMiddleware, KafkaProducerMiddleware  # , JSONTranslator
+# , JSONTranslator
+from app.middleware import CrossDomain, HandleForwardSlashMiddleware, KafkaProducerMiddleware
 from app.resources.facial_recognition import FacialRecognitionResource
 from app.resources.github import GithubWebhooksResource, GithubRepoListResource, GithubLoginResource, \
     GithubOAuthResource
@@ -19,7 +20,7 @@ from app.resources.member import MemberRegisterResource, MemberSearchResource, \
     MemberInfoResource, MemberJobTitles, MemberTerms, MemberDepartments, MemberContactsRoles, \
     MemberContactsCompanies, MemberContactsCountries, MemberTimezones, MemberInfoByIdResource, \
     MemberContactSecurity, MemberSettingResource, MemberVideoMailResource, \
-    ContactMembersTextMailsResource, MemberSkills, MemberIndustry
+    ContactMembersTextMailsResource, MemberSkills, MemberIndustry, MemberLocationResource
 from app.resources.verification import Verification
 from app.resources.verifycell import VerifyCell
 from app.resources.promo_codes import PromoCodes
@@ -202,6 +203,7 @@ def _setup_routes(app):
     app.add_route("/member/invite", MemberInviteResource())
     app.add_route("/member/info/{member_id}", MemberInfoByIdResource())
     app.add_route("/member/info", MemberInfoResource())
+    app.add_route("/member/info/location", MemberLocationResource())
     member_setting_resource = MemberSettingResource()
     app.add_route("/member/setting", member_setting_resource)
     app.add_route("/member/payment-setting",
@@ -223,7 +225,8 @@ def _setup_routes(app):
     app.add_route("/member/register/verification", Verification())
     app.add_route("/member/register/verify-cell", verify_cell_resource)
     app.add_route("/member/register/promo-code", PromoCodes())
-    app.add_route("/member/register/verify-outgoing-cell", verify_cell_resource, suffix="outgoing")
+    app.add_route("/member/register/verify-outgoing-cell",
+                  verify_cell_resource, suffix="outgoing")
 
     # This route is commneted out to prevent any registrations someone may be sniffing out
     # This will be enabled later on
@@ -299,6 +302,9 @@ def _setup_routes(app):
     app.add_route("/member/schedule/attach", EventAttachmentResorce())
     app.add_route("/member/schedule/holiday", MemberScheduleHolidayResource())
     app.add_route("/member/schedule/event/directions", MemberEventDirections())
+    # Google Map place photo
+    # app.add_route("/member/schedule/event/google-map-photo",
+    #               MemberEventGoogleMapPhoto())
 
     # app.add_route("/member/schedule/event-invite/add-single", MemberScheduleEventInviteAddSingleResource())
     app.add_route("/member/schedule/event-invite",
@@ -580,7 +586,8 @@ def _setup_routes(app):
     app.add_route("/streaming/types", stream_type_resource)
 
     # twilio
-    app.add_route("/twilio/outgoing-caller/{twilio_verify_id}", verify_cell_resource, suffix="verified")
+    app.add_route(
+        "/twilio/outgoing-caller/{twilio_verify_id}", verify_cell_resource, suffix="verified")
     # app.add_route("/twilio/message")
     # app.add_route("/twilio/message/status")
     twilio_resource = TwilioResource()

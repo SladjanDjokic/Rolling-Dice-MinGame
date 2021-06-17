@@ -153,7 +153,7 @@ class ProjectResource(object):
                 })
             else:
                 resp.body = json.dumps({
-                    "success": True,
+                    "success": False,
                     "description": 'Something went wrong when updating the project'
                 })
 

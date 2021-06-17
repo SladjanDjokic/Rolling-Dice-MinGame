@@ -142,7 +142,8 @@ class MemberScheduleEventResource(object):
         if location_mode == 'lookup' and location:
             storage_file_id = None
             # check if exist location by place_id
-            location_data = LocationDA().get_location_by_place_id(location['place_id'])
+            location_data = LocationDA().get_location_by_place_id(
+                location['place_id'])
 
             if not location_data:
                 logger.debug('Location not found in database')
@@ -152,27 +153,27 @@ class MemberScheduleEventResource(object):
                     storage_file_id = self._fetch_location_photo_url(
                         location.get('place_id'), location.get('photo_url'))
 
-                country_code_id = CountryCodeDA.get_id_by_alpha2(location["country_alpha2"])
-                location_params = {
-                    "country_code_id": country_code_id,
-                    "admin_area_1": location.get("admin_area_1"),
-                    "admin_area_2": location.get("admin_area_2"),
-                    "locality": location.get("locality"),
-                    "sub_locality": location.get("sub_locality"),
-                    "street_address_1": location.get("street_address_1"),
-                    "street_address_2": location.get("street_address_2"),
-                    "postal_code": location.get("postal_code"),
-                    "latitude": location.get("latitude"),
-                    "longitude": location.get("longitude"),
-                    "map_vendor": location.get("map_vendor"),
-                    "map_link": location.get("map_link"),
-                    "place_id": location.get("place_id"),
-                    "vendor_formatted_address": location.get("vendor_formatted_address"),
-                    "raw_response": json.dumps(location),
-                    "location_profile_picture_id": storage_file_id,
-                    "name": location.get("name")
-                }
-                location_id = LocationDA.insert_location(location_params)
+                country_code_id = CountryCodeDA.get_id_by_alpha2(
+                    location["country_alpha2"])
+                location_id = LocationDA.insert_location(
+                    country_code_id=country_code_id,
+                    admin_area_1=location.get("admin_area_1"),
+                    admin_area_2=location.get("admin_area_2"),
+                    locality=location.get("locality"),
+                    sub_locality=location.get("sub_locality"),
+                    street_address_1=location.get("street_address_1"),
+                    street_address_2=location.get("street_address_2"),
+                    postal_code=location.get("postal_code"),
+                    latitude=location.get("latitude"),
+                    longitude=location.get("longitude"),
+                    map_vendor=location.get("map_vendor"),
+                    map_link=location.get("map_link"),
+                    place_id=location.get("place_id"),
+                    vendor_formatted_address=location.get("vendor_formatted_address"),
+                    raw_response=json.dumps(location),
+                    location_profile_picture_id=storage_file_id,
+                    name=location.get("name")
+                )
             else:
                 location_id = location_data['id']
         elif location_mode == 'my_locations' and member_location_id:
@@ -295,7 +296,7 @@ class MemberScheduleEventResource(object):
             "event_data", "mode", req=req)
 
         contents = json.loads(event_data)
-
+        result = None
         updated_event_id = None
 
         if mode == 'date':
@@ -347,27 +348,28 @@ class MemberScheduleEventResource(object):
                         storage_file_id = self._fetch_location_photo_url(
                             location.get('place_id'), location.get('photo_url'))
 
-                    country_code_id = CountryCodeDA.get_id_by_alpha2(location["country_alpha2"])
-                    location_params = {
-                        "country_code_id": country_code_id,
-                        "admin_area_1": location.get("admin_area_1"),
-                        "admin_area_2": location.get("admin_area_2"),
-                        "locality": location.get("locality"),
-                        "sub_locality": location.get("sub_locality"),
-                        "street_address_1": location.get("street_address_1"),
-                        "street_address_2": location.get("street_address_2"),
-                        "postal_code": location.get("postal_code"),
-                        "latitude": location.get("latitude"),
-                        "longitude": location.get("longitude"),
-                        "map_vendor": location.get("map_vendor"),
-                        "map_link": location.get("map_link"),
-                        "place_id": location.get("place_id"),
-                        "vendor_formatted_address": location.get("vendor_formatted_address"),
-                        "name": location.get("name"),
-                        "raw_response": json.dumps(location),
-                        "location_profile_picture_id": storage_file_id
-                    }
-                    location_id = LocationDA.insert_location(location_params)
+                    country_code_id = CountryCodeDA.get_id_by_alpha2(
+                        location["country_alpha2"])
+
+                    location_id = LocationDA.insert_location(
+                        country_code_id=country_code_id,
+                        admin_area_1=location.get("admin_area_1"),
+                        admin_area_2=location.get("admin_area_2"),
+                        locality=location.get("locality"),
+                        sub_locality=location.get("sub_locality"),
+                        street_address_1=location.get("street_address_1"),
+                        street_address_2=location.get("street_address_2"),
+                        postal_code=location.get("postal_code"),
+                        latitude=location.get("latitude"),
+                        longitude=location.get("longitude"),
+                        map_vendor=location.get("map_vendor"),
+                        map_link=location.get("map_link"),
+                        place_id=location.get("place_id"),
+                        vendor_formatted_address=location.get("vendor_formatted_address"),
+                        name=location.get("name"),
+                        raw_response=json.dumps(location),
+                        location_profile_picture_id=storage_file_id
+                    )
                 else:
                     location_id = location_data['id']
             elif location_mode == 'my_locations' and member_location_id:

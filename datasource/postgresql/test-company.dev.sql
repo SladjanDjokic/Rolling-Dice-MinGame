@@ -3,13 +3,21 @@ INSERT INTO file_storage_engine (storage_engine_id, storage_engine, status) VALU
     ('https://file-testing.s3.us-east-2.amazonaws.com/hq2.jpg', 'S3', 'available');
 
 
-INSERT INTO company (logo_storage_id, email, parent_company_id,name, country_code_id, main_phone, primary_url)
+INSERT INTO location (country_code_id) 
 VALUES 
-    (8,'info@megachips.com', null, 'Megachips Corporation',  392, '663992884', 'www.coriander.com' ),
-    (9,'info@ameraiot.com',1, 'Amera IoT Inc.', 840, '8177980012', 'Ameraiot.com' ),
-    (8,'info@jetsilk.org',null, 'Jetsilk',  840, '6667777777', 'www.jetsilk.com' ),
-    (8,'mark@facebook.com',null, 'Facebook', 840, '61982828888', 'www.facebook.com' ),
-    (8,'arigato@sony.jp',null, 'Sony', 392, '12345678', 'www.sony.jp' );
+    (392),
+    (840),
+    (840),
+    (840),
+    (392);
+
+INSERT INTO company (logo_storage_id, email, parent_company_id,name, country_code_id, main_phone, primary_url, location_id)
+VALUES 
+    (8,'info@megachips.com', null, 'Megachips Corporation',  392, '663992884', 'www.coriander.com',1 ),
+    (9,'info@ameraiot.com',1, 'Amera IoT Inc.', 840, '8177980012', 'Ameraiot.com',2 ),
+    (8,'info@jetsilk.org',null, 'Jetsilk',  840, '6667777777', 'www.jetsilk.com',3 ),
+    (8,'mark@facebook.com',null, 'Facebook', 840, '61982828888', 'www.facebook.com',4 ),
+    (8,'arigato@sony.jp',null, 'Sony', 392, '12345678', 'www.sony.jp',5 );
 
 INSERT INTO company_department (company_id, department_id) VALUES
     (1, 11),

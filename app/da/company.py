@@ -117,7 +117,8 @@ class CompanyDA(object):
                     location.map_link,
                     location.place_id,
                     location.name,
-                    company.country_code_id,
+                    location.raw_response,
+                    COALESCE(company.country_code_id, location.country_code_id) AS country_code_id,
                     country_code.name as country_name,
                     currency_code.id AS currency_code_id,
                     currency_code.currency_code,
@@ -130,7 +131,7 @@ class CompanyDA(object):
                     company.create_date
                 FROM company
                 LEFT JOIN location ON location.id = company.location_id
-                LEFT JOIN country_code ON country_code.id = company.country_code_id
+                LEFT JOIN country_code ON country_code.id = (SELECT COALESCE(company.country_code_id, location.country_code_id))
                 LEFT JOIN currency_code ON currency_code.id = country_code.currency_code_id
                 LEFT JOIN file_storage_engine ON file_storage_engine.id = company.logo_storage_id
                 LEFT JOIN company AS parent_company ON parent_company.id = company.parent_company_id
@@ -266,7 +267,7 @@ class CompanyDA(object):
                     location.map_link,
                     location.place_id,
                     location.name AS location_name,
-                    company.country_code_id,
+                    COALESCE(company.country_code_id, location.country_code_id) AS country_code_id,
                     country_code.name as country,
                     currency_code.id AS currency_code_id,
                     currency_code.currency_code,
@@ -279,7 +280,7 @@ class CompanyDA(object):
                     company.create_date
                 FROM company
                 LEFT JOIN location ON location.id = company.location_id
-                LEFT JOIN country_code ON country_code.id = company.country_code_id
+                LEFT JOIN country_code ON country_code.id = (SELECT COALESCE(company.country_code_id, location.country_code_id))
                 LEFT JOIN currency_code ON currency_code.id = country_code.currency_code_id
                 LEFT JOIN file_storage_engine ON file_storage_engine.id = company.logo_storage_id
                 LEFT JOIN company AS parent_company ON parent_company.id = company.parent_company_id
@@ -338,15 +339,15 @@ class CompanyDA(object):
         }
 
     @classmethod
-    def create_company(cls, name, country_code_id=None, main_phone=None, primary_url=None, logo_storage_id=None, commit=True):
+    def create_company(cls, name, country_code_id=None, main_phone=None, primary_url=None, logo_storage_id=None, location_id=None, commit=True):
         query = ("""
-            INSERT INTO company (name,  country_code_id, main_phone, primary_url, logo_storage_id)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO company (name,  country_code_id, main_phone, primary_url, logo_storage_id, location_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING id
         """)
 
         params = (name, country_code_id, main_phone,
-                  primary_url, logo_storage_id)
+                  primary_url, logo_storage_id, location_id)
         cls.source.execute(query, params)
         id = cls.source.get_last_row_id()
 

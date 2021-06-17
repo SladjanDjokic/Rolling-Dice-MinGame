@@ -36,12 +36,14 @@ class CompanyResource(object):
                 logo_storage_id = FileStorageDA().put_file_to_storage(logo)
 
             name = None if not name else name
-            country_code_id = None if country_code_id == 'null' else country_code_id
+            country_code_id = 840 if country_code_id == 'null' else country_code_id
             main_phone = None if not main_phone else main_phone
             primary_url = None if not primary_url else primary_url
 
-            company_id = CompanyDA().create_company(name, country_code_id,
-                                                    main_phone, primary_url, logo_storage_id)
+            location_id = LocationDA.insert_location(
+                country_code_id=country_code_id)
+            company_id = CompanyDA().create_company(name=name, country_code_id=country_code_id,
+                                                    main_phone=main_phone, primary_url=primary_url, logo_storage_id=logo_storage_id, location_id=location_id)
 
             company = CompanyDA.get_company(company_id)
             resp.body = json.dumps({
@@ -118,27 +120,76 @@ class CompanyResource(object):
     def on_post_details_update(self, req, resp, company_id):
         member_id = req.context.auth['session']['member_id']
         try:
-            (name, industries, email, primary_url, main_phone, country_code_id, place_id, street_address_1, street_address_2, locality, sub_locality, admin_area_1, admin_area_2, postal_code, map_link, latitude, longitude, map_vendor, vendor_formatted_address) = request.get_json_or_form(
-                "name", "industries", "email", "primaryUrl", "phone", "countryCode", "placeId", "streetAddress1", "streetAddress2", "locality", "sublocality", "adminArea1", "adminArea2", "postal", "map_link", "latitude", "longitude", "map_vendor", "vendor_formatted_address", req=req)
+            (name, industries, email, primary_url, main_phone, country_code_id, place_id, street_address_1, street_address_2, locality, sub_locality, admin_area_1, admin_area_2, postal_code, map_link, latitude, longitude, map_vendor, vendor_formatted_address, raw_response, location_id) = request.get_json_or_form(
+                "name", "industries", "email", "primaryUrl", "phone", "countryCode", "placeId", "streetAddress1", "streetAddress2", "locality", "sublocality", "adminArea1", "adminArea2", "postal", "map_link", "latitude", "longitude", "map_vendor", "vendor_formatted_address", "raw_response", "location_id", req=req)
 
             member_role = CompanyDA.get_member_role(member_id, company_id)
             self._check_company_update_privileges(req, member_role)
 
-            location_params = {"country_code_id": country_code_id,
-                               "admin_area_1": json.convert_null(admin_area_1),
-                               "admin_area_2": json.convert_null(admin_area_2),
-                               "locality": json.convert_null(locality),
-                               "sub_locality": json.convert_null(sub_locality),
-                               "street_address_1": json.convert_null(street_address_1),
-                               "street_address_2": json.convert_null(street_address_2),
-                               "postal_code": json.convert_null(postal_code),
-                               "latitude": json.convert_null(latitude),
-                               "longitude": json.convert_null(longitude),
-                               "map_vendor": json.convert_null(map_vendor),
-                               "map_link": json.convert_null(map_link),
-                               "place_id": json.convert_null(place_id),
-                               "vendor_formatted_address": json.convert_null(vendor_formatted_address)}
-            location_id = LocationDA.insert_location(location_params)
+            company_data = CompanyDA().get_company(company_id)
+            if company_data["location_id"] == location_id:
+                # Change location data keeping the id if valid location
+                location_id = LocationDA().update_location(location_id=location_id, country_code_id=country_code_id,
+                                                           admin_area_1=json.convert_null(
+                                                               admin_area_1),
+                                                           admin_area_2=json.convert_null(
+                                                               admin_area_2),
+                                                           locality=json.convert_null(
+                                                               locality),
+                                                           sub_locality=json.convert_null(
+                                                               sub_locality),
+                                                           street_address_1=json.convert_null(
+                                                               street_address_1),
+                                                           street_address_2=json.convert_null(
+                                                               street_address_2),
+                                                           postal_code=json.convert_null(
+                                                               postal_code),
+                                                           latitude=json.convert_null(
+                                                               latitude),
+                                                           longitude=json.convert_null(
+                                                               longitude),
+                                                           map_vendor=json.convert_null(
+                                                               map_vendor),
+                                                           map_link=json.convert_null(
+                                                               map_link),
+                                                           place_id=json.convert_null(
+                                                               place_id),
+                                                           vendor_formatted_address=json.convert_null(
+                                                               vendor_formatted_address),
+                                                           raw_response=json.dumps(
+                                                               raw_response),
+                                                           location_profile_picture_id=None)
+            else:
+                location_id = LocationDA().insert_location(country_code_id=country_code_id,
+                                                           admin_area_1=json.convert_null(
+                                                               admin_area_1),
+                                                           admin_area_2=json.convert_null(
+                                                               admin_area_2),
+                                                           locality=json.convert_null(
+                                                               locality),
+                                                           sub_locality=json.convert_null(
+                                                               sub_locality),
+                                                           street_address_1=json.convert_null(
+                                                               street_address_1),
+                                                           street_address_2=json.convert_null(
+                                                               street_address_2),
+                                                           postal_code=json.convert_null(
+                                                               postal_code),
+                                                           latitude=json.convert_null(
+                                                               latitude),
+                                                           longitude=json.convert_null(
+                                                               longitude),
+                                                           map_vendor=json.convert_null(
+                                                               map_vendor),
+                                                           map_link=json.convert_null(
+                                                               map_link),
+                                                           place_id=json.convert_null(
+                                                               place_id),
+                                                           vendor_formatted_address=json.convert_null(
+                                                               vendor_formatted_address),
+                                                           raw_response=json.dumps(
+                                                               raw_response),
+                                                           location_profile_picture_id=None)
 
             company_params = {"company_id": company_id,
                               "name": name,

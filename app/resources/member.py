@@ -172,7 +172,7 @@ class MemberRegisterResource(object):
 
             if croppedPFP is not None:
                 profile_picture_storage_id = FileStorageDA().put_file_to_storage(croppedPFP)
-            
+
             # logger.debug(
                 # f"Job Title ID: {job_title_id} and {type(job_title_id)}")
 
@@ -194,7 +194,7 @@ class MemberRegisterResource(object):
                 )
 
             member_id = MemberDA.register(
-                city=city, state=state, province=province, pin=pin, 
+                city=city, state=state, province=province, pin=pin,
                 security_picture_storage_id=security_picture_storage_id, profile_picture_storage_id=profile_picture_storage_id,
                 email=email, username=email, password=password,
                 first_name=first_name, last_name=last_name, company_name=company_name, job_title_id=job_title_id,
@@ -204,14 +204,28 @@ class MemberRegisterResource(object):
             logger.debug("New registered member_id: {}".format(member_id))
 
             # If not listed company - create one, then handle membership and deps
-            if not company_id and company_name:
-                company_id = CompanyDA.create_company(name=company_name)
+            if not company_id:
+                location_id = LocationDA.insert_location(
+                    country_code_id=country)
+                company_id = CompanyDA.create_company(
+                    name=company_name, location_id=location_id)
 
             if company_id and member_id:
                 company_member_id = None
                 try:
                     company_member_id = CompanyDA.create_company_membership(
                         company_id, member_id)
+
+                    # Tie company location and make it member's location for Work
+                    company_data = CompanyDA.get_company(company_id)
+                    logger.info(company_data, type(company_data))
+                    location_id = company_data["location_id"]
+                    company_name = company_data["name"]
+                    logger.info(location_id, company_name)
+                    if location_id:
+                        MemberInfoDA.create_member_location(
+                            location_type='work', member_id=member_id, location_id=location_id, description=company_name, editable_by_member=False)
+
                 except DuplicateKeyError:
                     company_membership = CompanyDA.get_membership_by_member_id(
                         company_id=company_id,
@@ -220,7 +234,7 @@ class MemberRegisterResource(object):
 
                 if company_member_id and department_id:
 
-                    #Create department, ignore duplicate key error as it already exists
+                    # Create department, ignore duplicate key error as it already exists
                     try:
                         CompanyDA.add_company_department(
                             company_id, department_id)
@@ -240,30 +254,28 @@ class MemberRegisterResource(object):
 
             # Insert location
             if location:
-                location_params = {
-                    "country_code_id": country,
-                    "admin_area_1": location.get('adminArea1'),
-                    "admin_area_2": location.get('adminArea2'),
-                    "locality": location.get('locality'),
-                    "sub_locality": location.get('sublocality'),
-                    "street_address_1": location.get('streetAddress1'),
-                    "street_address_2": location.get('streetAddress2'),
-                    "postal_code": location.get('postal'),
-                    "latitude": location.get('latitude'),
-                    "longitude": location.get('longitude'),
-                    "map_vendor": location.get('map_vendor'),
-                    "map_link": location.get('map_link'),
-                    "place_id": location.get('placeId'),
-                    "raw_response": None,
-                    "location_profile_picture_id": None,
-                    "vendor_formatted_address": location.get('vendor_formatted_address'),
-                    "name": location.get('name')
-                }
-                location_id = LocationDA.insert_location(location_params)
-                MemberInfoDA.create_member_location({"location_type": "home",
-                                                     "member_id": member_id,
-                                                     "location_id": location_id,
-                                                     "description": None})
+                location_id = LocationDA.insert_location(
+                    country_code_id=country,
+                    admin_area_1=location.get('adminArea1'),
+                    admin_area_2=location.get('adminArea2'),
+                    locality=location.get('locality'),
+                    sub_locality=location.get('sublocality'),
+                    street_address_1=location.get('streetAddress1'),
+                    street_address_2=location.get('streetAddress2'),
+                    postal_code=location.get('postal'),
+                    latitude=location.get('latitude'),
+                    longitude=location.get('longitude'),
+                    map_vendor=location.get('map_vendor'),
+                    map_link=location.get('map_link'),
+                    place_id=location.get('placeId'),
+                    raw_response=None,
+                    location_profile_picture_id=None,
+                    vendor_formatted_address=location.get('vendor_formatted_address'),
+                    name=location.get('name')
+                )
+                MemberInfoDA.create_member_location(
+                    location_type="home", member_id=member_id, location_id=location_id, description="My Home")
+
 
             if member_id:
                 group = None
@@ -333,7 +345,6 @@ class MemberRegisterResource(object):
             logger.exception(f"Unknown exception creating member {email}")
             logger.error(f"Error Creating Member: {err}")
             raise MemberRegistrationServerError(email, invite_key)
-            
 
     def _send_email(self, first_name, email, invite_email):
         sendmail.send_mail(
@@ -718,7 +729,10 @@ class MemberInfoResource(object):
         company_id = json.convert_null(company["id"])
         company_name = company["name"]
         if not company_id:
-            company_id = CompanyDA.create_company(name=company_name)
+            location_id = LocationDA.insert_location(
+                country_code_id=840)
+            company_id = CompanyDA.create_company(
+                name=company_name, location_id=location_id)
 
         if company_id and member_id:
             company_member_record = CompanyDA.get_membership_by_member_id(
@@ -870,6 +884,30 @@ class MemberInfoResource(object):
             }, default_parser=json.parser)
 
 
+class MemberLocationResource(object):
+    @check_session
+    def on_post(self, req, resp):
+        member_id = req.context.auth["session"]["member_id"]
+        (locations,) = request.get_json_or_form("locations", req=req)
+        if not locations:
+            locations = []
+        success = MemberInfoDA().handle_member_locations(locations, member_id)
+        member_info = MemberInfoDA().get_member_info(member_id)
+
+        if success:
+            resp.body = json.dumps({
+                "success": True,
+                "data": member_info,
+                "description": "Locations updated successfully"
+            }, default_parser=json.parser)
+        else:
+            resp.body = json.dumps({
+                "success": False,
+                "description": 'Soething went wrong with updating locations',
+
+            }, default_parser=json.parser)
+
+
 class MemberSettingResource(object):
 
     # def __init__(self):
@@ -901,7 +939,8 @@ class MemberSettingResource(object):
         updated = MemberSettingDA().update_member_setting(
             member_id, member_profile, member_location)
         if outgoing_caller_contact_id:
-            MemberSettingDA().update_outgoing_contact(member_id, outgoing_caller_contact_id)
+            MemberSettingDA().update_outgoing_contact(
+                member_id, outgoing_caller_contact_id)
         if updated:
             member_info = MemberSettingDA().get_member_setting(member_id)
             resp.body = json.dumps({

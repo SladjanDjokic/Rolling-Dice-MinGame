@@ -1198,6 +1198,7 @@ class MemberContactDA(object):
                             member_location.location_type,
                             member_location.description,
                             member_location.location_id,
+                            member_location.editable_by_member,
                             location.country_code_id,
                             country_code.name AS country_name,
                             location.admin_area_1,
@@ -1212,7 +1213,8 @@ class MemberContactDA(object):
                             location.map_vendor,
                             location.map_link,
                             location.place_id,
-                            location.name
+                            location.name,
+                            location.raw_response
                         FROM member_location
                         LEFT JOIN location ON location.id = member_location.location_id
                         LEFT JOIN country_code ON country_code.id = location.country_code_id
@@ -2201,6 +2203,7 @@ class MemberInfoDA(object):
                             member_location.location_type,
                             member_location.description,
                             member_location.location_id,
+                            member_location.editable_by_member,
                             location.country_code_id,
                             location.vendor_formatted_address,
                             country_code.name AS country_name,
@@ -2216,7 +2219,8 @@ class MemberInfoDA(object):
                             location.map_vendor,
                             location.map_link,
                             location.place_id,
-                            location.name
+                            location.name,
+                            location.raw_response
                         FROM member_location
                         LEFT JOIN location ON location.id = member_location.location_id
                         LEFT JOIN country_code ON country_code.id = location.country_code_id
@@ -2466,61 +2470,16 @@ class MemberInfoDA(object):
         # Member location
         logger.debug(f"member locations {member_locations}")
         cls.handle_member_locations(member_locations, member_id)
-        # if member_locations:
-        #     location_ids_to_stay = list()
-        #     for member_location in member_locations:
-        #         logger.debug(f"item {member_location}")
-        #         if member_location:
-        #             id_, country_code_id, location_type, admin_area_1, admin_area_2, locality, sub_locality, street_address_1, street_address_2, postal_code, latitude, longitude, map_vendor, map_link, place_id, vendor_formatted_address, description = [
-        #                 member_location[k] for k in ('id', 'country_code_id', 'location_type', 'admin_area_1', 'admin_area_2', 'locality', 'sub_locality', 'street_address_1', 'street_address_2', 'postal_code', 'latitude', 'longitude', 'map_vendor', 'map_link', 'place_id', 'vendor_formatted_address', 'description')]
-
-        #             location_params = {"country_code_id": country_code_id,
-        #                                "admin_area_1": json.convert_null(admin_area_1),
-        #                                "admin_area_2": json.convert_null(admin_area_2),
-        #                                "locality": json.convert_null(locality),
-        #                                "sub_locality": json.convert_null(sub_locality),
-        #                                "street_address_1": json.convert_null(street_address_1),
-        #                                "street_address_2": json.convert_null(street_address_2),
-        #                                "postal_code": json.convert_null(postal_code),
-        #                                "latitude": json.convert_null(latitude),
-        #                                "longitude": json.convert_null(longitude),
-        #                                "map_vendor": json.convert_null(map_vendor),
-        #                                "map_link": json.convert_null(map_link),
-        #                                "place_id": json.convert_null(place_id),
-        #                                "vendor_formatted_address": json.convert_null(vendor_formatted_address)}
-        #             location_id = LocationDA.insert_location(
-        #                 location_params)
-
-        #             if (type(id_) == int):
-        #                 logger.info(f"Will update member_location {id_}")
-        #                 cls.update_member_location({
-        #                     "location_type": location_type,
-        #                     "member_location_id": id_,
-        #                     "location_id": location_id,
-        #                     "member_id": member_id,
-        #                     "description": description
-        #                 })
-        #                 location_ids_to_stay.append(id_)
-        #             else:
-        #                 logger.info(f"Will insert member_location {id_}")
-        #                 inserted = cls.create_member_location({
-        #                     "location_type": location_type,
-        #                     "member_id": member_id,
-        #                     "location_id": location_id,
-        #                     "description": description
-        #                 })
-        #                 location_ids_to_stay.append(inserted)
-        #     # Track what was deleted in the UI and kill it in db as well
-        #     cls.delete_member_location(member_id, location_ids_to_stay)
-        # return True
 
     @classmethod
-    def create_member_location(cls, params, commit=True):
+    def create_member_location(cls, location_type, member_id, location_id, description, editable_by_member=True, commit=True):
         query = ("""
-            INSERT INTO member_location (location_type, member_id, location_id, description)
-            VALUES ( %(location_type)s, %(member_id)s, %(location_id)s, %(description)s)
+            INSERT INTO member_location (location_type, member_id, location_id, description, editable_by_member)
+            VALUES ( %s, %s, %s, %s, %s)
             RETURNING id;
         """)
+        params = (location_type, member_id, location_id,
+                  description, editable_by_member)
         cls.source.execute(query, params)
 
         if commit:
@@ -2560,27 +2519,41 @@ class MemberInfoDA(object):
         if member_locations:
             location_ids_to_stay = list()
             for member_location in member_locations:
-                logger.debug(f"item {member_location}")
+                logger.info(f"item {member_location}")
                 if member_location:
-                    id_, country_code_id, location_type, admin_area_1, admin_area_2, locality, sub_locality, street_address_1, street_address_2, postal_code, latitude, longitude, map_vendor, map_link, place_id, vendor_formatted_address, description = [
-                        member_location[k] for k in ('id', 'country_code_id', 'location_type', 'admin_area_1', 'admin_area_2', 'locality', 'sub_locality', 'street_address_1', 'street_address_2', 'postal_code', 'latitude', 'longitude', 'map_vendor', 'map_link', 'place_id', 'vendor_formatted_address', 'description')]
+                    id_, country_code_id, location_type, admin_area_1, admin_area_2, locality, sub_locality, street_address_1, street_address_2, postal_code, latitude, longitude, map_vendor, map_link, place_id, vendor_formatted_address, description, raw_response = [
+                        member_location[k] for k in ('id', 'country_code_id', 'location_type', 'admin_area_1', 'admin_area_2', 'locality', 'sub_locality', 'street_address_1', 'street_address_2', 'postal_code', 'latitude', 'longitude', 'map_vendor', 'map_link', 'place_id', 'vendor_formatted_address', 'description', 'raw_response')]
 
-                    location_params = {"country_code_id": country_code_id,
-                                       "admin_area_1": json.convert_null(admin_area_1),
-                                       "admin_area_2": json.convert_null(admin_area_2),
-                                       "locality": json.convert_null(locality),
-                                       "sub_locality": json.convert_null(sub_locality),
-                                       "street_address_1": json.convert_null(street_address_1),
-                                       "street_address_2": json.convert_null(street_address_2),
-                                       "postal_code": json.convert_null(postal_code),
-                                       "latitude": json.convert_null(latitude),
-                                       "longitude": json.convert_null(longitude),
-                                       "map_vendor": json.convert_null(map_vendor),
-                                       "map_link": json.convert_null(map_link),
-                                       "place_id": json.convert_null(place_id),
-                                       "vendor_formatted_address": json.convert_null(vendor_formatted_address)}
-                    location_id = LocationDA.insert_location(
-                        location_params)
+                    location_id = LocationDA().insert_location(country_code_id=country_code_id,
+                                                               admin_area_1=json.convert_null(
+                                                                   admin_area_1),
+                                                               admin_area_2=json.convert_null(
+                                                                   admin_area_2),
+                                                               locality=json.convert_null(
+                                                                   locality),
+                                                               sub_locality=json.convert_null(
+                                                                   sub_locality),
+                                                               street_address_1=json.convert_null(
+                                                                   street_address_1),
+                                                               street_address_2=json.convert_null(
+                                                                   street_address_2),
+                                                               postal_code=json.convert_null(
+                                                                   postal_code),
+                                                               latitude=json.convert_null(
+                                                                   latitude),
+                                                               longitude=json.convert_null(
+                                                                   longitude),
+                                                               map_vendor=json.convert_null(
+                                                                   map_vendor),
+                                                               map_link=json.convert_null(
+                                                                   map_link),
+                                                               place_id=json.convert_null(
+                                                                   place_id),
+                                                               vendor_formatted_address=json.convert_null(
+                                                                   vendor_formatted_address),
+                                                               raw_response=json.dumps(
+                                                                   raw_response),
+                                                               location_profile_picture_id=None)
 
                     if (type(id_) == int):
                         logger.info(f"Will update member_location {id_}")
@@ -2594,12 +2567,8 @@ class MemberInfoDA(object):
                         location_ids_to_stay.append(id_)
                     else:
                         logger.info(f"Will insert member_location {id_}")
-                        inserted = cls.create_member_location({
-                            "location_type": location_type,
-                            "member_id": member_id,
-                            "location_id": location_id,
-                            "description": description
-                        })
+                        inserted = cls.create_member_location(
+                            location_type=location_type, member_id=member_id, location_id=location_id, description=description)
                         location_ids_to_stay.append(inserted)
             # Track what was deleted in the UI and kill it in db as well
             cls.delete_member_location(member_id, location_ids_to_stay)
@@ -2800,6 +2769,7 @@ class MemberSettingDA(object):
                             member_location.location_type,
                             member_location.description,
                             member_location.location_id,
+                            member_location.editable_by_member,
                             location.country_code_id,
                             location.vendor_formatted_address,
                             country_code.name AS country_name,
@@ -2815,6 +2785,7 @@ class MemberSettingDA(object):
                             location.map_vendor,
                             location.map_link,
                             location.place_id
+                            location.raw_response
                         FROM member_location
                         LEFT JOIN location ON location.id = member_location.location_id
                         LEFT JOIN country_code ON country_code.id = location.country_code_id
