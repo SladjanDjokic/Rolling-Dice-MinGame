@@ -1064,108 +1064,108 @@ class GroupMembershipDA(object):
         cls.source.execute(query, params)
         cls.source.commit()
 
-class GroupMemberInviteDA(object):
-    source = source
+# class GroupMemberInviteDA(object):
+#     source = source
 
-    @classmethod
-    def create_invite(cls, invite_key, email, first_name, last_name,
-                      inviter_member_id, group_id, country, country_code, phone_number,
-                      expiration, role, confirm_phone_required=False, company_id=None, company_name=None, 
-                      commit=True):
-        query = ("""
-            INSERT INTO invite
-                (invite_key, email, first_name, last_name,
-                    inviter_member_id, group_id, country, country_code, phone_number,
-                        expiration, role_id, confirm_phone_required, company_id, company_name)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id
-            """)
+#     @classmethod
+#     def create_invite(cls, invite_key, email, first_name, last_name,
+#                       inviter_member_id, group_id, country, country_code, phone_number,
+#                       expiration, role, confirm_phone_required=False, company_id=None, company_name=None, 
+#                       commit=True):
+#         query = ("""
+#             INSERT INTO invite
+#                 (invite_key, email, first_name, last_name,
+#                     inviter_member_id, group_id, country, country_code, phone_number,
+#                         expiration, role_id, confirm_phone_required, company_id, company_name)
+#             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+#             RETURNING id
+#             """)
 
-        params = (
-            invite_key, email, first_name, last_name,
-            inviter_member_id, group_id, country, country_code, phone_number,
-            expiration, role, confirm_phone_required, company_id, company_name
-        )
+#         params = (
+#             invite_key, email, first_name, last_name,
+#             inviter_member_id, group_id, country, country_code, phone_number,
+#             expiration, role, confirm_phone_required, company_id, company_name
+#         )
 
-        try:
-            cls.source.execute(query, params)
+#         try:
+#             cls.source.execute(query, params)
 
-            invite_id = cls.source.get_last_row_id()
+#             invite_id = cls.source.get_last_row_id()
 
-            if commit:
-                cls.source.commit()
+#             if commit:
+#                 cls.source.commit()
 
-            return invite_id
-        except DuplicateKeyError as err:
-            raise InviteExistsError from err
-        except DataMissingError as err:
-            raise InviteDataMissingError from err
-        except RelationshipReferenceError as err:
-            raise InviteInvalidInviterError from err
+#             return invite_id
+#         except DuplicateKeyError as err:
+#             raise InviteExistsError from err
+#         except DataMissingError as err:
+#             raise InviteDataMissingError from err
+#         except RelationshipReferenceError as err:
+#             raise InviteInvalidInviterError from err
 
-    @classmethod
-    def get_invite(cls, invite_key):
-        query = ("""
-            SELECT
-                id, invite_key, email, expiration,
-                first_name, last_name, inviter_member_id
-            FROM invite
-            WHERE invite_key = %s
-            """)
+#     @classmethod
+#     def get_invite(cls, invite_key):
+#         query = ("""
+#             SELECT
+#                 id, invite_key, email, expiration,
+#                 first_name, last_name, inviter_member_id
+#             FROM invite
+#             WHERE invite_key = %s
+#             """)
 
-        params = (invite_key,)
-        cls.source.execute(query, params)
-        if cls.source.has_results():
-            (
-                id, invite_key, email,
-                expiration, first_name,
-                last_name, inviter_member_id
-            ) = cls.source.cursor.fetchone()
-            invite = {
-                "id": id,
-                "invite_key": invite_key,
-                "email": email,
-                "expiration": expiration,
-                "first_name": first_name,
-                "last_name": last_name,
-                "inviter_member_id": inviter_member_id,
-            }
-            return invite
+#         params = (invite_key,)
+#         cls.source.execute(query, params)
+#         if cls.source.has_results():
+#             (
+#                 id, invite_key, email,
+#                 expiration, first_name,
+#                 last_name, inviter_member_id
+#             ) = cls.source.cursor.fetchone()
+#             invite = {
+#                 "id": id,
+#                 "invite_key": invite_key,
+#                 "email": email,
+#                 "expiration": expiration,
+#                 "first_name": first_name,
+#                 "last_name": last_name,
+#                 "inviter_member_id": inviter_member_id,
+#             }
+#             return invite
 
-        return None
+#         return None
 
-    @classmethod
-    def update_invite_registered_member(cls, invite_key, registered_member_id, commit=True):
+#     @classmethod
+#     def update_invite_registered_member(cls, invite_key, registered_member_id, commit=True):
 
-        query = ("""
-            UPDATE invite SET
-                registered_member_id = %s
-            WHERE invite_key = %s
-            """)
+#         query = ("""
+#             UPDATE invite SET
+#                 registered_member_id = %s
+#             WHERE invite_key = %s
+#             """)
 
-        params = (
-            registered_member_id, invite_key,
-        )
-        try:
-            cls.source.execute(query, params)
+#         params = (
+#             registered_member_id, invite_key,
+#         )
+#         try:
+#             cls.source.execute(query, params)
 
-            if commit:
-                cls.source.commit()
-        except DataMissingError as err:
-            raise InviteDataMissingError from err
-        except RelationshipReferenceError as err:
-            raise InviteInvalidInviterError from err
+#             if commit:
+#                 cls.source.commit()
+#         except DataMissingError as err:
+#             raise InviteDataMissingError from err
+#         except RelationshipReferenceError as err:
+#             raise InviteInvalidInviterError from err
 
-    @classmethod
-    def delete_invite(cls, invite_key, commit=True):
-        query = ("""
-            DELETE FROM invite WHERE invite_key = %s
-            """)
+#     @classmethod
+#     def delete_invite(cls, invite_key, commit=True):
+#         query = ("""
+#             DELETE FROM invite WHERE invite_key = %s
+#             """)
 
-        params = (invite_key,)
-        res = cls.source.execute(query, params)
-        if commit:
-            cls.source.commit()
+#         params = (invite_key,)
+#         res = cls.source.execute(query, params)
+#         if commit:
+#             cls.source.commit()
 
-        return res
+#         return res
 

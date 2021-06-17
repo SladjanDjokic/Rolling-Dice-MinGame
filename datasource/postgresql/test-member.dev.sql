@@ -314,7 +314,8 @@ do $$
     begin
         for r in 1..71 loop
             UPDATE member_profile
-            SET notification_settings = '{"sms": {
+            SET notification_settings = '{
+                        "email": {
                             "Contact": true,
                             "Invoice": true,
                             "Message": true,
@@ -328,21 +329,35 @@ do $$
                             "RequestFriendship": true,
                             "RequestToJoinGroup": true
                         },
-                            "email": {
-                                "Contact": true,
-                                "Invoice": true,
-                                "Message": true,
-                                "Payment": true,
-                                "AmeraMail": true,
-                                "GroupJoin": true,
-                                "ChatMessage": true,
-                                "AcceptFriend": true,
-                                "EventReminder": true,
-                                "RequestContact": true,
-                                "RequestFriendship": true,
-                                "RequestToJoinGroup": true
-                            }
-                        }'
+                        "sms": {
+                            "Contact": true,
+                            "Invoice": true,
+                            "Message": true,
+                            "Payment": true,
+                            "AmeraMail": true,
+                            "GroupJoin": true,
+                            "ChatMessage": true,
+                            "AcceptFriend": true,
+                            "EventReminder": true,
+                            "RequestContact": true,
+                            "RequestFriendship": true,
+                            "RequestToJoinGroup": true
+                        },
+                        "browser": {
+                            "Contact": true,
+                            "Invoice": true,
+                            "Message": true,
+                            "Payment": true,
+                            "AmeraMail": true,
+                            "GroupJoin": true,
+                            "ChatMessage": true,
+                            "AcceptFriend": true,
+                            "EventReminder": true,
+                            "RequestContact": true,
+                            "RequestFriendship": true,
+                            "RequestToJoinGroup": true
+                        }
+                    }'
             WHERE member_id = r;
             end loop;
     end;

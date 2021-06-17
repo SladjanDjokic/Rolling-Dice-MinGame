@@ -24,7 +24,7 @@ from app.resources.member import MemberRegisterResource, MemberSearchResource, \
 from app.resources.verification import Verification
 from app.resources.verifycell import VerifyCell
 from app.resources.promo_codes import PromoCodes
-from app.resources.invite import MemberInviteResource, ValidInviteResource
+from app.resources.invite import MemberInviteContactResource, MemberInviteResource, ValidInviteResource
 from app.resources.login import MemberLoginResource
 from app.resources.forgot_password import MemberForgotPasswordResource
 from app.resources.reset_password import MemberResetPasswordResource
@@ -35,7 +35,7 @@ from app.resources.file_download import FileDownloadResource
 from app.resources.file_sharing import MemberFileCloud, MemberFileBin, \
     MemberShareFile, GroupFileCloud, GroupFileBin, FileGroupResource
 from app.resources.group import MemberGroupResource, GroupMembershipResource, GroupDetailResource, \
-    GroupMemberInviteResource, GroupMembersResource, MemberGroupSecurity, GroupMemberAccept, \
+    GroupMembersResource, MemberGroupSecurity, GroupMemberAccept, \
     GroupActivityDriveResource, GroupActivityCalendarResource
 from app.resources.system import SystemActivityResource
 from app.resources.system import SystemActivityUsersResource
@@ -200,7 +200,6 @@ def _setup_routes(app):
     app.add_route("/member/change-password", MemberChangePasswordResource())
     app.add_route(
         "/member/{member_id:int}/logout/{session_id:uuid}", MemberLogoutResource())
-    app.add_route("/member/invite", MemberInviteResource())
     app.add_route("/member/info/{member_id}", MemberInfoByIdResource())
     app.add_route("/member/info", MemberInfoResource())
     app.add_route("/member/info/location", MemberLocationResource())
@@ -208,6 +207,9 @@ def _setup_routes(app):
     app.add_route("/member/setting", member_setting_resource)
     app.add_route("/member/payment-setting",
                   member_setting_resource, suffix="payment")
+
+    app.add_route("/member/invite/contact", MemberInviteContactResource())
+    app.add_route("/member/invite", MemberInviteResource())
     app.add_route("/member/invite/{invite_key:uuid}", MemberInviteResource())
     app.add_route("/member/register/{invite_key:uuid}", MemberRegisterResource())  # noqa: E501
     app.add_route("/member/register", MemberRegisterResource())  # noqa: E501
@@ -267,7 +269,7 @@ def _setup_routes(app):
         "/group/activity/calendar/{group_id}", GroupActivityCalendarResource())
     app.add_route(
         "/group/activity/drive/{group_id}", GroupActivityDriveResource())
-    app.add_route("/member/group/invite", GroupMemberInviteResource())
+    # app.add_route("/member/group/invite", GroupMemberInviteResource())
     app.add_route(
         "/member/group/membership/request/{group_id}", GroupMemberAccept())
     app.add_route("/member/group-members", GroupMembersResource())

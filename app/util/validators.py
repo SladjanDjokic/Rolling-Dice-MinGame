@@ -42,3 +42,11 @@ def receiver_dict_validator(rec, required=True):
         "amera": rec["amera"] if rec["amera"] else [],
         "external": rec["external"] if rec["external"] else [],
     }
+
+def is_integer(n):
+    try:
+        float(n)
+    except ValueError:
+        return False
+    else:
+        return float(n).is_integer()

@@ -1,32 +1,16 @@
-from app.resources.invite import MemberInviteResource
-import pdb
-import uuid
 import app.util.json as json
 from app.util.auth import check_session
 import logging
-from pprint import pformat
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
-from urllib.parse import urljoin
 
 import app.util.request as request
-from app.util.session import get_session_cookie, validate_session
 from app.config import settings
-import app.util.email as sendmail
 
 from app.da.file_sharing import FileStorageDA
 from app.da.activity import ActivityDA
-from app.da.group import GroupDA, GroupMembershipDA, GroupMemberInviteDA
-from app.da.file_sharing import FileTreeDA
+from app.da.group import GroupDA, GroupMembershipDA
 from app.da.member import MemberDA
-from app.exceptions.group import GroupExists, MemberNotFound, MemberExists, GroupNotFound
-from app.exceptions.invite import InviteExistsError, InviteDataMissingError,\
-    InviteKeyMissing, InviteNotFound, InviteExists,\
-    InviteExpired, InviteDataMissing, InviteInvalidInviterError,\
-    InviteInvalidInviter, InviteEmailSystemFailure
+from app.exceptions.group import GroupExists, MemberNotFound, MemberExists
 from app.exceptions.member import MemberExists
-from app.exceptions.session import ForbiddenSession
-from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 
 logger = logging.getLogger(__name__)
 
@@ -121,56 +105,56 @@ class MemberGroupResource(object):
             "success": True
         }, default_parser=json.parser)
 
-    def bulk_create_invite(self, inviter_member_id, group_id, members, req):
+    # def bulk_create_invite(self, inviter_member_id, group_id, members, req):
 
-        expiration = datetime.now() + relativedelta(months=+1)
+    #     expiration = datetime.now() + relativedelta(months=+1)
 
-        for member_id in members:
+    #     for member_id in members:
 
-            invite_key = uuid.uuid4().hex
+    #         invite_key = uuid.uuid4().hex
 
-            member = MemberDA.get_member(member_id)
-            member_contact = MemberDA.get_member_contact(member_id)
-            member_location = MemberDA.get_member_location(member_id)
+    #         member = MemberDA.get_member(member_id)
+    #         member_contact = MemberDA.get_member_contact(member_id)
+    #         member_location = MemberDA.get_member_location(member_id)
 
-            if member is None:
-                continue
+    #         if member is None:
+    #             continue
 
-            invite_params = {
-                "registered_member_id": member_id,
-                "email": member["email"],
-                "first_name": member["first_name"],
-                "last_name": member["last_name"],
-                "inviter_member_id": inviter_member_id,
-                "invite_key": invite_key,
-                "group_id": group_id,
-                "country": member_location["country"] if member_location else None,
-                "phone_number": member_contact["phone_number"] if member_contact else None,
-                "expiration": expiration
-            }
-            try:
-                invite_id = GroupMemberInviteDA().create_invite(**invite_params)
-                register_url = settings.get(
-                    "web.member_invite_register_url"
-                ).format(invite_key)
+    #         invite_params = {
+    #             "registered_member_id": member_id,
+    #             "email": member["email"],
+    #             "first_name": member["first_name"],
+    #             "last_name": member["last_name"],
+    #             "inviter_member_id": inviter_member_id,
+    #             "invite_key": invite_key,
+    #             "group_id": group_id,
+    #             "country": member_location["country"] if member_location else None,
+    #             "phone_number": member_contact["phone_number"] if member_contact else None,
+    #             "expiration": expiration
+    #         }
+    #         try:
+    #             invite_id = MemberInviteContactDA().create_invite(**invite_params)
+    #             register_url = settings.get(
+    #                 "web.member_invite_register_url"
+    #             ).format(invite_key)
 
-                register_url = urljoin(request.get_url_base(req), register_url)
+    #             register_url = urljoin(request.get_url_base(req), register_url)
 
-                # GroupMemberInviteResource._send_email(
-                #     email=email,
-                #     first_name=first_name,
-                #     invite_key=invite_key,
-                #     register_url=register_url
-                # )
+    #             # GroupMemberInviteResource._send_email(
+    #             #     email=email,
+    #             #     first_name=first_name,
+    #             #     invite_key=invite_key,
+    #             #     register_url=register_url
+    #             # )
 
-            except sendmail.EmailAuthError:
-                continue
-            except InviteExistsError:
-                continue
-            except InviteDataMissingError:
-                continue
-            except InviteInvalidInviterError:
-                continue
+    #         except sendmail.EmailAuthError:
+    #             continue
+    #         except InviteExistsError:
+    #             continue
+    #         except InviteDataMissingError:
+    #             continue
+    #         except InviteInvalidInviterError:
+    #             continue
 
     @check_session
     def on_delete(self, req, resp):
@@ -338,101 +322,101 @@ class GroupMembershipResource(object):
         }, default_parser=json.parser)
 
 
-class GroupMemberInviteResource(MemberInviteResource):
+# class GroupMemberInviteResource(MemberInviteResource):
 
-    def __init__(self):
-        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.group_non_member_invite'),
-                                    "topic": settings.get('kafka.topics.member')
-                                    }
-                           }
+#     def __init__(self):
+#         self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.group_non_member_invite'),
+#                                     "topic": settings.get('kafka.topics.member')
+#                                     }
+#                            }
 
-    def on_post(self, req, resp):
+#     def on_post(self, req, resp):
 
-        logger.debug("Content-Type: {}".format(req.content_type))
-        logger.debug("Accepts: {}".format(req.accept))
+#         logger.debug("Content-Type: {}".format(req.content_type))
+#         logger.debug("Accepts: {}".format(req.accept))
 
-        session_id = get_session_cookie(req)
-        session = validate_session(session_id)
-        inviter_member_id = session["member_id"]
+#         session_id = get_session_cookie(req)
+#         session = validate_session(session_id)
+#         inviter_member_id = session["member_id"]
 
-        (email, first_name, last_name, group_id,
-            country, country_code, phone_number, role, confirm_phone_required,
-            company_id, company_name) = request.get_json_or_form(
-            "groupMemberEmail", "firstName", "lastName", "groupId",
-            "country", "countryCode", "phoneNumber", "role", "confirmPhoneRequired",
-            "company_id", "company_name", req=req
-        )
-        if not country_code and is_integer(country):
-            country_code = country
-            country = None
+#         (email, first_name, last_name, group_id,
+#             country, country_code, phone_number, role, confirm_phone_required,
+#             company_id, company_name) = request.get_json_or_form(
+#             "groupMemberEmail", "firstName", "lastName", "groupId",
+#             "country", "countryCode", "phoneNumber", "role", "confirmPhoneRequired",
+#             "company_id", "company_name", req=req
+#         )
+#         if not country_code and is_integer(country):
+#             country_code = country
+#             country = None
 
-        expiration = datetime.now() + relativedelta(months=+1)
+#         expiration = datetime.now() + relativedelta(months=+1)
 
-        invite_key = uuid.uuid4().hex
-        member = MemberDA.get_member_by_email(email=email)
-        if member:
-            raise MemberExists(email)
+#         invite_key = uuid.uuid4().hex
+#         member = MemberDA.get_member_by_email(email=email)
+#         if member:
+#             raise MemberExists(email)
 
-        invite_params = {
-            "email": email,
-            "first_name": first_name,
-            "last_name": last_name,
-            "inviter_member_id": inviter_member_id,
-            "invite_key": invite_key,
-            "group_id": group_id,
-            "country": country,
-            "country_code": country_code,
-            "phone_number": phone_number,
-            "expiration": expiration,
-            "role": role,
-            "confirm_phone_required": confirm_phone_required,
-            "company_id": company_id if company_id!='null' else None,
-            "company_name": company_name if company_name!='null' else None
-        }
+#         invite_params = {
+#             "email": email,
+#             "first_name": first_name,
+#             "last_name": last_name,
+#             "inviter_member_id": inviter_member_id,
+#             "invite_key": invite_key,
+#             "group_id": group_id,
+#             "country": country,
+#             "country_code": country_code,
+#             "phone_number": phone_number,
+#             "expiration": expiration,
+#             "role": role,
+#             "confirm_phone_required": confirm_phone_required,
+#             "company_id": company_id if company_id!='null' else None,
+#             "company_name": company_name if company_name!='null' else None
+#         }
 
-        try:
-            invite_id = GroupMemberInviteDA().create_invite(**invite_params)
+#         try:
+#             invite_id = MemberInviteContactDA().create_invite(**invite_params)
 
-            register_url = self._get_register_url(req, invite_key)
+#             register_url = self._get_register_url(req, invite_key)
 
-            self._send_email(
-                email=email,
-                first_name=first_name,
-                invite_key=invite_key,
-                register_url=register_url
-            )
+#             self._send_email(
+#                 email=email,
+#                 first_name=first_name,
+#                 invite_key=invite_key,
+#                 register_url=register_url
+#             )
 
-            resp.body = json.dumps({
-                "data": invite_id,
-                "description": "Invite has been sent successfully!",
-                "success": True
-            })
-        except sendmail.EmailAuthError:
-            logger.exception('Deleting invite due to unable \
-                             to auth to email system')
-            GroupMemberInviteDA.delete_invite(invite_key)
-            raise InviteEmailSystemFailure(invite_key)
-        except InviteExistsError:
-            raise InviteExists(email)
-        except InviteDataMissingError:
-            del invite_params["invite_key"]
-            del invite_params["expiration"]
-            raise InviteDataMissing(invite_params)
-        except InviteInvalidInviterError:
-            raise InviteInvalidInviter(inviter_member_id)
+#             resp.body = json.dumps({
+#                 "data": invite_id,
+#                 "description": "Invite has been sent successfully!",
+#                 "success": True
+#             })
+#         except sendmail.EmailAuthError:
+#             logger.exception('Deleting invite due to unable \
+#                              to auth to email system')
+#             MemberInviteContactDA.delete_invite(invite_key)
+#             raise InviteEmailSystemFailure(invite_key)
+#         except InviteExistsError:
+#             raise InviteExists(email)
+#         except InviteDataMissingError:
+#             del invite_params["invite_key"]
+#             del invite_params["expiration"]
+#             raise InviteDataMissing(invite_params)
+#         except InviteInvalidInviterError:
+#             raise InviteInvalidInviter(inviter_member_id)
 
-    @staticmethod
-    def _send_email(invite_key, email, first_name, register_url):
+#     @staticmethod
+#     def _send_email(invite_key, email, first_name, register_url):
 
-        sendmail.send_mail(
-            to_email=email,
-            subject="Welcome to AMERA Share",
-            template="welcome",
-            data={
-                "first_name": first_name,
-                "invite_key": invite_key,
-                "register_url": register_url
-            })
+#         sendmail.send_mail(
+#             to_email=email,
+#             subject="Welcome to AMERA Share",
+#             template="welcome",
+#             data={
+#                 "first_name": first_name,
+#                 "invite_key": invite_key,
+#                 "register_url": register_url
+#             })
 
 
 class GroupMemberAccept(object):

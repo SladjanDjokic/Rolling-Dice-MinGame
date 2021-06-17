@@ -445,6 +445,7 @@ class MemberDA(object):
                  commit=True):
 
         page_settings = settings.get('page_settings')
+        notification_settings = settings.get('notification_settings')
 
         # TODO: CHANGE THIS LATER TO ENCRYPT IN APP
         query_member = ("""
@@ -470,8 +471,8 @@ class MemberDA(object):
         """)
 
         query_member_profile = ("""
-        INSERT INTO member_profile (member_id, profile_picture_storage_id)
-        VALUES (%s, %s)
+        INSERT INTO member_profile (member_id, profile_picture_storage_id, notification_settings)
+        VALUES (%s, %s, %s)
         """)
 
         query_member_page_settings = ("""
@@ -513,7 +514,7 @@ class MemberDA(object):
                                params_cell_member_contact_2)
 
         # When registering a new member, the uploaded photo is set as both profile and security picture. Profile picture can be changed later on.
-        params_member_profile = (id, profile_picture_storage_id)
+        params_member_profile = (id, profile_picture_storage_id, json.dumps(notification_settings))
         cls.source.execute(query_member_profile, params_member_profile)
 
         for key in page_settings:

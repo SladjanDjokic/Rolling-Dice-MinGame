@@ -243,3 +243,46 @@ distance_max = "2.5"
     page_type = "Mail"
     view_type = "table"
     sort_order = [""]
+
+[notification_settings]
+    [notification_settings.email]
+    Contact = false
+    AcceptFriend = false
+    EventReminder = false
+    GroupJoin = false
+    RequestContact = false
+    RequestFriendship = false
+    RequestToJoinGroup = false
+    AmeraMail = false
+    ChatMessage = false
+    Invoice = false
+    Payment = false
+    Message = false
+
+    [notification_settings.sms]
+    Contact = false
+    AcceptFriend = false
+    EventReminder = false
+    GroupJoin = false
+    RequestContact = false
+    RequestFriendship = false
+    RequestToJoinGroup = false
+    AmeraMail = false
+    ChatMessage = false
+    Invoice = false
+    Payment = false
+    Message = false
+
+    [notification_settings.browser]
+    Contact = false
+    AcceptFriend = false
+    EventReminder = false
+    GroupJoin = false
+    RequestContact = false
+    RequestFriendship = false
+    RequestToJoinGroup = false
+    AmeraMail = false
+    ChatMessage = false
+    Invoice = false
+    Payment = false
+    Message = false

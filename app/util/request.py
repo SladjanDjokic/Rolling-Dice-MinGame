@@ -1,7 +1,7 @@
 import logging
 import socket
 from pprint import pformat
-from urllib.parse import urlunsplit
+from urllib.parse import urlunsplit, urljoin
 from falcon import uri
 
 logger = logging.getLogger(__name__)
@@ -142,3 +142,14 @@ def get_request_client_data(req):
     return client_ip, gateway_ip, original_url, query_string,\
         client_name, gateway_name, server_name1, server_ip1,\
         server_name2, server_ip2
+
+def _get_register_url(req, invite_key):
+    request_domain = req.env.get('HTTP_ORIGIN', req.forwarded_host)
+    register_domain = request_domain
+    logger.debug(f"REGISTER DOMAIN: {register_domain}")
+
+    register_url = "/registration/{}".format(invite_key)
+    register_url = urljoin(register_domain, register_url)
+    return register_url
+
+    

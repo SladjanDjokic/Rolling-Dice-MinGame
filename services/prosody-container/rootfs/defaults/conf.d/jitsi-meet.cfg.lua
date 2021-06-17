@@ -154,11 +154,15 @@ Component "{{ .Env.XMPP_INTERNAL_MUC_DOMAIN }}" "muc"
     }
     muc_room_locking = false
     muc_room_default_public_jids = true
+    restrict_room_creation = false
 
 Component "{{ .Env.XMPP_MUC_DOMAIN }}" "muc"
     storage = "memory"
     modules_enabled = {
         "muc_meeting_id";
+        "muc_domain_mapper";
+        "vcard";
+        
         {{ if .Env.XMPP_MUC_MODULES }}
         "{{ join "\";\n\"" (splitList "," .Env.XMPP_MUC_MODULES) }}";
         {{ end }}
