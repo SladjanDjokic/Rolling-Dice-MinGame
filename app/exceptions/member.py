@@ -19,6 +19,14 @@ class ForgotDuplicateDataError (Exception):
     pass
 
 
+class UsernameDuplicateDataError (Exception):
+    pass
+
+
+class EmailDuplicateDataError (Exception):
+    pass
+
+
 class MemberExistsError(Exception):
     pass
 
@@ -49,6 +57,42 @@ class MemberExists(falcon.HTTPConflict):
     def __init__(self, email):
         description = (
             'Member already exists'
+        )
+        super().__init__(description=description)
+        self._email = email
+
+    def to_dict(self, obj_type=dict):
+        result = super().to_dict(obj_type)
+        result["success"] = False
+        result["exists"] = True
+        result["email"] = self._email
+        return result
+
+
+# HTTP Response Error to throw when an invite is duplicate
+class UsernameExists(falcon.HTTPConflict):
+
+    def __init__(self, username):
+        description = (
+            'Username already exists'
+        )
+        super().__init__(description=description)
+        self._username = username
+
+    def to_dict(self, obj_type=dict):
+        result = super().to_dict(obj_type)
+        result["success"] = False
+        result["exists"] = True
+        result["username"] = self._username
+        return result
+
+
+# HTTP Response Error to throw when an invite is duplicate
+class EmailExists(falcon.HTTPConflict):
+
+    def __init__(self, email):
+        description = (
+            'Email already exists'
         )
         super().__init__(description=description)
         self._email = email

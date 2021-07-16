@@ -1,3 +1,4 @@
+from app.util.auth import check_session
 import logging
 import falcon
 import app.util.json as json
@@ -21,6 +22,7 @@ class MemberChangePasswordResource(object):
                                     },
                            }
 
+    @check_session
     def on_post(self, req, resp):
         (current_password, new_password) = request.get_json_or_form(
             "currentPassword", "newPassword", req=req)
@@ -33,22 +35,23 @@ class MemberChangePasswordResource(object):
         if new_password == current_password:
             raise PasswordsConflict()
 
-        try:
-            session_id = get_session_cookie(req)
-            session = validate_session(session_id)
-            username = session["username"]
-        except Exception as e:
-            raise SessionExistsError(e)
+        member_id = req.context.auth["session"]["member_id"]
+
+        member = MemberDA.get_member(member_id)
+        if not member:
+            raise MemberNotFound(member_id)
+
+        username = member.get('username')
         member = SessionDA.auth(username, current_password)
         if not member:
-            raise MemberNotFound(member)
-        
+            raise MemberNotFound(username)
+
         if member['status'] == 'disabled':
             raise MemberDisabled()
-        
+
         member_id = member['id']
         MemberDA.update_member_password(member_id, new_password)
 
         resp.body = json.dumps({
-                "success": True
-            })
+          "success": True
+        })

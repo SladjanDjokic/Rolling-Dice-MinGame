@@ -9,7 +9,7 @@ import falcon
 import requests
 from ipregistry import IpregistryClient, InMemoryCache, ApiError
 
-from app import settings
+from app.config import settings
 from app.da import FileTreeDA
 from app.da.member import MemberDA
 from app.da.session import SessionDA

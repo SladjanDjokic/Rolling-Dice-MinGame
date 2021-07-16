@@ -1,14 +1,16 @@
 import logging
 import socket
 from pprint import pformat
-from urllib.parse import urlunsplit, urljoin
+from urllib.parse import urlunsplit, urljoin, urlsplit
 from falcon import uri
+from app.config import settings
+
 
 logger = logging.getLogger(__name__)
 
 
 # This is a utility function, possibly a hack to support web forms
-# And support JSON Api's
+# And support JSON API's
 # does not support extra parameters to `get_param`
 def get_json_or_form(*params, req):
     results = []
@@ -45,6 +47,15 @@ def get_request_host(req):
             'HTTP_ORIGIN', req.env.get(
                 'HTTP_X_FORWARDED_HOST_ORIGINAL',
                 req.forwarded_host or req.host))
+    # else:
+    #     try:
+    #         request_host = _get_request_domain(req)[1][1]
+    #         if request_host:
+    #             host = request_host
+    #     except:
+    #         logger.debug(f'_get_request_domain unexpected response')
+    #         logger.debug(_get_request_domain(req))
+
     return host
 
 
@@ -52,6 +63,15 @@ def get_request_scheme(req):
     scheme = 'https'
     if req.forwarded_scheme:
         scheme = req.forwarded_scheme
+
+    # try:
+    #     request_scheme = _get_request_domain(req)[1][0]
+    #     if request_scheme:
+    #         scheme = request_scheme
+    # except:
+    #     logger.debug(f'_get_request_domain unexpected response')
+    #     logger.debug(_get_request_domain(req))
+
     return scheme
 
 
@@ -80,16 +100,19 @@ def get_request_client_data(req):
     # - Forwarded
     # - X-Forwarded-For
     # - X-Real-IP
+    logger.debug(f"Headers:")
+    logger.debug(req.headers)
     logger.debug(f"Access Route: {req.access_route}")
     logger.debug(f"Remote Addr: {req.remote_addr}")
+    logger.debug(f"Forwarded header: {req.forwarded}")
 
     access_route = iter(req.access_route)
 
     # https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For
     # We know that the very first value of access_route is the actual client IP
     # any further IP are proxies, we only care about the outer most proxy
-    client_ip = next(access_route, None)
-    gateway_ip = next(access_route, None)
+    client_ip = next(access_route, "")
+    gateway_ip = next(access_route, "")
 
     # If we do not have a Client IP, we have no access routes
     # Therefore, access_route should default to `remote_addr`
@@ -143,13 +166,16 @@ def get_request_client_data(req):
         client_name, gateway_name, server_name1, server_ip1,\
         server_name2, server_ip2
 
-def _get_register_url(req, invite_key):
+def _get_request_domain(req):
     request_domain = req.env.get('HTTP_ORIGIN', req.forwarded_host)
+    return request_domain, urlsplit(request_domain)
+
+
+def _get_register_url(req, invite_key):
+    request_domain = _get_request_domain(req)[0]
     register_domain = request_domain
     logger.debug(f"REGISTER DOMAIN: {register_domain}")
 
     register_url = "/registration/{}".format(invite_key)
     register_url = urljoin(register_domain, register_url)
     return register_url
-
-    

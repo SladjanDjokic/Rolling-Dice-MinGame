@@ -1,5 +1,6 @@
 from app.exceptions.data import DuplicateKeyError
 import logging
+import falcon
 from datetime import timezone, datetime
 from uuid import UUID
 
@@ -16,7 +17,7 @@ from app.da.member import MemberInfoDA
 from app.da.location import LocationDA
 from app.da.company import CompanyDA
 from app.util.session import get_session_cookie, validate_session
-from app.exceptions.member import MemberExistsError, MemberNotFound, MemberDataMissing, MemberExists, MemberContactExists, MemberPasswordMismatch, MemberRegistrationServerError
+from app.exceptions.member import EmailDuplicateDataError, EmailExists, MemberExistsError, MemberNotFound, MemberDataMissing, MemberExists, MemberContactExists, MemberPasswordMismatch, MemberRegistrationServerError, UsernameDuplicateDataError, UsernameExists
 from app.exceptions.invite import InviteNotFound, InviteExpired
 from app.exceptions.session import InvalidSessionError, UnauthorizedSession
 from app.da.member import MemberContactDA, MemberVideoMailDA
@@ -68,6 +69,27 @@ class MemberSearchResource(object):
         except InvalidSessionError as err:
             raise UnauthorizedSession() from err
 
+    def on_get_email(req, resp, email):
+        try:
+            MemberDA.email_exists(email)
+            resp.body = json.dumps({
+                "unique": True,
+                "success": True
+            })
+
+        except EmailDuplicateDataError as err:
+            raise EmailExists(email)
+
+    def on_get_username(req, resp, username):
+        try:
+            MemberDA.username_exists(username)
+            resp.body = json.dumps({
+                "unique": True,
+                "success": True
+            })
+
+        except UsernameDuplicateDataError as err:
+            raise UsernameExists(username)
 
 class MemberGroupSearchResource(object):
 
@@ -456,6 +478,8 @@ class ContactMembersResource(object):
         page_number = req.get_param_as_int('pageNumber')
         sort_params = req.get_param('sort')
         filter_params = req.get_param('filter')
+        if search_key == 'null' or search_key == 'undefined':
+            search_key = None
 
         result = MemberContactDA.get_members(
             member_id, sort_params, filter_params,
@@ -600,6 +624,8 @@ class MemberContactResource(object):
         page_number = req.get_param_as_int('pageNumber')
         sort_params = req.get_param('sort')
         filter_params = req.get_param('filter')
+        if search_key == 'null' or search_key == 'undefined':
+            search_key = ''
 
         result = MemberContactDA.get_member_contacts(
             member_id, sort_params, filter_params,
@@ -891,19 +917,42 @@ class MemberLocationResource(object):
         (locations,) = request.get_json_or_form("locations", req=req)
         if not locations:
             locations = []
-        success = MemberInfoDA().handle_member_locations(locations, member_id)
+        id = MemberInfoDA().handle_member_locations(locations, member_id)
         member_info = MemberInfoDA().get_member_info(member_id)
 
-        if success:
+        if id:
             resp.body = json.dumps({
                 "success": True,
                 "data": member_info,
+                "id": id,
                 "description": "Locations updated successfully"
             }, default_parser=json.parser)
         else:
             resp.body = json.dumps({
                 "success": False,
-                "description": 'Soething went wrong with updating locations',
+                "description": 'Something went wrong with updating locations',
+
+            }, default_parser=json.parser)
+
+    @check_session
+    def on_delete(self, req, resp):
+        try:
+            member_id = req.context.auth["session"]["member_id"]
+            location_id = req.get_param('id')
+
+            MemberInfoDA().delete_member_location(member_id, location_id)
+            member_info = MemberInfoDA().get_member_info(member_id)
+
+            resp.body = json.dumps({
+                "success": True,
+                "data": member_info,
+                "description": "Location deleted successfully"
+            }, default_parser=json.parser)
+        
+        except Exception as e:
+            resp.body = json.dumps({
+                "success": False,
+                "description": 'Something went wrong with deleting location',
 
             }, default_parser=json.parser)
 
@@ -961,6 +1010,28 @@ class MemberSettingResource(object):
                 "data": member_info,
                 "success": True
             }, default_parser=json.parser)
+
+    @check_session
+    def on_put_username(self, req, resp):
+        member_id = req.context.auth["session"]["member_id"]
+        (username, ) = request.get_json_or_form(
+            "username", req=req)
+
+        try:
+            MemberSettingDA().update_username(member_id, username)
+            resp.body = json.dumps({
+                "success": True
+            }, default_parser=json.parser)
+        except UsernameDuplicateDataError as err:
+            raise UsernameExists(username)
+        except Exception as err:
+            logger.exception(err)
+            resp.status = falcon.HTTP_INTERNAL_SERVER_ERROR
+            resp.body = json.dumps({
+                "success": False,
+                "description": "Something went wrong"
+            }, default_parser=json.parser)
+
 
 
 class MemberInfoByIdResource(object):

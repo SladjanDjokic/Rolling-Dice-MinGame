@@ -10,8 +10,8 @@ import app.util.request as request
 from app.da.member import MemberDA
 from app.exceptions.member import MemberNotFound, ForgotKeyConflict, ForgotPassEmailSystemFailure
 from app.config import settings
-from urllib.parse import urljoin
 import app.util.email as sendmail
+from app.util.request import build_url_from_request
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,10 @@ class MemberForgotPasswordResource(object):
                 "web.member_forgot_password_url"
             ).format(forgot_key)
 
-        forgot_url = urljoin("https://amerashare.com", forgot_url)
+        logger.debug(f'forgot_url: {forgot_url}')
+
+        forgot_url = build_url_from_request(req, forgot_url)
+        logger.debug(f'forgot_url: {forgot_url}')
         result['forgot_url'] = forgot_url
         try:
             self._send_email(

@@ -1,3 +1,4 @@
+from app.util.auth import check_session_administrator
 import logging
 import os
 import falcon
@@ -81,22 +82,22 @@ from app.resources.bug_report import BugReportResource, BugReportUsersResource
 
 from app.resources.admin import AdminMemberResource
 from app.resources.stream import StreamResource, StreamCategoryResource, StreamTypeResource
-from app.util.request import get_request_host
+from app.util.request import build_url_from_request, get_request_host, _get_request_domain
 from app.util.config import setup_vyper
 from app.util.error import error_handler
 from app.util.logging import setup_logging
 # import app.util.stored_procedure as stored_procedure
 
-try:
-    imsecure_spec = importlib.util.find_spec(
-        ".imsecure.image_secure", package="imsecure")
-except ModuleNotFoundError:
-    imsecure_spec = None
+# try:
+#     imsecure_spec = importlib.util.find_spec(
+#         ".imsecure.image_secure", package="imsecure")
+# except ModuleNotFoundError:
+#     imsecure_spec = None
 
-imsecure_found = imsecure_spec is not None
+# imsecure_found = imsecure_spec is not None
 
-if imsecure_found:
-    from app.resources.keygen import KeyGenResource, KeyGenFileUpload
+# if imsecure_found:
+from app.resources.keygen import KeyGenResource, KeyGenFileUpload
 
 # from app.util.auth import validate_token
 
@@ -130,7 +131,7 @@ def configure(**overrides):
         max_size = 2**10 * 2**10 * 2**10 * 1
         # print(f"Max size: {max_size}")
         # This sets the max body size to 549 GB
-        meinheld.set_max_content_length(max_size)
+        meinheld.set_max_content_length(max_size)  # type: ignore
 
 
 def create_app():
@@ -165,6 +166,7 @@ class HealthResource:
 
 
 class HeadersResource:
+    @check_session_administrator
     def on_get(self, req, resp):
         data = dict(req.env)
         data.pop('wsgi.file_wrapper', None)
@@ -175,6 +177,9 @@ class HeadersResource:
         data['domain'] = get_request_host(req)
         data['req.host'] = req.host
         data['req.forwarded'] = req.forwarded_host
+        data['req.forwarded_scheme'] = req.forwarded_scheme
+        data['build_url_route'] = build_url_from_request(req)
+        data['request_domain'] = _get_request_domain(req)
         logger.debug(data)
         resp.media = data
 
@@ -184,15 +189,18 @@ def start():
 
 
 def _setup_routes(app):
-    logger.debug(
-        f"Spec checker: {imsecure_found} {imsecure_spec} {imsecure_spec.name if imsecure_spec else ''}")
+    # logger.debug(
+        # f"Spec checker: {imsecure_found} {imsecure_spec} {imsecure_spec.name if imsecure_spec else ''}")
 
     app.add_route('/healthz', HealthResource())
     app.add_route('/healthz/headers', HeadersResource())
 
-    if imsecure_found:
-        app.add_route('/demo/image-upload', KeyGenFileUpload())
-        app.add_route("/demo/keygen", KeyGenResource())
+    key_gen_resource = KeyGenResource()
+    # if imsecure_found:
+    app.add_route('/demo/image-upload', KeyGenFileUpload())
+    app.add_route("/demo/keygen", key_gen_resource)
+    app.add_route("/keygen/file", key_gen_resource, suffix="file")
+    app.add_route("/keygen/storage", key_gen_resource, suffix="storage")
     app.add_route("/member/login", MemberLoginResource())
     app.add_route("/member/forgot", MemberForgotPasswordResource())
     app.add_route(
@@ -207,6 +215,7 @@ def _setup_routes(app):
     app.add_route("/member/setting", member_setting_resource)
     app.add_route("/member/payment-setting",
                   member_setting_resource, suffix="payment")
+    app.add_route("/member/change-username", member_setting_resource, suffix="username")
 
     app.add_route("/member/invite/contact", MemberInviteContactResource())
     app.add_route("/member/invite", MemberInviteResource())
@@ -233,7 +242,10 @@ def _setup_routes(app):
     # This route is commneted out to prevent any registrations someone may be sniffing out
     # This will be enabled later on
     # app.add_route("/member/register", MemberRegistrationResource())  # noqa: E501
-    app.add_route("/member/search", MemberSearchResource())
+    member_search_resource = MemberSearchResource
+    app.add_route("/member/search", member_search_resource)
+    app.add_route("/member/search/username/{username}", member_search_resource, suffix="username")
+    app.add_route("/member/search/email/{email}", member_search_resource, suffix="email")
     app.add_route("/member/group/search", MemberGroupSearchResource())
     app.add_route(
         "/member/contact/security/{contact_member_id}", MemberContactSecurity())

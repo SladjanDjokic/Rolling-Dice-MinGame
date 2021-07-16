@@ -116,7 +116,7 @@ class CompanyDA(object):
                     location.map_vendor,
                     location.map_link,
                     location.place_id,
-                    location.name,
+                    location.name AS location_name,
                     location.raw_response,
                     COALESCE(company.country_code_id, location.country_code_id) AS country_code_id,
                     country_code.name as country_name,

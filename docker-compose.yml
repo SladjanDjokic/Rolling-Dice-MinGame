@@ -69,6 +69,8 @@ services:
           - amera-web-notifications
           - amera-signaling
           - amera-eventserver
+          - amera-prosody
+          - amera-jitsi-web
           - host.docker.internal
     volumes:
       - ../web-api/config/local/nginx.conf:/etc/nginx/nginx.conf:ro
@@ -81,15 +83,15 @@ services:
         condition: service_healthy
       amera-web-api:
         condition: service_healthy
+      # amera-eventserver:
+      #   condition: service_healthy
+      # amera-web-auth:
+      #   condition: service_healthy
     healthcheck:
       test: ["CMD", "nc", "-zv", "localhost", "9000"]
       interval: "30s"
       timeout: "1s"
       retries: 1000
-      # amera-eventserver:
-      #   condition: service_healthy
-      # amera-web-auth:
-      #   condition: service_healthy
 
   # amera-web-auth:
   #   container_name: amera-web-auth
@@ -462,20 +464,22 @@ services:
       - ../web-api/datasource/postgresql/schema-updates-2021-04-22_drop_company_department_status.sql:/docker-entrypoint-initdb.d/t-4-schema-updates-2021-04-22-22_drop_company_department_status.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-04-22_member_contact_2.sql:/docker-entrypoint-initdb.d/t-5-schema-updates-2021-04-22_member_contact_2.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-04-23_company.sql:/docker-entrypoint-initdb.d/t-6-company.sql
-      - ../web-api/datasource/postgresql/twilio_verification.sql:/docker-entrypoint-initdb.d/u-twilio-verification.sql
-      - ../web-api/datasource/postgresql/locations.sql:/docker-entrypoint-initdb.d/u-0-locations.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-04-26_locations_member_company.sql:/docker-entrypoint-initdb.d/u-1-company-member-location.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-04-30_member_contact_2-outgoing.sql:/docker-entrypoint-initdb.d/u-2-member_contact_2-outgoing.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-04-30_new_member_location_types.sql:/docker-entrypoint-initdb.d/u-3-new_location_types.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-05-04_rename_location_types.sql:/docker-entrypoint-initdb.d/u-4-new_location_types_renamed.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-05-04_event_locations.sql:/docker-entrypoint-initdb.d/u-5-event-locations.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-04-30_invite_company.sql:/docker-entrypoint-initdb.d/u-6-invite_company.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-05-20_location-file_storage_id.sql:/docker-entrypoint-initdb.d/u-7-location-file_storage_id.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-05-19_invite_company.sql:/docker-entrypoint-initdb.d/u-7-invite_company.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-05-27_location-name.sql:/docker-entrypoint-initdb.d/u-8-location-name.sql
-      - ../web-api/datasource/postgresql/schema-updates-2021-05-25_new_location_types.sql:/docker-entrypoint-initdb.d/u-9-location_types.sql
+      - ../web-api/datasource/postgresql/twilio_verification.sql:/docker-entrypoint-initdb.d/u-00-twilio-verification.sql
+      - ../web-api/datasource/postgresql/locations.sql:/docker-entrypoint-initdb.d/u-00-locations.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-04-26_locations_member_company.sql:/docker-entrypoint-initdb.d/u-01-company-member-location.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-04-30_member_contact_2-outgoing.sql:/docker-entrypoint-initdb.d/u-02-member_contact_2-outgoing.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-04-30_new_member_location_types.sql:/docker-entrypoint-initdb.d/u-03-new_location_types.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-05-04_rename_location_types.sql:/docker-entrypoint-initdb.d/u-04-new_location_types_renamed.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-05-04_event_locations.sql:/docker-entrypoint-initdb.d/u-05-event-locations.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-04-30_invite_company.sql:/docker-entrypoint-initdb.d/u-06-invite_company.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-05-20_location-file_storage_id.sql:/docker-entrypoint-initdb.d/u-07-location-file_storage_id.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-05-19_invite_company.sql:/docker-entrypoint-initdb.d/u-07-invite_company.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-05-27_location-name.sql:/docker-entrypoint-initdb.d/u-08-location-name.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-05-25_new_location_types.sql:/docker-entrypoint-initdb.d/u-09-location_types.sql
       - ../web-api/datasource/postgresql/schema-updates-2021-05-28_member_location.sql:/docker-entrypoint-initdb.d/u-10-member_locations.sql
-
+      - ../web-api/datasource/postgresql/schema-updates-2021-05-24_bug_report_member_id.sql:/docker-entrypoint-initdb.d/u-11-bug_report.sql
+      - ../web-api/datasource/postgresql/schema-updates-2021-06-22_member-session_column-updates.sql:/docker-entrypoint-initdb.d/u-12-member-session_updates.sql
+      
       # Test data
       - ../web-api/datasource/postgresql/test-country.dev.sql:/docker-entrypoint-initdb.d/z-1-test-country.sql
       - ../web-api/datasource/postgresql/test-member.dev.sql:/docker-entrypoint-initdb.d/z-2-test-member.sql
@@ -507,78 +511,77 @@ services:
 
     # XMPP server
   amera-prosody:
-      container_name: amera-prosody
-      image: jitsi/prosody:latest
-      build:
-        context: services/prosody-container/
-      restart: always
-      expose:
-          - '5222'
-          - '5347'
-          - '5280'
-      ports:
-          - '5280:5280'
-      volumes:
-          - ../web-api/config/prosody/config:/config:Z
-          - ../web-api/config/prosody/prosody-plugins-custom:/prosody-plugins-custom:Z
-      environment:
-          - AUTH_TYPE
-          - ENABLE_AUTH
-          - ENABLE_GUESTS
-          - ENABLE_LOBBY
-          - ENABLE_XMPP_WEBSOCKET=1
-          - GLOBAL_MODULES=
-          - GLOBAL_CONFIG=
-          - LDAP_URL
-          - LDAP_BASE
-          - LDAP_BINDDN
-          - LDAP_BINDPW
-          - LDAP_FILTER
-          - LDAP_AUTH_METHOD
-          - LDAP_VERSION
-          - LDAP_USE_TLS
-          - LDAP_TLS_CIPHERS
-          - LDAP_TLS_CHECK_PEER
-          - LDAP_TLS_CACERT_FILE
-          - LDAP_TLS_CACERT_DIR
-          - LDAP_START_TLS
-          - LOG_LEVEL=debug
-          - XMPP_SERVER=xmpp.share.dev.amera.local
-          - XMPP_DOMAIN=share.dev.amera.local
-          - XMPP_AUTH_DOMAIN=auth.share.dev.amera.local
-          - XMPP_GUEST_DOMAIN=guest.share.dev.amera.local
-          - XMPP_MUC_DOMAIN=muc.share.dev.amera.local
-          - XMPP_INTERNAL_MUC_DOMAIN=internal-muc.share.dev.amera.local
-          - XMPP_CROSS_DOMAIN=true
-          - XMPP_MODULES
-          - XMPP_MUC_MODULES
-          - XMPP_INTERNAL_MUC_MODULES
-          - XMPP_RECORDER_DOMAIN
-          - JICOFO_COMPONENT_SECRET
-          - JICOFO_AUTH_USER
-          - JICOFO_AUTH_PASSWORD=fdsafsdfsa
-          - JVB_AUTH_USER
-          - JVB_AUTH_PASSWORD=dfasfdf
-          - JWT_APP_ID
-          - JWT_APP_SECRET
-          - JWT_ACCEPTED_ISSUERS
-          - JWT_ACCEPTED_AUDIENCES
-          - JWT_ASAP_KEYSERVER
-          - JWT_ALLOW_EMPTY
-          - JWT_AUTH_TYPE
-          - JWT_TOKEN_AUTH_MODULE
-          - LOG_LEVEL
-          - PUBLIC_URL
-          - TZ
-      networks:
-        amera-net:
-          aliases:
-            - jitsi.share.dev.amera.local
-            - auth.jitsi.share.dev.amera.local
-            - xmpp.jitsi.share.dev.amera.local
-            - guest.jitsi.share.dev.amera.local
-            - muc.jitsi.share.dev.amera.local
-            - internal-muc.jitsi.share.dev.amera.local
+    container_name: amera-prosody
+    image: jitsi/prosody:latest
+    build:
+      context: services/prosody-container/
+    restart: always
+    expose:
+        - '5222'
+        - '5347'
+        - '5280'
+    ports:
+        - '5280:5280'
+    volumes:
+        - ../web-api/config/prosody/config:/config:Z
+        - ../web-api/config/prosody/prosody-plugins-custom:/prosody-plugins-custom:Z
+    environment:
+        - AUTH_TYPE
+        - ENABLE_GUESTS
+        - ENABLE_LOBBY=1
+        - ENABLE_XMPP_WEBSOCKET=1
+        - GLOBAL_MODULES=
+        - GLOBAL_CONFIG=
+        - LDAP_URL
+        - LDAP_BASE
+        - LDAP_BINDDN
+        - LDAP_BINDPW
+        - LDAP_FILTER
+        - LDAP_AUTH_METHOD
+        - LDAP_VERSION
+        - LDAP_USE_TLS
+        - LDAP_TLS_CIPHERS
+        - LDAP_TLS_CHECK_PEER
+        - LDAP_TLS_CACERT_FILE
+        - LDAP_TLS_CACERT_DIR
+        - LDAP_START_TLS
+        - LOG_LEVEL=debug
+        - XMPP_SERVER=xmpp.share.dev.amera.local
+        - XMPP_DOMAIN=share.dev.amera.local
+        - XMPP_AUTH_DOMAIN=auth.share.dev.amera.local
+        - XMPP_GUEST_DOMAIN=guest.share.dev.amera.local
+        - XMPP_MUC_DOMAIN=muc.share.dev.amera.local
+        - XMPP_INTERNAL_MUC_DOMAIN=internal-muc.share.dev.amera.local
+        - XMPP_CROSS_DOMAIN=true
+        - XMPP_MODULES
+        - XMPP_MUC_MODULES
+        - XMPP_INTERNAL_MUC_MODULES
+        - XMPP_RECORDER_DOMAIN
+        - JICOFO_COMPONENT_SECRET
+        - JICOFO_AUTH_USER
+        - JICOFO_AUTH_PASSWORD=fdsafsdfsa
+        - JVB_AUTH_USER
+        - JVB_AUTH_PASSWORD=dfasfdf
+        - JWT_APP_ID
+        - JWT_APP_SECRET
+        - JWT_ACCEPTED_ISSUERS
+        - JWT_ACCEPTED_AUDIENCES
+        - JWT_ASAP_KEYSERVER
+        - JWT_ALLOW_EMPTY
+        - JWT_AUTH_TYPE
+        - JWT_TOKEN_AUTH_MODULE
+        - LOG_LEVEL
+        - PUBLIC_URL
+        - TZ
+    networks:
+      amera-net:
+        aliases:
+          - jitsi.share.dev.amera.local
+          - auth.jitsi.share.dev.amera.local
+          - xmpp.jitsi.share.dev.amera.local
+          - guest.jitsi.share.dev.amera.local
+          - muc.jitsi.share.dev.amera.local
+          - internal-muc.jitsi.share.dev.amera.local
 
   amera-web-notifications:
     container_name: amera-web-notifications
@@ -764,10 +767,18 @@ services:
   zookeeper:
     image: "bitnami/zookeeper:latest"
     container_name: zookeeper
+    restart: always
     ports:
       - "2181:2181"
     environment:
+      - ZOO_LOG_LEVEL=TRACE
+      # - ZOO_MY_ID=1
+      # - ZOO_PORT=2181
+      # - ZOO_SERVERS=server.1=zookeeper:2888:3888
       - ALLOW_ANONYMOUS_LOGIN=yes
+    volumes:
+      - ./config/zookeeper/data:/data
+      - ./config/zookeeper/datalog:/datalog
     networks:
       - amera-net
     logging:
@@ -780,39 +791,62 @@ services:
           memory: 256M
         reservations:
           memory: 50M
+    healthcheck:
+      test: ["CMD", "echo", "srvr", "|", "nc", "localhost", "2181"]
+      interval: "30s"
+      timeout: "1s"
+      retries: 1000
 
   kafka:
     image: "bitnami/kafka:latest"
     container_name: kafka
+    restart: always
     ports:
-      - "29092:29092"
+      - "9092:9092"
+      # - "29092:29092"
+    volumes:
+      - ./config/kafka:/bitnami/kafka
     environment:
-      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
       - ALLOW_PLAINTEXT_LISTENER=yes
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
-      - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:29092
-      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:29092
-      - KAFKA_INTER_BROKER_LISTENER_NAME=CLIENT
-    depends_on:
-      - zookeeper
+      # - KAFKA_ADVERTISED_LISTENERS=LISTENER_DOCKER_INTERNAL://kafka:19092,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092
+      # - KAFKA_BROKER_ID=1
+      # - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092
+      # - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT
+      # - KAFKA_CFG_LISTENERS=CLIENT://:9092
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      # - KAFKA_ZOOKEEPER_CONNECT="zookeeper:2181"
+      # - KAFKA_INTER_BROKER_LISTENER_NAME=CLIENT
+      # - KAFKA_INTER_BROKER_LISTENER_NAME=LISTENER_DOCKER_INTERNAL
+      # - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT
+      # - KAFKA_LOG4J_LOGGERS="kafka.controller=TRACE,kafka.producer.async.DefaultEventHandler=TRACE,state.change.logger=TRACE"
+      - KAFKA_OPTS=-Dlog4j.rootLogger=DEBUG
+      - KAFKA_LOG4J_ROOT_LOGLEVEL=TRACE
+      - KAFKA_TOOLS_LOG4J_LOGLEVEL=TRACE
+      # - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
     networks:
       - amera-net
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "1"
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 192M
+    # logging:
+    #   options:
+    #     max-size: "10m"
+    #     max-file: "1"
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 512M
+    #     reservations:
+    #       memory: 192M
+    depends_on:
+      zookeeper:
+        condition: service_healthy
     healthcheck:
       test:
         ["CMD", "kafka-topics.sh", "--list", "--zookeeper", "zookeeper:2181"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
+      interval: "30s"
+      timeout: "10s"
+      retries: 1000
+
 
 volumes:
   web-nginx-cache:

@@ -1,3 +1,4 @@
+from app.exceptions.member import EmailDuplicateDataError, UsernameDuplicateDataError
 from app.util.security import SECURITY_EXCHANGE_OPTIONS
 import app.util.json as json
 import logging
@@ -9,7 +10,7 @@ from app.util.config import settings
 from app.util.filestorage import amerize_url
 from app.da.location import LocationDA
 
-from app.exceptions.data import DataMissingError, RelationshipReferenceError
+from app.exceptions.data import DataMissingError, DuplicateKeyError, RelationshipReferenceError
 # from app.exceptions.member import ForgotDuplicateDataError
 
 
@@ -145,7 +146,7 @@ class MemberDA(object):
                 sort_params, members_dict) or sort_columns_string
 
         where_clause = ""
-        if search_key != "" and len(search_key) > 0:
+        if search_key and search_key != "" and len(search_key) > 0:
             where_clause = """
             (
                 email LIKE %s
@@ -195,7 +196,7 @@ class MemberDA(object):
 
         like_search_key = """%{}%""".format(search_key)
         params = ()
-        if search_key != "" and len(search_key) > 0:
+        if search_key and search_key != "" and len(search_key) > 0:
             params = (like_search_key, like_search_key,
                       like_search_key, like_search_key)
         if not all_members:
@@ -975,12 +976,98 @@ class MemberDA(object):
 
         return members
 
+    @classmethod
+    def email_exists(cls, value):
+        query = f"""
+            SELECT
+                COUNT(*)
+            FROM member
+            WHERE member.email = %s
+        """
+
+        params = (value,)
+        cls.source.execute(query, params)
+
+        count = 0
+        if cls.source.has_results():
+            (count,) = cls.source.cursor.fetchone()
+        if count == 0:
+            return False
+        raise EmailDuplicateDataError
+
+    @classmethod
+    def username_exists(cls, value):
+        query = f"""
+            SELECT
+                COUNT(*)
+            FROM member
+            WHERE member.username = %s
+        """
+
+        params = (value,)
+        cls.source.execute(query, params)
+
+        count = 0
+        if cls.source.has_results():
+            (count,) = cls.source.cursor.fetchone()
+        if count == 0:
+            return False
+        raise UsernameDuplicateDataError
 
 class MemberContactDA(object):
     source = source
 
     @classmethod
     def get_member_contacts(cls, member_id, sort_params, filter_params, search_key='', page_size=None, page_number=None):
+        filters = dict(parse.parse_qs(filter_params))
+        logger.debug('Filters:')
+        logger.debug(filters)
+
+        # if (name === "company") {
+        #   setCompanyFilter(value);
+        #   filterByItems = {
+        #     'company': value.company_name,
+        #     'company_id': value.company_id,
+        #     'company_profile': value.company_profile
+        #   };
+        # } else if (name === "country_code_id") {
+        #   setCountryFilter(value);
+        #   filterByItems = {
+        #     'country_code_id': value.country_code_id,
+        #     'location_country': value.location_country
+        #   };
+        # } else if (name === "role") {
+        #   setRoleFilter(value);
+        #   filterByItems = {
+        #     'role': value.name
+        #   };
+        # }
+
+        company_filter_column = 'member.company_name'
+        if filters.get('company_profile', ['false'])[0] == 'true': 
+            company_filter_column = 'company.id'
+            filters['company'] = int(filters['company_id'][0])
+        elif filters.get('company'):
+            filters['company'] = str(filters['company'][0])
+
+        if filters.get('location_country', ['false'])[0] == 'true':
+            country_filter_column = 'location.country_code_id'
+        else:
+            country_filter_column = 'member_location.country_code_id'
+
+        if filters.get('country_code_id'):
+            filters['country_code_id'] = int(filters['country_code_id'][0])
+
+        if filters.get('role'):
+            filters['role'] = str(filters['role'][0])
+
+        filters.pop('company_id', None)
+        filters.pop('company_profile', None)
+        filters.pop('location_country', None)
+
+        filter_params = parse.urlencode(filters)
+        logger.debug('Filter Params')
+        logger.debug(filter_params)
         sort_columns_string = 'first_name ASC'
         contact_dict = {
             'id': 'contact.id',
@@ -994,10 +1081,11 @@ class MemberContactDA(object):
             # 'home_phone': 'contact.home_phone',
             # 'email': 'contact.email',
             # 'personal_email': 'contact.personal_email',
-            'company': 'member.company_name',
+            'company': company_filter_column,
             'title': 'job_title.name',
-            'country_code_id': 'location.country_code_id',
-            'company_name': 'member.company_name',
+            'country_code_id': country_filter_column,
+            'company_name': 'COALESCE(member_company_name, member.company_name)',
+            'company_id': 'company',
             # 'company_phone': 'contact.company_phone',
             # 'company_web_site': 'contact.company_web_site',
             # 'company_email': 'contact.company_email',
@@ -1014,6 +1102,7 @@ class MemberContactDA(object):
         if sort_params:
             sort_columns_string = formatSortingParams(
                 sort_params, contact_dict) or sort_columns_string
+
 
         (filter_conditions_query, filter_conditions_params) = cls.formatFilterConditions(
             filter_params, contact_dict)
@@ -1060,7 +1149,7 @@ class MemberContactDA(object):
                 LEFT JOIN member_certificate ON member_certificate.member_id = member.id
             WHERE
                 contact.member_id = %s {filter_conditions_query}
-                {get_contacts_search_query if search_key != "" else ''}
+                {get_contacts_search_query if search_key and search_key != "" else ''}
             GROUP BY
                 member.id,
                 contact.id,
@@ -1084,7 +1173,7 @@ class MemberContactDA(object):
                 online_sessions.online_status
             """)
 
-        if search_key != '':
+        if search_key and search_key != "":
             like_search_key = """%{}%""".format(search_key.lower())
             get_contacts_params = get_contacts_params + \
                 tuple(11 * [like_search_key])
@@ -1132,7 +1221,7 @@ class MemberContactDA(object):
                 (
                     SELECT row_to_json(row) AS company_membership
                     FROM (
-                        SELECT 
+                        SELECT
                             company.id,
                             company.parent_company_id,
                             company.name,
@@ -1156,7 +1245,7 @@ class MemberContactDA(object):
                             location.map_vendor,
                             location.map_link,
                             location.place_id,
-                            location.name,
+                            location.name AS location_name,
                             ls.company_role,
                             ls.company_department_id,
                             ls.department_name,
@@ -1194,7 +1283,7 @@ class MemberContactDA(object):
                 (
                     SELECT COALESCE(json_agg(rows), '[]'::json) AS location_information
                     FROM (
-                        SELECT 
+                        SELECT
                             member_location.id,
                             member_location.location_type,
                             member_location.description,
@@ -1418,19 +1507,24 @@ class MemberContactDA(object):
         companies = list()
         query = (f"""
             SELECT
-                member.company_name,
+                COALESCE(company.name, member.company_name) as company_name,
+                company.id,
+                (company.id IS NOT NULL) as company_profile,
                 count(*)
             FROM
                 member
                 INNER JOIN contact ON member.id = contact.contact_member_id
+                LEFT OUTER JOIN company_member ON company_member.member_id = member.id
+                LEFT OUTER JOIN company ON company_member.company_id = company.id
             WHERE
                 contact.member_id = %s
-                AND member.company_name IS NOT NULL
-                AND trim(member.company_name) != ''
+                AND 
+                (member.company_name IS NOT NULL OR company.name IS NOT NULL)
             GROUP BY
-                member.company_name
+                COALESCE(company.name, member.company_name),
+                company.id
             ORDER BY
-                member.company_name
+                company_name
         """)
 
         params = (member_id, )
@@ -1438,11 +1532,15 @@ class MemberContactDA(object):
         if cls.source.has_results:
             for (
                 company_name,
-                count
+                company_id,
+                company_profile,
+                count,
             ) in cls.source.cursor:
                 company = {
                     "company_name": company_name,
-                    "count": count
+                    "count": count,
+                    "company_profile": company_profile,
+                    "company_id": company_id
                 }
                 companies.append(company)
 
@@ -1453,21 +1551,26 @@ class MemberContactDA(object):
         countries = list()
         query = (f"""
             SELECT
-                country_code.id as id,
-                country_code.name as name,
+                COALESCE(location_country.id, member_country.id) as id,
+                COALESCE(location_country.name, member_country.name) as name,
+                (location_country.name IS NOT NULL) as location_country,
                 count(*) as count
             FROM
                 contact
                 INNER JOIN member_location ON (contact.contact_member_id = member_location.member_id)
-                INNER JOIN location ON member_location.location_id = location.id
-                INNER JOIN country_code ON (location.country_code_id = country_code.id)
+                LEFT OUTER JOIN location ON member_location.location_id = location.id
+                LEFT OUTER JOIN country_code AS location_country ON (location.country_code_id = location_country.id)
+                LEFT OUTER JOIN country_code AS member_country ON (member_location.country_code_id = member_country.id)
             WHERE
                 contact.member_id = %s
+                AND
+                COALESCE(location_country.name, member_country.name) IS NOT NULL
             GROUP BY
-                country_code.id,
-                country_code.name
+                COALESCE(location_country.id, member_country.id),
+                COALESCE(location_country.name, member_country.name),
+                (location_country.name IS NOT NULL)
             ORDER BY
-                country_code.name
+                name
         """)
         params = (member_id, )
         cls.source.execute(query, params)
@@ -1475,12 +1578,14 @@ class MemberContactDA(object):
             for (
                 id,
                 name,
-                total
+                location_country,
+                count
             ) in cls.source.cursor:
                 country = {
                     "id": id,
                     "name": name,
-                    "total": total
+                    "location_country": location_country,
+                    "count": count
                 }
                 countries.append(country)
         return countries
@@ -1510,7 +1615,7 @@ class MemberContactDA(object):
         # + filter_conditions_params
 
         get_members_search_query = ""
-        if search_key:
+        if search_key and search_key != '':
             get_members_search_query = """
                 AND
                 (
@@ -1539,7 +1644,7 @@ class MemberContactDA(object):
                     (
                         SELECT row_to_json(row) AS company_membership
                         FROM (
-                            SELECT 
+                            SELECT
                                 company.*,
                                 ls.company_role,
                                 ls.company_department_id,
@@ -1574,8 +1679,8 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN job_title ON member.job_title_id = job_title.id
                 LEFT OUTER JOIN member_profile ON member.id = member_profile.member_id
                 LEFT OUTER JOIN file_storage_engine ON member_profile.profile_picture_storage_id = file_storage_engine.id
-                WHERE 
-                    member.id <> %s 
+                WHERE
+                    member.id <> %s
                     AND contact.contact_member_id IS NULL
                     {get_members_search_query}
                 ORDER BY {sort_columns_string}
@@ -1997,7 +2102,7 @@ class MemberContactDA(object):
                     COALESCE(json_agg(DISTINCT country_code.*) FILTER (WHERE country_code.id IS NOT NULL), '[]') AS country_code,
                     COALESCE(json_agg(DISTINCT member_achievement.*) FILTER (WHERE member_achievement.id IS NOT NULL), '[]') AS achievement_information,
                     COALESCE(json_agg(DISTINCT profile_skill.*) FILTER (WHERE profile_skill.display_status = TRUE), '[]') AS skills_information,
-                    COALESCE(json_agg(DISTINCT member_workhistory.*), '[]') AS workhistory_information, 
+                    COALESCE(json_agg(DISTINCT member_workhistory.*), '[]') AS workhistory_information,
                     COALESCE(json_agg(DISTINCT member_education.*), '[]') AS education_information,
                     COALESCE(json_agg(DISTINCT member_certificate.*), '[]') AS certificate_information,
                     member_profile.biography as biography,
@@ -2018,7 +2123,7 @@ class MemberContactDA(object):
                 LEFT OUTER JOIN country_code ON country_code.id = member_contact_2.device_country
                 LEFT OUTER JOIN member_location ON member_location.member_id = member.id
                 LEFT OUTER JOIN member_achievement ON member_achievement.member_id = member.id
-                LEFT OUTER JOIN member_security_preferences ON member_security_preferences.member_id = member.id 
+                LEFT OUTER JOIN member_security_preferences ON member_security_preferences.member_id = member.id
                 LEFT JOIN member_rate ON member_rate.member_id = member.id
                 LEFT JOIN member_skill ON member_skill.member_id = member.id
                 LEFT JOIN profile_skill ON profile_skill.id = member_skill.profile_skill_id
@@ -2029,7 +2134,7 @@ class MemberContactDA(object):
                 LEFT JOIN currency_code ON currency_code.id = member_rate.currency_code_id
                 LEFT JOIN company_member ON company_member.member_id = member.id
                 LEFT JOIN company ON company_member.company_id=company.id
-                WHERE 
+                WHERE
                     receiver_contact.member_id = %s
                     {pending}
                 GROUP BY
@@ -2159,7 +2264,7 @@ class MemberInfoDA(object):
                 (
                     SELECT row_to_json(row) AS company_membership
                     FROM (
-                        SELECT 
+                        SELECT
                             company.name AS company_name,
                             company_member.company_id,
                             ls.company_role,
@@ -2199,7 +2304,7 @@ class MemberInfoDA(object):
                 (
                     SELECT COALESCE(json_agg(rows), '[]'::json) AS location_information
                     FROM (
-                        SELECT 
+                        SELECT
                             member_location.id,
                             member_location.location_type,
                             member_location.description,
@@ -2506,19 +2611,18 @@ class MemberInfoDA(object):
             cls.source.commit()
 
     @classmethod
-    def delete_member_location(cls, member_id, location_ids_to_stay, commit=True):
+    def delete_member_location(cls, member_id, location_id, commit=True):
         query = ("""
             DELETE FROM member_location
-            WHERE member_id = %s AND NOT id = ANY(%s);
+            WHERE member_id = %s AND id = %s;
         """)
-        cls.source.execute(query, (member_id, location_ids_to_stay))
+        cls.source.execute(query, (member_id, location_id))
         if commit:
             cls.source.commit()
 
     @classmethod
     def handle_member_locations(cls, member_locations, member_id, commit=True):
         if member_locations:
-            location_ids_to_stay = list()
             for member_location in member_locations:
                 logger.info(f"item {member_location}")
                 if member_location:
@@ -2565,14 +2669,11 @@ class MemberInfoDA(object):
                             "member_id": member_id,
                             "description": description
                         })
-                        location_ids_to_stay.append(id_)
                     else:
                         logger.info(f"Will insert member_location {id_}")
                         inserted = cls.create_member_location(
                             location_type=location_type, member_id=member_id, location_id=location_id, description=description)
-                        location_ids_to_stay.append(inserted)
-            # Track what was deleted in the UI and kill it in db as well
-            cls.delete_member_location(member_id, location_ids_to_stay)
+                        return inserted
         return True
 
     @classmethod
@@ -2765,7 +2866,7 @@ class MemberSettingDA(object):
                 (
                     SELECT COALESCE(json_agg(rows), '[]'::json) AS location_information
                     FROM (
-                        SELECT 
+                        SELECT
                             member_location.id,
                             member_location.location_type,
                             member_location.description,
@@ -2785,7 +2886,7 @@ class MemberSettingDA(object):
                             location.longitude,
                             location.map_vendor,
                             location.map_link,
-                            location.place_id
+                            location.place_id,
                             location.raw_response
                         FROM member_location
                         LEFT JOIN location ON location.id = member_location.location_id
@@ -2918,6 +3019,22 @@ class MemberSettingDA(object):
         except Exception as e:
             logger.debug("iss+++++xx {}".format(e))
             pass
+
+    @classmethod
+    def update_username(cls, member_id, username):
+
+        try:
+            query = ("""
+                UPDATE member
+                SET
+                    username = %s
+                WHERE id = %s;
+            """)
+            cls.source.execute(query, (username, member_id))
+            cls.source.commit()
+
+        except DuplicateKeyError:
+            raise UsernameDuplicateDataError
 
 
 class MemberNotificationsSettingDA(object):

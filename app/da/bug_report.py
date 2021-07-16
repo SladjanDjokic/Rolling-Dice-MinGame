@@ -8,7 +8,7 @@ class BugReportDA(object):
     source = source
 
     @classmethod
-    def create(cls, member_id, description, redux_state, member_file_id,
+    def create(cls, member_id, description, redux_state, storage_id,
                browser_info, referer_url, current_url, commit=True):
 
         query = ("""
@@ -21,7 +21,7 @@ class BugReportDA(object):
         """)
 
         params = (
-            member_id, description, redux_state, member_file_id, browser_info,
+            member_id, description, redux_state, storage_id, browser_info,
             referer_url, current_url
         )
         try:
@@ -97,8 +97,7 @@ class BugReportDA(object):
                 FROM
                     bug_report
                 LEFT OUTER JOIN member ON member.id = bug_report.member_id
-                LEFT OUTER JOIN member_file ON member_file.id = bug_report.screenshot_storage_id
-                LEFT OUTER JOIN file_storage_engine ON file_storage_engine.id = member_file.file_id
+                LEFT OUTER JOIN file_storage_engine ON file_storage_engine.id = bug_report.screenshot_storage_id
                 WHERE
                     {query_conditions}
                 ORDER BY {sort_columns_string}
@@ -208,6 +207,6 @@ class BugReportDA(object):
                     }
                     users.append(user)
             return users
-        except:
+        except Exception as e:
             logger.debug(e, exc_info=True)
             return None

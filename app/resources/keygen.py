@@ -1,13 +1,21 @@
+import os
 import uuid
 import pathlib
-import app.util.json as json
+from urllib.parse import urlparse
+from io import StringIO
+import sys
+import logging
+
 from imsecure.image_secure import ImageSecure
 from imsecure.entropy import eta
 from imsecure.biastests import check_odd_bias, check_odd_even_run, check_repeats, distro, save_to_bin
+import app.util.json as json
+from app.da.file_sharing import FileStorageDA
+from app.util.filestorage import s3fy_filekey
+from app.exceptions.file_sharing import FileNotFound
+from app.exceptions.keygen import IMSecureError
 
-
-from io import StringIO
-import sys
+logger = logging.getLogger(__name__)
 
 from app import settings
 
@@ -32,7 +40,7 @@ def get_image_info(image_file, pin="000000", factor="", keysize=256, mode="lowxo
 
     secure = ImageSecure(image_file, pin, factor, keysize=keysize,
                          mode=mode, compress=compress, ncount=ncount,
-                         ratio=ratio, verbose=verbose, demo=demo)
+                         ratio=ratio, verbose=verbose)
     #secure.test_incr()
     keys = ['color_count', 'color_per_row', 'color_ratio', 'colorsize', 'columns', 
             'pixelsize', 'rotateby', 'rows', 'size', 'pixelsize', 
@@ -44,14 +52,14 @@ def get_image_info(image_file, pin="000000", factor="", keysize=256, mode="lowxo
 
 
 def call_key_gen(image_file, pin="000000", factor="", keysize=256, mode="lowxor",
-                 ratio=1000, compress=False, ncount=1, verbose=1, demo=False):
+                 ratio=1000, compress=False, ncount=1, verbose=1, frombytes=False, imagedata=None):
     
     print("Mode: {}".format(mode))
     print("Pin: {}".format(pin))
 
     secure = ImageSecure(image_file, pin, factor, keysize=keysize,
         mode=mode, compress=compress, ncount=ncount,
-        ratio=ratio, verbose=verbose, demo=demo)
+        ratio=ratio, verbose=verbose, frombytes=frombytes, imagedata=imagedata)
 
     with Capturing() as output:
         #secure.test_incr()
@@ -68,6 +76,11 @@ def call_key_gen(image_file, pin="000000", factor="", keysize=256, mode="lowxor"
     saved = pathlib.Path(saved)
 
     return output, key, saved, entropy, secure
+    
+    # key = secure.harvest()
+    # keydata = f'{bytes(key).hex()}'  #result is bytes, want a hex string
+    # return keydata
+    
 
 
 class KeyGenFileUpload(object):
@@ -130,13 +143,16 @@ class KeyGenFileUpload(object):
 class KeyGenResource(object):
 
     def __init__(self):
-        self.kafka_data = {"POST": {"event_type": settings.get('kafka.event_types.post.keygen_resource_crud'),
-                                    "topic": settings.get('kafka.topics.keygen')
-                                    },
-                           "GET": {"event_type": settings.get('kafka.event_types.get.keygen_resource_crud'),
-                                   "topic": settings.get('kafka.topics.keygen')
-                                   },
-                           }
+        self.kafka_data = {
+            "POST": {
+                "event_type": settings.get('kafka.event_types.post.keygen_resource_crud'),
+                "topic": settings.get('kafka.topics.keygen')
+            },
+            "GET": {
+                "event_type": settings.get('kafka.event_types.get.keygen_resource_crud'),
+                "topic": settings.get('kafka.topics.keygen')
+            },
+        }
 
     auth = {
         'exempt_methods': ['POST']
@@ -180,3 +196,92 @@ class KeyGenResource(object):
         file = pathlib.Path('/tmp/{}'.format(file))
         binary = file.read_bytes()
         resp.body = binary
+
+    def on_post_file(self, req, resp):
+        image = req.get_param('image', required=True)
+        pin = req.get_param('pin', required=True)
+        factor = req.get_param('factor', default='0')
+        keysize = req.get_param_as_int('keysize', default=256)
+        ncount = req.get_param_as_int('ncount', default=4)
+        ratio = req.get_param_as_int('ratio', default=30)
+
+        try:
+            keysize=int(keysize)
+        except:
+            keysize=256
+
+        # Read image as binary
+        raw = image.file.read()
+        # Retrieve filename
+        filename = image.filename
+
+        temp = uuid.uuid4().hex
+        filename = '/tmp/{}-{}'.format(temp, filename)
+
+        image_file = pathlib.Path(filename)
+        image_file.write_bytes(raw)
+
+        try:
+
+            output, key, saved, entropy, secure = call_key_gen(
+                image_file=image_file,
+                pin=pin,
+                factor=factor,
+                keysize=keysize,
+                ncount=ncount,
+                ratio=ratio)
+
+            resp.body = json.dumps({
+                "filename": image_file.name,
+                "output": output,
+                "key": key,
+                "saved": saved.name,
+                "entropy": entropy
+            })
+        except Exception as e:
+            raise IMSecureError
+
+    def on_post_storage(self, req, resp):
+        storage_id = req.get_param('storage_id', required=True)
+        pin = req.get_param('pin', required=True)
+        factor = req.get_param('factor', default='0')
+        keysize = req.get_param_as_int('keysize', default=256)
+        ncount = req.get_param_as_int('ncount', default=4)
+        ratio = req.get_param_as_int('ratio', default=30)
+
+        try:
+            keysize=int(keysize)
+        except:
+            keysize=256
+
+        file_info = FileStorageDA.get_file_storage_by_storage_id(storage_id)
+        if not file_info:
+            raise FileNotFound()
+        
+        item_path = urlparse(file_info['file_location']).path
+        item_key = s3fy_filekey(item_path)
+        s3resp = FileStorageDA.stream_s3_file(item_key)
+
+        try:
+
+            output, key, saved, entropy, secure = call_key_gen(
+                image_file="",
+                pin=pin,
+                factor=factor,
+                keysize=keysize,
+                ncount=ncount,
+                ratio=ratio,
+                frombytes=True,
+                imagedata=s3resp['Body'].read()
+            )
+
+            resp.body = json.dumps({
+                "filename": pathlib.Path(item_path).name,
+                "output": output,
+                "key": key,
+                "saved": saved.name,
+                "entropy": entropy
+            })
+
+        except Exception as e:
+            raise IMSecureError

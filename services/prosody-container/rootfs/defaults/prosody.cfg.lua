@@ -32,6 +32,8 @@ admins = { }
 -- It looks for mod_modulename.lua in the plugins folder, so make sure that exists too.
 -- Documentation on modules can be found at: http://prosody.im/doc/modules
 modules_enabled = {
+	-- Archieve Messages in-memory by default
+	"mam",
 
 	-- Generally required
 		"roster"; -- Allow users to have a roster. Recommended ;)

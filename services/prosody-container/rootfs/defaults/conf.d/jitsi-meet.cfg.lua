@@ -5,6 +5,7 @@ admins = {
 
 plugin_paths = { "/prosody-plugins/", "/prosody-plugins-custom" }
 http_default_host = "{{ .Env.XMPP_DOMAIN }}"
+muc_mapper_domain_base = "{{ .Env.XMPP_DOMAIN }}"
 
 {{ $ENABLE_AUTH := .Env.ENABLE_AUTH | default "0" | toBool }}
 {{ $ENABLE_GUEST_DOMAIN := and $ENABLE_AUTH (.Env.ENABLE_GUESTS | default "0" | toBool)}}
@@ -47,34 +48,7 @@ VirtualHost "{{ .Env.XMPP_DOMAIN }}"
     authentication = "http_auth_cookie"
     http_auth_url = "http://amera-web-api:5000/valid-session/xmpp"
     http_cookie_auth_url = "http://amera-web-api:5000/valid-session/xmpp"
--- {{ if $ENABLE_AUTH }}
---   {{ if eq $AUTH_TYPE "jwt" }}
---     authentication = "{{ $JWT_AUTH_TYPE }}"
---     app_id = "{{ .Env.JWT_APP_ID }}"
---     app_secret = "{{ .Env.JWT_APP_SECRET }}"
---     allow_empty_token = {{ if $JWT_ALLOW_EMPTY }}true{{ else }}false{{ end }}
---     {{ if $JWT_ASAP_KEYSERVER }}
---     asap_key_server = "{{ .Env.JWT_ASAP_KEYSERVER }}"
---     {{ end }}
 
---     {{ else if eq $AUTH_TYPE "ldap" }}
---     authentication = "cyrus"
---     cyrus_application_name = "xmpp"
---     allow_unencrypted_plain_auth = true
---   {{ else if eq $AUTH_TYPE "internal" }}
---     authentication = "internal_hashed"
---   {{ end }}
--- {{ else }}
---     -- https://github.com/jitsi/docker-jitsi-meet/pull/502#issuecomment-619146339
---     {{ if $ENABLE_XMPP_WEBSOCKET }}
---     authentication = "token"
---     {{ else }}
---     authentication = "anonymous"
---     {{ end }}
---     app_id = ""
---     app_secret = ""
---     allow_empty_token = true
--- {{ end }}
     ssl = {
         key = "/config/certs/{{ .Env.XMPP_DOMAIN }}.key";
         certificate = "/config/certs/{{ .Env.XMPP_DOMAIN }}.crt";
@@ -96,9 +70,6 @@ VirtualHost "{{ .Env.XMPP_DOMAIN }}"
         {{ if .Env.XMPP_MODULES }}
         "{{ join "\";\n\"" (splitList "," .Env.XMPP_MODULES) }}";
         {{ end }}
-        {{ if and $ENABLE_AUTH (eq $AUTH_TYPE "ldap") }}
-        "auth_cyrus";
-        {{end}}
     }
 
     {{ if $ENABLE_LOBBY }}

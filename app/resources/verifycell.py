@@ -66,7 +66,7 @@ class VerifyCell(object):
                 req,
                 f"{callback_uri}/{twilio_verify_id}"
             )
-            callback_url = f"https://735bfeb10348.ngrok.io/api/twilio/outgoing-caller/{twilio_verify_id}"
+            # callback_url = f"https://735bfeb10348.ngrok.io/api/twilio/outgoing-caller/{twilio_verify_id}"
             logger.debug(f"code generation callback: {callback_url}")
             validation_request = VerificationDA.add_outgoing_caller(member_id, username, contact_id, phone_number, callback_url)
             
@@ -96,7 +96,7 @@ class VerifyCell(object):
                 "/api/web-notifications/notify"
             )
 
-            notification_url = f"https://735bfeb10348.ngrok.io/api/web-notifications/notify"
+            # notification_url = f"https://735bfeb10348.ngrok.io/api/web-notifications/notify"
             cookies = {'member_session': verification['session_id']}
 
             headers = {

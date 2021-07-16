@@ -436,6 +436,49 @@ class FileStorageDA(object):
         return result
 
     @classmethod
+    def get_file_storage_by_storage_id(cls, storage_id):
+        query = ("""
+            SELECT
+                file_storage_engine.id as file_id,
+                file_storage_engine.storage_engine_id as file_location,
+                file_storage_engine.storage_engine as storage_engine,
+                file_storage_engine.status as status,
+                file_storage_engine.create_date as created_date,
+                file_storage_engine.update_date as updated_date,
+                file_storage_engine.mime_type as mime_type,
+                file_storage_engine.file_size_bytes as file_size_bytes
+            FROM file_storage_engine
+            WHERE file_storage_engine.id = %s
+        """)
+        params = (storage_id,)
+        cls.source.execute(query, params)
+
+        result = None
+        if cls.source.has_results():
+            (
+                file_id,
+                file_location,
+                storage_engine,
+                status,
+                created_date,
+                updated_date,
+                mime_type,
+                file_size_bytes
+            ) = cls.source.cursor.fetchone()
+            result = {
+                "file_id": file_id,
+                "file_location": file_location,
+                "storage_engine": storage_engine,
+                "status": status,
+                "created_date": created_date,
+                "updated_date": updated_date,
+                "mime_type": mime_type,
+                "file_size_bytes": file_size_bytes
+            }
+        
+        return result
+
+    @classmethod
     def get_file_detail_by_storage_engine_id(cls, member, storage_engine_id):
         query = ("""
             SELECT

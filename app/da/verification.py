@@ -215,7 +215,7 @@ class VerificationDA(object):
             query = ("""
                 UPDATE member_contact_2
                 SET
-                    outgoing_caller_verification = %s
+                    outgoing_caller_verified = %s
                 WHERE id = %s;
             """)
             
